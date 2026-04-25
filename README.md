@@ -1,0 +1,14 @@
+# u_nite_software
+
+Integrantes:
+
+- Alejandra Oporto C.I
+- Diego De Jesus C.I
+- Jabrieliz Cuello C.I: 31.979.214
+- Luis Arcia C.I: 30.124.773
+- Santiago Atacho C.I:
+- Sofia Machado C.I:
+
+Link de github: https://github.com/Pepillo06/U-Nite_Software.git
+
+Proyecto de la materia "Ingeniería de Software" para el periodo académico 2026-02
