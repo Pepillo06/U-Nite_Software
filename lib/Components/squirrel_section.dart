@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import '../theme.dart';
 
 class SquirrelSection extends StatefulWidget {
@@ -17,12 +18,12 @@ class _SquirrelSectionState extends State<SquirrelSection>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat(reverse: true);
     _animation = Tween<double>(
       begin: 0,
-      end: -15,
+      end: -20,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
@@ -36,31 +37,48 @@ class _SquirrelSectionState extends State<SquirrelSection>
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 30),
+      padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 30),
       color: Colors.white,
       child: Column(
         children: [
           AnimatedBuilder(
             animation: _animation,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(0, _animation.value),
-                child: child,
-              );
-            },
-            child: Image.network(
-              "https://api.dicebear.com/7.x/bottts/svg?seed=squirrel&backgroundColor=ff6b00",
-              height: 180,
+            builder: (context, child) => Transform.translate(
+              offset: Offset(0, _animation.value),
+              child: child,
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(25),
+              decoration: BoxDecoration(
+                color: AppColors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Image.network(
+                "https://api.dicebear.com/7.x/bottts/svg?seed=Uni&backgroundColor=ff6b00&radius=20",
+                height: 180,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const SizedBox(
+                    height: 180,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                },
+                errorBuilder: (context, error, stack) => const Icon(
+                  LucideIcons.bot,
+                  size: 100,
+                  color: AppColors.orange,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 30),
+          const SizedBox(height: 40),
           const Text(
             "Tu carrera, optimizada por Inteligencia Colectiva",
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 26,
+              fontSize: 30,
               fontWeight: FontWeight.w900,
-              height: 1.2,
+              height: 1.1,
             ),
           ),
           const SizedBox(height: 15),
@@ -68,7 +86,7 @@ class _SquirrelSectionState extends State<SquirrelSection>
             "Uni te ayudará a encontrar lo que necesitas, desde el libro de cálculo hasta el equipo de estudio ideal.",
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 17,
               color: Colors.grey,
               fontWeight: FontWeight.w500,
             ),

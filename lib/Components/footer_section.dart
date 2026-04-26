@@ -9,11 +9,10 @@ class FooterSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // --- BANNER NARANJA (Newsletter/CTA) ---
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
-          decoration: const BoxDecoration(color: AppColors.orange),
+          color: AppColors.orange,
           child: Column(
             children: [
               const Text(
@@ -21,12 +20,12 @@ class FooterSection extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 28,
+                  fontSize: 26,
                   fontWeight: FontWeight.w900,
                   fontStyle: FontStyle.italic,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 15),
               const Text(
                 "Únete a miles de estudiantes que ya están optimizando su vida universitaria.",
                 textAlign: TextAlign.center,
@@ -36,19 +35,16 @@ class FooterSection extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 30),
               DuoButton(
                 text: "¡Registrarme ahora!",
                 color: Colors.white,
-                shadowColor: Colors.black12,
+                shadowColor: const Color(0xFFE0E0E0),
                 onPressed: () {},
-                // Modificamos el color del texto para este botón específico
               ),
             ],
           ),
         ),
-
-        // --- FOOTER DETALLADO ---
         Container(
           color: Colors.white,
           padding: const EdgeInsets.all(40),
@@ -56,44 +52,33 @@ class FooterSection extends StatelessWidget {
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _socialIcon(LucideIcons.instagram),
-                  _socialIcon(LucideIcons.twitter),
-                  _socialIcon(LucideIcons.github),
-                  _socialIcon(LucideIcons.mail),
+                children: const [
+                  Icon(LucideIcons.instagram, color: Colors.grey),
+                  SizedBox(width: 20),
+                  Icon(LucideIcons.twitter, color: Colors.grey),
+                  SizedBox(width: 20),
+                  Icon(LucideIcons.github, color: Colors.grey),
                 ],
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
               const Divider(),
               const SizedBox(height: 20),
               const Text(
                 "U-NITE PROJECT",
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
                   color: AppColors.green,
+                  letterSpacing: 2,
                 ),
               ),
-              const SizedBox(height: 10),
               const Text(
                 "© 2026 Hecho con ❤️ para estudiantes.",
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _socialIcon(IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Icon(icon, color: Colors.grey, size: 24),
     );
   }
 }

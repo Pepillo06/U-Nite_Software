@@ -9,7 +9,6 @@ class AppColors {
   static const white = Colors.white;
 }
 
-// Widget personalizado para el botón tipo Duolingo
 class DuoButton extends StatefulWidget {
   final String text;
   final Color color;
@@ -58,7 +57,10 @@ class _DuoButtonState extends State<DuoButton> {
           widget.text.toUpperCase(),
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white,
+            // Texto naranja si el botón es blanco, blanco si el botón tiene color
+            color: widget.color == Colors.white
+                ? AppColors.orange
+                : Colors.white,
             fontWeight: FontWeight.w900,
             fontSize: widget.fontSize,
             letterSpacing: 1.2,
