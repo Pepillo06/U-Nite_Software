@@ -3,7 +3,7 @@
 Integrantes:
 
 - Alejandra Oporto C.I
-- Diego De Jesus C.I
+- Diego De Jesus C.I: 29.741.760
 - Jabrieliz Cuello C.I: 31.979.214
 - Luis Arcia C.I: 30.124.773
 - Santiago Atacho C.I:
