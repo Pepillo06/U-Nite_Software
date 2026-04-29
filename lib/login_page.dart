@@ -1,6 +1,7 @@
 import 'dart:ui'; // Necesario para ImageFilter.blur
 
 import 'package:flutter/material.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -236,21 +237,29 @@ class _LoginPageState extends State<LoginPage> {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20.0),
                           child: Center(
-                            child: RichText(
-                              text: const TextSpan(
-                                text: "¿No tienes cuenta? ",
-                                // Ahora el color base es gris porque el fondo es blanco.
-                                style: TextStyle(color: Colors.black54, fontSize: 14),
-                                children: <TextSpan>[
-                                  TextSpan(
-                                    text: 'Registro',
-                                    style: TextStyle(
-                                      color: myOrange,
-                                      fontWeight: FontWeight.bold,
-                                      decoration: TextDecoration.underline,
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const RegisterPage()),
+                                );
+                              },
+                              child: RichText(
+                                text: const TextSpan(
+                                  text: "¿No tienes cuenta? ",
+                                  // Ahora el color base es gris porque el fondo es blanco.
+                                  style: TextStyle(color: Colors.black54, fontSize: 14),
+                                  children: <TextSpan>[
+                                    TextSpan(
+                                      text: 'Registro',
+                                      style: TextStyle(
+                                        color: myOrange,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme.dart';
 import '../login_page.dart';
+import '../register_page.dart';
 
 class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
   const HeaderUnite({super.key});
@@ -70,7 +71,10 @@ class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
             Align(
               alignment: Alignment.center,
               child: isMobile
-                  ? _buildAccessRow(context, isMobile) // EN MÓVIL: ACCESO AL CENTRO
+                  ? _buildAccessRow(
+                      context,
+                      isMobile,
+                    ) // EN MÓVIL: ACCESO AL CENTRO
                   : _buildNavRow(), // EN WEB: MÓDULOS AL CENTRO
             ),
 
@@ -102,7 +106,8 @@ class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
   }
 
   // Fila de Acceso (Login y Registro)
-  Widget _buildAccessRow(BuildContext context, bool isMobile) { // Agregamos BuildContext aquí
+  Widget _buildAccessRow(BuildContext context, bool isMobile) {
+    // Agregamos BuildContext aquí
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -132,7 +137,12 @@ class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
             text: "Registro",
             color: AppColors.green,
             shadowColor: AppColors.greenDark,
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RegisterPage()),
+              );
+            },
             fontSize: 11,
           ),
         ),
