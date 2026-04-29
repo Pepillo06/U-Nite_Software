@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../theme.dart';
+import '../login_page.dart';
 
 class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
   const HeaderUnite({super.key});
@@ -69,7 +70,7 @@ class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
             Align(
               alignment: Alignment.center,
               child: isMobile
-                  ? _buildAccessRow(isMobile) // EN MÓVIL: ACCESO AL CENTRO
+                  ? _buildAccessRow(context, isMobile) // EN MÓVIL: ACCESO AL CENTRO
                   : _buildNavRow(), // EN WEB: MÓDULOS AL CENTRO
             ),
 
@@ -79,7 +80,7 @@ class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
                 alignment: Alignment.centerRight,
                 child: Padding(
                   padding: const EdgeInsets.only(right: 16),
-                  child: _buildAccessRow(isMobile),
+                  child: _buildAccessRow(context, isMobile),
                 ),
               ),
           ],
@@ -101,12 +102,17 @@ class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
   }
 
   // Fila de Acceso (Login y Registro)
-  Widget _buildAccessRow(bool isMobile) {
+  Widget _buildAccessRow(BuildContext context, bool isMobile) { // Agregamos BuildContext aquí
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         TextButton(
-          onPressed: () {},
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+            );
+          },
           style: TextButton.styleFrom(
             padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12),
           ),
@@ -121,7 +127,7 @@ class HeaderUnite extends StatelessWidget implements PreferredSizeWidget {
         ),
         const SizedBox(width: 8),
         SizedBox(
-          width: 120, // Ahora podemos usar el ancho completo de 120 sin miedo
+          width: 120,
           child: DuoButton(
             text: "Registro",
             color: AppColors.green,
