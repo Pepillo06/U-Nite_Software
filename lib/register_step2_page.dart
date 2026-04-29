@@ -46,9 +46,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                 width: double.infinity,
                 constraints: const BoxConstraints(maxWidth: 600),
                 decoration: BoxDecoration(
-                  color: const Color(
-                    0xFFF5F5F5,
-                  ), // Light grey background like in the image
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(15.0),
                   boxShadow: [
                     BoxShadow(
@@ -63,24 +61,11 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // Logo
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        'assets/logo.png',
-                        height: 40,
-                        errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.school, size: 40, color: myOrange),
-                      ),
+                    Image.asset(
+                      'assets/logo.png',
+                      height: 80,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Icon(Icons.school, size: 60, color: myOrange),
                     ),
                     const SizedBox(height: 30),
 

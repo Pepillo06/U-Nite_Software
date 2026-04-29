@@ -43,7 +43,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                 width: double.infinity,
                 constraints: const BoxConstraints(maxWidth: 500),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEBEBEB), // Slightly darker grey for the card to contrast with white fields
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(15.0),
                   boxShadow: [
                     BoxShadow(
@@ -62,18 +62,18 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)
-                        ]
                       ),
                       child: Image.asset(
                         'assets/logo.png',
-                        height: 40,
+                        height: 80,
                         errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.school, size: 40, color: myOrange),
+                            const Icon(Icons.school, size: 60, color: myOrange),
                       ),
                     ),
+                    const SizedBox(height: 30),
+
+                    // Progress Indicator Step 3
+                    _buildProgressIndicator(currentStep: 3),
                     const SizedBox(height: 30),
 
                     // Title
@@ -91,10 +91,6 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.black54, fontWeight: FontWeight.w500),
                     ),
-                    const SizedBox(height: 30),
-
-                    // Progress Indicator Step 3
-                    _buildProgressIndicator(currentStep: 3),
                     const SizedBox(height: 40),
 
                     // Universidad

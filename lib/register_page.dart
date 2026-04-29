@@ -52,7 +52,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 width: double.infinity,
                 constraints: const BoxConstraints(maxWidth: 500),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Colors.white, // fondo blanco
                   borderRadius: BorderRadius.circular(15.0),
                   boxShadow: [
                     BoxShadow(
@@ -69,7 +69,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     // Logo
                     Image.asset(
                       'assets/logo.png',
-                      height: 60,
+                      height: 80,
                       errorBuilder: (context, error, stackTrace) =>
                           const Icon(Icons.school, size: 60, color: myOrange),
                     ),
