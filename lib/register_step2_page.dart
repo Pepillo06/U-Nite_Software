@@ -85,7 +85,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                     const SizedBox(height: 30),
 
                     // Progress Indicator Step 2
-                    _buildProgressIndicator(),
+                    _buildProgressIndicator(currentStep: 2),
                     const SizedBox(height: 30),
 
                     // Title
@@ -199,81 +199,63 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
     );
   }
 
-  Widget _buildProgressIndicator() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildProgressIndicator({required int currentStep}) {
+    // Definimos los colores marrón y gris de la imagen para que sean consistentes
+    const Color myBrown = Color(0xFFE05200); // El color marrón/naranja oscuro de tu foto
+    const Color myGreyInactive = Color(0xFFCFCFCF); // Un gris claro para lo inactivo
+
+    // Función interna para construir cada una de las 3 barras
+    Widget buildStepBar(int stepNumber) {
+      // La barra se ilumina si es el paso actual
+      bool isActive = stepNumber == currentStep;
+      return Container(
+        width: 60, // Ancho de la barra como en la imagen
+        height: 4, // Grosor de la barra
+        decoration: BoxDecoration(
+          color: isActive ? myBrown : myGreyInactive,
+          borderRadius: BorderRadius.circular(2), // Bordes redondeados
+        ),
+      );
+    }
+
+    // Función interna para construir el texto "Paso X" debajo de la barra
+    Widget buildStepLabel(String label, int stepNumber) {
+      // El texto se ilumina si es el paso actual
+      bool isActive = stepNumber == currentStep;
+      return Text(
+        label,
+        style: TextStyle(
+          color: isActive ? myBrown : myGreyInactive,
+          fontSize: 10,
+          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+        ),
+      );
+    }
+
+    // Retornamos la estructura completa: barras arriba, etiquetas abajo
+    return Column(
       children: [
-        // Step 1 Completed
-        Column(
+        // Fila de las 3 barras con separadores
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: const BoxDecoration(
-                color: myOrange,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check, color: Colors.white, size: 16),
-            ),
-            const SizedBox(height: 14), // To align with the active text
+            buildStepBar(1),
+            const SizedBox(width: 10), // Espacio entre barras
+            buildStepBar(2),
+            const SizedBox(width: 10), // Espacio entre barras
+            buildStepBar(3),
           ],
         ),
-        Container(height: 2, width: 60, color: myOrange),
-        // Step 2 Active
-        Column(
+        const SizedBox(height: 5), // Espacio entre barras y etiquetas
+        // Fila de las 3 etiquetas con separadores
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: myOrange, width: 2),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                "2",
-                style: TextStyle(
-                  color: myOrange,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              "Perfil",
-              style: TextStyle(
-                color: myOrange,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        Container(height: 2, width: 60, color: Colors.grey[300]),
-        // Step 3 Inactive
-        Column(
-          children: [
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey[300]!, width: 2),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                "3",
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14), // To align with the active text
+            buildStepLabel("Paso 1", 1),
+            const SizedBox(width: 30), // Espacio para alinear el texto bajo la barra
+            buildStepLabel("Paso 2", 2),
+            const SizedBox(width: 30), // Espacio para alinear el texto bajo la barra
+            buildStepLabel("Paso 3", 3),
           ],
         ),
       ],
