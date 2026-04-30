@@ -37,152 +37,146 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
 
           // Content
           Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20.0,
-                vertical: 40.0,
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(maxWidth: 800), // Aumentado para acomodar 3 tarjetas
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15.0),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-              child: Container(
-                width: double.infinity,
-                constraints: const BoxConstraints(maxWidth: 800), // Aumentado para acomodar 3 tarjetas
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(40.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Logo
-                    Image.asset(
-                      'assets/logo.png',
-                      height: 80,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.school, size: 60, color: myOrange),
-                    ),
-                    const SizedBox(height: 30),
+              padding: const EdgeInsets.all(40.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Logo
+                  Image.asset(
+                    'assets/logo.png',
+                    height: 80,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.school, size: 60, color: myOrange),
+                  ),
+                  const SizedBox(height: 30),
 
-                    // Progress Indicator Step 2
-                    _buildProgressIndicator(currentStep: 2),
-                    const SizedBox(height: 30),
+                  // Progress Indicator Step 2
+                  _buildProgressIndicator(currentStep: 2),
+                  const SizedBox(height: 30),
 
-                    // Title
-                    const Text(
-                      "Selecciona tu perfil",
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.black87,
+                  // Title
+                  const Text(
+                    "Selecciona tu perfil",
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "¿Cómo planeas usar U-NITE?",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // Profile Selection Cards
+                  Wrap(
+                    spacing: 20,
+                    runSpacing: 20,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 220, // Ancho fijo para mantener simetría
+                        child: _buildProfileCard(
+                          index: 0,
+                          title: "Comprador",
+                          description:
+                              "Busco comprar libros, herramientas, materiales de uso universitario cerca del campus.",
+                          iconData: Icons.person,
+                          iconBgColor: Colors.green.withOpacity(0.2),
+                          iconColor: Colors.green[800]!,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      "¿Cómo planeas usar U-NITE?",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                        fontWeight: FontWeight.w500,
+                      SizedBox(
+                        width: 220,
+                        child: _buildProfileCard(
+                          index: 1,
+                          title: "Vendedor",
+                          description:
+                              "Quiero publicar artículos, ofrecer materiales o realizar intercambios con otros estudiantes.",
+                          iconData: Icons.local_offer,
+                          iconBgColor: myOrange.withOpacity(0.2),
+                          iconColor: myOrange,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 40),
+                      SizedBox(
+                        width: 220,
+                        child: _buildProfileCard(
+                          index: 2,
+                          title: "Estudiante",
+                          description:
+                              "Quiero conectar con otros estudiantes para hacer grupos de estudio, apoyarnos en clase o realizar proyectos de materias.",
+                          iconData: Icons.groups,
+                          iconBgColor: Colors.blue.withOpacity(0.2),
+                          iconColor: Colors.blue[800]!,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 40),
 
-                    // Profile Selection Cards
-                    Wrap(
-                      spacing: 20,
-                      runSpacing: 20,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 220, // Ancho fijo para mantener simetría
-                          child: _buildProfileCard(
-                            index: 0,
-                            title: "Comprador",
-                            description:
-                                "Busco comprar libros, herramientas, materiales de uso universitario cerca del campus.",
-                            iconData: Icons.person,
-                            iconBgColor: Colors.green.withOpacity(0.2),
-                            iconColor: Colors.green[800]!,
+                  // Siguiente Paso Button
+                  SizedBox(
+                    height: 45,
+                    width: 200,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterStep3Page(),
                           ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: myOrange,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0),
                         ),
-                        SizedBox(
-                          width: 220,
-                          child: _buildProfileCard(
-                            index: 1,
-                            title: "Vendedor",
-                            description:
-                                "Quiero publicar artículos, ofrecer materiales o realizar intercambios con otros estudiantes.",
-                            iconData: Icons.local_offer,
-                            iconBgColor: myOrange.withOpacity(0.2),
-                            iconColor: myOrange,
-                          ),
-                        ),
-                        SizedBox(
-                          width: 220,
-                          child: _buildProfileCard(
-                            index: 2,
-                            title: "Estudiante",
-                            description:
-                                "Quiero conectar con otros estudiantes para hacer grupos de estudio, apoyarnos en clase o realizar proyectos de materias.",
-                            iconData: Icons.groups,
-                            iconBgColor: Colors.blue.withOpacity(0.2),
-                            iconColor: Colors.blue[800]!,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 40),
-
-                    // Siguiente Paso Button
-                    SizedBox(
-                      height: 45,
-                      width: 200,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const RegisterStep3Page(),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: myOrange,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Siguiente Paso",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Icon(
-                              Icons.arrow_forward,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Siguiente Paso",
+                            style: TextStyle(
                               color: Colors.white,
-                              size: 18,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
-                          ],
-                        ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(
+                            Icons.arrow_forward,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -244,11 +238,11 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            buildStepLabel("Paso 1", 1),
+            buildStepLabel("Paso 1 ", 1),
             const SizedBox(width: 30),
-            buildStepLabel("Paso 2", 2),
+            buildStepLabel("  Paso 2", 2),
             const SizedBox(width: 30),
-            buildStepLabel("Paso 3", 3),
+            buildStepLabel("   Paso 3", 3),
           ],
         ),
       ],

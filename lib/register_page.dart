@@ -26,18 +26,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
   static const Color myOrange = Color(0xFFF05100);
 
-  // Función para validar intentos en campos de texto (solo letras)
-  void _validateAlphaAttempt(String value, String lastValue, Function(String?) setError) {
-    if (value.length < lastValue.length) {
-      setError(null); // Si está borrando, quitamos el error
-      return;
-    }
-    // Si el usuario intentó meter algo que no es letra (y el formatter lo bloqueó),
-    // el valor no cambiará, pero podemos detectar el error si el campo está vacío o no cumple.
-    // Aquí usamos una lógica de "limpieza" automática:
-    setError(null);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,183 +46,179 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
 
           Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 40.0),
-              child: Container(
-                width: double.infinity,
-                constraints: const BoxConstraints(maxWidth: 500),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(40.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/logo.png',
-                      height: 80,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.school, size: 60, color: myOrange),
-                    ),
-                    const SizedBox(height: 30),
-                    _buildProgressIndicator(currentStep: 1),
-                    const SizedBox(height: 40),
-                    const Text(
-                      "Registro de Usuario",
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.black87),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      "Para empezar, necesitamos conocerte un poco mejor.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.black54),
-                    ),
-                    const SizedBox(height: 40),
-                    // Inputs de Nombre y Apellido
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _buildFormField(
-                            "Nombre",
-                            "Ej. Juan",
-                            controller: _nombreController,
-                            errorText: _nombreError,
-                            // Bloquea números y signos
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(
+                maxWidth: 500,
+                maxHeight: 700, // Altura máxima para que la tarjeta no se salga de la pantalla
+              ),
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15.0),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(40.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/logo.png',
+                    height: 80,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.school, size: 60, color: myOrange),
+                  ),
+                  const SizedBox(height: 30),
+                  _buildProgressIndicator(currentStep: 1),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Registro de Usuario",
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "Para empezar, necesitamos conocerte un poco mejor.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ESTA ES LA PARTE QUE HACE EL SCROLL INTERNO
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: _buildFormField(
+                                  "Nombre",
+                                  "Ej. Juan",
+                                  controller: _nombreController,
+                                  errorText: _nombreError,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+                                  ],
+                                  onTapOutside: () => setState(() => _nombreError = null),
+                                  onChanged: (val) => setState(() => _nombreError = null),
+                                  onForbiddenCharacter: () {
+                                    setState(() => _nombreError = "*Valor de campo inválido");
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: _buildFormField(
+                                  "Apellido",
+                                  "Ej. Pérez",
+                                  controller: _apellidoController,
+                                  errorText: _apellidoError,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+                                  ],
+                                  onTapOutside: () => setState(() => _apellidoError = null),
+                                  onChanged: (val) => setState(() => _apellidoError = null),
+                                  onForbiddenCharacter: () {
+                                    setState(() => _apellidoError = "*Valor de campo inválido");
+                                  },
+                                ),
+                              ),
                             ],
-                            onTapOutside: () => setState(() => _nombreError = null),
-                            onChanged: (val) {
+                          ),
+                          const SizedBox(height: 20),
+                          _buildFormField(
+                            "Fecha de Nacimiento",
+                            "dd/mm/yyyy",
+                            controller: _fechaController,
+                            icon: Icons.calendar_today_outlined,
+                            readOnly: true,
+                            onTap: () {
                               setState(() {
-                                // Si el usuario escribe algo, reseteamos el error
-                                _nombreError = null;
+                                _showCalendar = !_showCalendar;
                               });
                             },
-                            // Esta es la clave: detectamos si el usuario intenta meter algo prohibido
-                            onForbiddenCharacter: () {
-                              setState(() => _nombreError = "*Valor de campo inválido");
-                            },
                           ),
-                        ),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: _buildFormField(
-                            "Apellido",
-                            "Ej. Pérez",
-                            controller: _apellidoController,
-                            errorText: _apellidoError,
+                          if (_showCalendar)
+                            Container(
+                              margin: const EdgeInsets.only(top: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.black12),
+                              ),
+                              child: CalendarDatePicker(
+                                initialDate: _selectedDate,
+                                firstDate: DateTime(1900),
+                                lastDate: DateTime.now(),
+                                onDateChanged: (DateTime date) {
+                                  setState(() {
+                                    _selectedDate = date;
+                                    _fechaController.text =
+                                        "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+                                    _showCalendar = false;
+                                  });
+                                },
+                              ),
+                            ),
+                          const SizedBox(height: 20),
+                          _buildFormField(
+                            "Cédula de Identidad",
+                            "Ej. 26123456",
+                            controller: _cedulaController,
+                            errorText: _cedulaError,
+                            icon: Icons.badge_outlined,
+                            keyboardType: TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]')),
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(8),
                             ],
-                            onTapOutside: () => setState(() => _apellidoError = null),
-                            onChanged: (val) => setState(() => _apellidoError = null),
+                            onTapOutside: () => setState(() => _cedulaError = null),
+                            onChanged: (val) => setState(() => _cedulaError = null),
                             onForbiddenCharacter: () {
-                              setState(() => _apellidoError = "*Valor de campo inválido");
+                              setState(() => _cedulaError = "*Valor de campo inválido");
                             },
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Fecha de Nacimiento
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFormField(
-                          "Fecha de Nacimiento",
-                          "dd/mm/yyyy",
-                          controller: _fechaController,
-                          icon: Icons.calendar_today_outlined,
-                          readOnly: true,
-                          onTap: () {
-                            setState(() {
-                              _showCalendar = !_showCalendar;
-                            });
-                          },
-                        ),
-                        if (_showCalendar)
-                          Container(
-                            margin: const EdgeInsets.only(top: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.black12),
-                            ),
-                            child: CalendarDatePicker(
-                              initialDate: _selectedDate,
-                              firstDate: DateTime(1900),
-                              lastDate: DateTime.now(),
-                              onDateChanged: (DateTime date) {
-                                setState(() {
-                                  _selectedDate = date;
-                                  _fechaController.text =
-                                      "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
-                                  _showCalendar = false;
-                                });
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Cédula de Identidad
-                    _buildFormField(
-                      "Cédula de Identidad",
-                      "Ej. 26123456",
-                      controller: _cedulaController,
-                      errorText: _cedulaError,
-                      icon: Icons.badge_outlined,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(8),
-                      ],
-                      onTapOutside: () => setState(() => _cedulaError = null),
-                      onChanged: (val) => setState(() => _cedulaError = null),
-                      onForbiddenCharacter: () {
-                        setState(() => _cedulaError = "*Valor de campo inválido");
-                      },
-                    ),
-                    const SizedBox(height: 40),
-
-                    // Botón Siguiente
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const RegisterStep2Page()),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: myOrange,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text("Siguiente Paso", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                            SizedBox(width: 8),
-                            Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-                          ],
-                        ),
+                          const SizedBox(height: 20),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+
+                  const SizedBox(height: 20),
+                  // Botón Siguiente (Se mantiene fijo abajo de la tarjeta)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RegisterStep2Page()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: myOrange,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text("Siguiente Paso", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          SizedBox(width: 8),
+                          Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -253,7 +237,7 @@ class _RegisterPageState extends State<RegisterPage> {
       children: [
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepBar(1), const SizedBox(width: 10), buildStepBar(2), const SizedBox(width: 10), buildStepBar(3)]),
         const SizedBox(height: 5),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepLabel("Paso 1", 1), const SizedBox(width: 30), buildStepLabel("Paso 2", 2), const SizedBox(width: 30), buildStepLabel("Paso 3", 3)]),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepLabel("Paso 1 ", 1), const SizedBox(width: 30), buildStepLabel("  Paso 2", 2), const SizedBox(width: 30), buildStepLabel("   Paso 3", 3)]),
       ],
     );
   }
@@ -277,18 +261,15 @@ class _RegisterPageState extends State<RegisterPage> {
       children: [
         Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54)),
         const SizedBox(height: 8),
-        // Envolvemos en RawKeyboardListener para detectar la tecla física antes de ser procesada
         RawKeyboardListener(
           focusNode: FocusNode(),
           onKey: (event) {
             if (event is RawKeyDownEvent && event.character != null) {
-              // Si el campo es nombre/apellido y presiona un número o signo
               if (label == "Nombre" || label == "Apellido") {
                 if (RegExp(r'[0-9!@#<>?":_`~;[\]\\|=+)(*&^%$]').hasMatch(event.character!)) {
                   onForbiddenCharacter?.call();
                 }
               }
-              // Si el campo es cédula y presiona una letra o signo
               if (label == "Cédula de Identidad") {
                 if (!RegExp(r'[0-9]').hasMatch(event.character!)) {
                   onForbiddenCharacter?.call();
