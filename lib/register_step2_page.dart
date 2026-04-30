@@ -11,7 +11,7 @@ class RegisterStep2Page extends StatefulWidget {
 
 class _RegisterStep2PageState extends State<RegisterStep2Page> {
   static const Color myOrange = Color(0xFFF05100);
-  int _selectedProfile = 1; // 0 for Comprador, 1 for Vendedor
+  int _selectedProfile = 1; // 0 for Comprador, 1 for Vendedor, 2 for Estudiante
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +44,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
               ),
               child: Container(
                 width: double.infinity,
-                constraints: const BoxConstraints(maxWidth: 600),
+                constraints: const BoxConstraints(maxWidth: 800), // Aumentado para acomodar 3 tarjetas
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(15.0),
@@ -84,7 +84,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      "¿Cómo planeas usar U-NITE en el campus?",
+                      "¿Cómo planeas usar U-NITE?",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -95,12 +95,16 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                     const SizedBox(height: 40),
 
                     // Profile Selection Cards
-                    Row(
+                    Wrap(
+                      spacing: 20,
+                      runSpacing: 20,
+                      alignment: WrapAlignment.center,
                       children: [
-                        Expanded(
+                        SizedBox(
+                          width: 220, // Ancho fijo para mantener simetría
                           child: _buildProfileCard(
                             index: 0,
-                            title: "Comprador /\nCliente",
+                            title: "Comprador",
                             description:
                                 "Busco comprar libros, herramientas, materiales de uso universitario cerca del campus.",
                             iconData: Icons.person,
@@ -108,8 +112,8 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                             iconColor: Colors.green[800]!,
                           ),
                         ),
-                        const SizedBox(width: 20),
-                        Expanded(
+                        SizedBox(
+                          width: 220,
                           child: _buildProfileCard(
                             index: 1,
                             title: "Vendedor",
@@ -120,6 +124,18 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                             iconColor: myOrange,
                           ),
                         ),
+                        SizedBox(
+                          width: 220,
+                          child: _buildProfileCard(
+                            index: 2,
+                            title: "Estudiante",
+                            description:
+                                "Quiero conectar con otros estudiantes para hacer grupos de estudio, apoyarnos en clase o realizar proyectos de materias.",
+                            iconData: Icons.groups,
+                            iconBgColor: Colors.blue.withOpacity(0.2),
+                            iconColor: Colors.blue[800]!,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 40),
@@ -127,7 +143,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                     // Siguiente Paso Button
                     SizedBox(
                       height: 45,
-                      width: 200, // Smaller width as seen in the image
+                      width: 200,
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.push(
@@ -185,27 +201,22 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
   }
 
   Widget _buildProgressIndicator({required int currentStep}) {
-    // Definimos los colores marrón y gris de la imagen para que sean consistentes
-    const Color myBrown = Color(0xFFE05200); // El color marrón/naranja oscuro de tu foto
-    const Color myGreyInactive = Color(0xFFCFCFCF); // Un gris claro para lo inactivo
+    const Color myBrown = Color(0xFFE05200);
+    const Color myGreyInactive = Color(0xFFCFCFCF);
 
-    // Función interna para construir cada una de las 3 barras
     Widget buildStepBar(int stepNumber) {
-      // La barra se ilumina si es el paso actual
       bool isActive = stepNumber == currentStep;
       return Container(
-        width: 60, // Ancho de la barra como en la imagen
-        height: 4, // Grosor de la barra
+        width: 60,
+        height: 4,
         decoration: BoxDecoration(
           color: isActive ? myBrown : myGreyInactive,
-          borderRadius: BorderRadius.circular(2), // Bordes redondeados
+          borderRadius: BorderRadius.circular(2),
         ),
       );
     }
 
-    // Función interna para construir el texto "Paso X" debajo de la barra
     Widget buildStepLabel(String label, int stepNumber) {
-      // El texto se ilumina si es el paso actual
       bool isActive = stepNumber == currentStep;
       return Text(
         label,
@@ -217,29 +228,26 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
       );
     }
 
-    // Retornamos la estructura completa: barras arriba, etiquetas abajo
     return Column(
       children: [
-        // Fila de las 3 barras con separadores
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             buildStepBar(1),
-            const SizedBox(width: 10), // Espacio entre barras
+            const SizedBox(width: 10),
             buildStepBar(2),
-            const SizedBox(width: 10), // Espacio entre barras
+            const SizedBox(width: 10),
             buildStepBar(3),
           ],
         ),
-        const SizedBox(height: 5), // Espacio entre barras y etiquetas
-        // Fila de las 3 etiquetas con separadores
+        const SizedBox(height: 5),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             buildStepLabel("Paso 1", 1),
-            const SizedBox(width: 30), // Espacio para alinear el texto bajo la barra
+            const SizedBox(width: 30),
             buildStepLabel("Paso 2", 2),
-            const SizedBox(width: 30), // Espacio para alinear el texto bajo la barra
+            const SizedBox(width: 30),
             buildStepLabel("Paso 3", 3),
           ],
         ),
@@ -267,10 +275,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
         height: 240,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFEFEFEF)
-              : Colors
-                    .white, // Slight gray if selected, white if not based on image
+          color: isSelected ? const Color(0xFFEFEFEF) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? myOrange : Colors.transparent,
