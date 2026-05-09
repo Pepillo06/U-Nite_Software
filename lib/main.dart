@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
-//import 'home_page.dart';
-//import 'u_nite_home.dart';
 import 'home_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 void main() {
   runApp(const UNITEApp());
 }
-
-//void main() => runApp(const UNITEApp());
 
 class UNITEApp extends StatelessWidget {
   const UNITEApp({super.key});
