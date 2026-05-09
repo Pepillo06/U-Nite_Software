@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
-import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 import 'dart:ui'; // Necesario para el efecto de Blur
 import 'package:flutter/material.dart';
+import 'login_page.dart';
+import 'register_page.dart';
 
 void main() => runApp(const UNITEApp());
 
@@ -138,7 +139,12 @@ class _Navbar extends StatelessWidget {
 
           // Iniciar Sesión: Ajustamos padding y tamaño de letra
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+              );
+            },
             style: TextButton.styleFrom(
               // Padding dinámico: más pequeño en móvil
               padding: EdgeInsets.symmetric(
@@ -166,7 +172,12 @@ class _Navbar extends StatelessWidget {
           UButtonPrimary(
             text: 'Registrarse',
             style: UButtonStyle.green,
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RegisterPage()),
+              );
+            },
           ),
         ],
       ),
@@ -372,7 +383,16 @@ class _HeroSectionState extends State<_HeroSection> {
         Row(
           mainAxisAlignment: isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
           children: [
-            UButtonPrimary(text: 'Empezar', style: style, onPressed: () {}),
+            UButtonPrimary(
+              text: 'Empezar', 
+              style: style, 
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                );
+              }
+            ),
             const SizedBox(width: 12),
             UButtonSecondary(text: 'Saber más', style: style, onPressed: () {}),
           ],
@@ -1263,7 +1283,12 @@ class _CTASection extends StatelessWidget {
           const SizedBox(height: 32),
           UButtonPrimary(
             text: 'Crear cuenta',
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RegisterPage()),
+              );
+            },
           ),
           const SizedBox(height: 30),
           
