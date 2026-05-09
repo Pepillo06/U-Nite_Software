@@ -30,7 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+  google_fonts: ^6.2.1  # Revisa la versión más reciente en pub.dev
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -58,6 +58,8 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - assets/
+    - assets/images/
     - assests.dart/19762-37175-star-rating-animation.riv
     - assets/logo.png
     - assets/background.jpg

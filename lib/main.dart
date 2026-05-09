@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
+//import 'home_page.dart';
+//import 'u_nite_home.dart';
 import 'home_page.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const UNITEApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+//void main() => runApp(const UNITEApp());
+
+class UNITEApp extends StatelessWidget {
+  const UNITEApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -15,6 +20,7 @@ class MyApp extends StatelessWidget {
       title: 'U-Nite Software',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        textTheme: GoogleFonts.lexendTextTheme(),
         useMaterial3: true,
       ),
       home: const HomePage(),
