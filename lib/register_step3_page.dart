@@ -1,7 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-
-// Assuming login page or home page as final destination
 import 'login_page.dart';
 
 class RegisterStep3Page extends StatefulWidget {
@@ -11,251 +9,275 @@ class RegisterStep3Page extends StatefulWidget {
   State<RegisterStep3Page> createState() => _RegisterStep3PageState();
 }
 
+// ───────────────────────────────────────────────────────────────
+// Paleta de colores
+// ───────────────────────────────────────────────────────────────
+class UColors {
+  static const orange = Color(0xFFF36900);
+  static const orangeLight = Color(0xFFF57b00);
+  static const orangeDark = Color(0xFFF05600);
+  static const sectionPink = Color(0xFFFDE8E0);
+  static const textDark = Color(0xFF1A1A1A);
+  static const textGray = Color(0xFF5B4137);
+  static const white = Color(0xFFFFFFFF);
+  static const cardBorder = Color(0xFFEEEEEE);
+  static const greenIcon = Color(0xFF4CAF7D);
+  static const blueIcon = Color(0xFF5B8DEF);
+  static const footerBg = Color(0xFFF5F5F5);
+  static const greenDark = Color(0xFF245000);
+  static const Color heroBackground = Color.fromARGB(255, 255, 204, 167);
+}
+
 class _RegisterStep3PageState extends State<RegisterStep3Page> {
   final TextEditingController _universidadController = TextEditingController();
   final TextEditingController _carreraController = TextEditingController();
   final TextEditingController _correoController = TextEditingController();
 
-  static const Color myOrange = Color(0xFFF05100);
+  // Variables para controlar las selecciones
+  String? _selectedUniversidad;
+  String? _selectedCarrera;
+
+  // Listado de Universidades
+  final List<String> _universidades = [
+    "No estoy estudiando actualmente",
+    "Universidad Metropolitana"
+  ];
+
+  // Mapa de Carreras de la UNIMET
+  final List<String> _carrerasUnimet = [
+    "Ingeniería de Sistemas",
+    "Ingeniería Eléctrica",
+    "Ingeniería Mecánica",
+    "Ingeniería Civil",
+    "Ingeniería de Producción",
+    "Ingeniería Química",
+    "Administración de Empresas",
+    "Contaduría Pública",
+    "Economía",
+    "Derecho",
+    "Psicología",
+    "Idiomas Modernos",
+    "Estudios Liberales",
+    "Diseño Gráfico",
+    "Educación",
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/background.jpg',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey),
-            ),
-          ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-              child: Container(color: Colors.black.withOpacity(0.3)),
-            ),
-          ),
-          Center(
-            child: Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(
-                maxWidth: 500,
-                maxHeight: 720, // Altura máxima para mantener la tarjeta estética
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Detectamos si es móvil
+          bool isMobile = constraints.maxWidth < 600;
+
+          return Stack(
+            children: [
+              // --- FONDO ---
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/background.jpg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey),
+                ),
               ),
-              margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 40.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15.0),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                  child: Container(color: Colors.black.withOpacity(0.3)),
+                ),
               ),
-              padding: const EdgeInsets.all(40.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Logo
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                    ),
-                    child: Image.asset(
-                      'assets/logo.png',
-                      height: 80,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.school, size: 60, color: myOrange),
-                    ),
+
+              // --- CONTENIDO ---
+              Center(
+                child: Container(
+                  width: isMobile ? constraints.maxWidth * 0.9 : 500,
+                  // Mantenemos el alto fijo en Web para evitar saltos visuales
+                  height: isMobile ? null : 720,
+                  constraints: BoxConstraints(
+                    maxWidth: 500,
+                    maxHeight: isMobile ? constraints.maxHeight * 0.9 : 650,
                   ),
-                  const SizedBox(height: 30),
-
-                  // Progress Indicator Step 3
-                  _buildProgressIndicator(currentStep: 3),
-                  const SizedBox(height: 30),
-
-                  // Title
-                  const Text(
-                    "Datos Universitarios",
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    "Casi terminamos. Cuéntanos sobre tus estudios.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.black54, fontWeight: FontWeight.w500),
-                  ),
-                  
-                  const SizedBox(height: 20),
-
-                  // SECCIÓN DE SCROLL INTERNO (Lo resaltado en rojo)
-                  Flexible(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 20),
-                          // Universidad
-                          _buildFormField(
-                            label: "UNIVERSIDAD",
-                            isRequired: true,
-                            hint: "Selecciona tu universidad",
-                            controller: _universidadController,
-                            icon: Icons.school,
-                            isDropdown: true,
-                          ),
-                          const SizedBox(height: 25),
-
-                          // Carrera
-                          _buildFormField(
-                            label: "CARRERA / FACULTAD",
-                            optionalText: "Opcional",
-                            hint: "Selecciona tu carrera",
-                            controller: _carreraController,
-                            icon: Icons.menu_book,
-                            isDropdown: true,
-                          ),
-                          const SizedBox(height: 25),
-
-                          // Correo
-                          _buildFormField(
-                            label: "CORREO ELECTRÓNICO",
-                            hint: "ejemplo@correo.com",
-                            hintColor: myOrange.withOpacity(0.5),
-                            controller: _correoController,
-                            icon: Icons.email,
-                          ),
-                          const SizedBox(height: 20),
-                        ],
+                  margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
                       ),
-                    ),
+                    ],
                   ),
+                  padding: EdgeInsets.all(isMobile ? 25.0 : 40.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Logo
+                      Image.asset(
+                        'assets/logo.png',
+                        height: isMobile ? 60 : 80,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.school, size: 60, color: UColors.orangeDark),
+                      ),
+                      const SizedBox(height: 20),
 
-                  const SizedBox(height: 20),
+                      // Progress Indicator
+                      _buildProgressIndicator(currentStep: 3),
+                      const SizedBox(height: 30),
 
-                  // Finalizar Registro Button (Fijo abajo)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (context) => const LoginPage()),
-                          (route) => false,
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: myOrange,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.0),
+                      // --- TÍTULO (Centrado dinámico) ---
+                      const SizedBox(width: double.infinity,
+                        child: Text(
+                          "Datos Universitarios",
+                          textAlign: TextAlign.center, // <-- Forzamos el centrado siempre
+                          style: TextStyle(
+                            fontSize: 28, // Puedes dejarlo fijo o usar el isMobile de antes
+                            fontWeight: FontWeight.w900,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            "Finalizar Registro",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.check,
-                              color: myOrange,
-                              size: 16,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Casi terminamos. Cuéntanos sobre tus estudios.",
+                        textAlign: TextAlign.center, // <-- Forzamos el centrado siempre
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black54,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
+                      
+                      const SizedBox(height: 20),
+
+                      // SECCIÓN DE SCROLL INTERNO
+                      Flexible(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 10),
+                              // Universidad
+                              _buildFormField(
+                                label: "UNIVERSIDAD",
+                                isRequired: true,
+                                hint: "Selecciona tu universidad",
+                                icon: Icons.school,
+                                isDropdown: true,
+                                dropdownItems: _universidades,
+                                selectedValue: _selectedUniversidad,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedUniversidad = value;
+                                    _selectedCarrera = null; // Reiniciar carrera si cambia la universidad
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 25),
+
+                              // Carrera (Se habilita solo si es la UNIMET)
+                              _buildFormField(
+                                label: "CARRERA / FACULTAD",
+                                optionalText: _selectedUniversidad == "Universidad Metropolitana" ? null : "No disponible",
+                                hint: _selectedUniversidad == "Universidad Metropolitana" 
+                                    ? "Selecciona tu carrera" 
+                                    : "N/A",
+                                icon: Icons.menu_book,
+                                isDropdown: true,
+                                // Solo mostramos carreras si seleccionó UNIMET
+                                dropdownItems: _selectedUniversidad == "Universidad Metropolitana" ? _carrerasUnimet : [],
+                                selectedValue: _selectedCarrera,
+                                onChanged: _selectedUniversidad == "Universidad Metropolitana" 
+                                  ? (value) => setState(() => _selectedCarrera = value)
+                                  : null, // Deshabilitado si no es la UNIMET
+                              ),
+                              const SizedBox(height: 25),
+                              _buildFormField(
+                                label: "CORREO ELECTRÓNICO",
+                                hint: "ejemplo@correo.com",
+                                //hintColor: UColors.orangeDark.withOpacity(0.5),
+                                controller: _correoController,
+                                icon: Icons.email,
+                              ),
+                              const SizedBox(height: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      // Botón Finalizar
+                      _buildFinalizeButton(),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+
+              // Botón Volver
+              Positioned(
+                top: 40,
+                left: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFinalizeButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+            (route) => false,
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: UColors.orangeDark,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
           ),
-          Positioned(
-            top: 40,
-            left: 20,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.of(context).pop(),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              "Finalizar Registro",
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: const Icon(Icons.check, color: UColors.orangeDark, size: 16),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildProgressIndicator({required int currentStep}) {
-    const Color myBrown = Color(0xFFE05200);
     const Color myGreyInactive = Color(0xFFCFCFCF);
-
-    Widget buildStepBar(int stepNumber) {
-      bool isActive = stepNumber == currentStep;
-      return Container(
-        width: 60,
-        height: 4,
-        decoration: BoxDecoration(
-          color: isActive ? myBrown : myGreyInactive,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      );
-    }
-
-    Widget buildStepLabel(String label, int stepNumber) {
-      bool isActive = stepNumber == currentStep;
-      return Text(
-        label,
-        style: TextStyle(
-          color: isActive ? myBrown : myGreyInactive,
-          fontSize: 10,
-          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-        ),
-      );
-    }
+    Widget buildStepBar(int n) => Container(width: 60, height: 4, decoration: BoxDecoration(color: n == currentStep ? UColors.orangeDark : myGreyInactive, borderRadius: BorderRadius.circular(2)));
+    Widget buildStepLabel(String t, int n) => Text(t, style: TextStyle(color: n == currentStep ? UColors.orangeDark : myGreyInactive, fontSize: 10, fontWeight: n == currentStep ? FontWeight.bold : FontWeight.normal));
 
     return Column(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            buildStepBar(1),
-            const SizedBox(width: 10),
-            buildStepBar(2),
-            const SizedBox(width: 10),
-            buildStepBar(3),
-          ],
-        ),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepBar(1), const SizedBox(width: 10), buildStepBar(2), const SizedBox(width: 10), buildStepBar(3)]),
         const SizedBox(height: 5),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            buildStepLabel("Paso 1 ", 1),
-            const SizedBox(width: 30),
-            buildStepLabel("  Paso 2", 2),
-            const SizedBox(width: 30),
-            buildStepLabel("   Paso 3", 3),
-          ],
-        ),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepLabel("Paso 1 ", 1), const SizedBox(width: 30), buildStepLabel("  Paso 2", 2), const SizedBox(width: 30), buildStepLabel("   Paso 3", 3)]),
       ],
     );
   }
@@ -265,10 +287,12 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
     bool isRequired = false,
     String? optionalText,
     required String hint,
-    Color? hintColor,
-    required TextEditingController controller,
     required IconData icon,
     bool isDropdown = false,
+    List<String>? dropdownItems,
+    String? selectedValue,
+    ValueChanged<String?>? onChanged,
+    TextEditingController? controller,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,33 +303,20 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             RichText(
               text: TextSpan(
                 text: label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black54,
-                  letterSpacing: 0.5,
-                ),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
                 children: [
                   if (isRequired)
-                    const TextSpan(
-                      text: " *",
-                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                    ),
+                    const TextSpan(text: " *", style: TextStyle(color: Colors.red)),
                 ],
               ),
             ),
             if (optionalText != null)
-              Text(
-                optionalText,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.black38,
-                ),
-              ),
+              Text(optionalText, style: const TextStyle(fontSize: 11, color: Colors.black38)),
           ],
         ),
         const SizedBox(height: 8),
         Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8.0),
@@ -313,28 +324,34 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
           ),
           child: Row(
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Icon(icon, color: Colors.brown[400], size: 20),
-              ),
+              Icon(icon, color: Colors.brown[400], size: 20),
+              const SizedBox(width: 12),
               Expanded(
-                child: TextFormField(
-                  controller: controller,
-                  readOnly: isDropdown,
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    hintStyle: TextStyle(color: hintColor ?? Colors.black87, fontSize: 14, fontWeight: FontWeight.w500),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
+                child: isDropdown
+                    ? DropdownButtonHideUnderline(
+                        child: DropdownButtonFormField<String>(
+                          value: selectedValue,
+                          hint: Text(hint, style: const TextStyle(fontSize: 14, color: Colors.black38)),
+                          isExpanded: true,
+                          items: dropdownItems?.map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value, style: const TextStyle(fontSize: 14)),
+                            );
+                          }).toList(),
+                          onChanged: onChanged,
+                          decoration: const InputDecoration(border: InputBorder.none),
+                        ),
+                      )
+                    : TextFormField(
+                        controller: controller,
+                        decoration: InputDecoration(
+                          hintText: hint,
+                          hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
+                          border: InputBorder.none,
+                        ),
+                      ),
               ),
-              if (isDropdown)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Icon(Icons.keyboard_arrow_down, color: Colors.black54),
-                ),
             ],
           ),
         ),

@@ -212,12 +212,14 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
 
   Widget _buildProgressIndicator({required int currentStep}) {
     const Color myGreyInactive = Color(0xFFCFCFCF);
-    Widget bar(int n) => Container(width: 60, height: 4, decoration: BoxDecoration(color: n == currentStep ? UColors.orangeDark : myGreyInactive, borderRadius: BorderRadius.circular(2)));
+    Widget buildStepBar(int n) => Container(width: 60, height: 4, decoration: BoxDecoration(color: n == currentStep ? UColors.orangeDark : myGreyInactive, borderRadius: BorderRadius.circular(2)));
+    Widget buildStepLabel(String t, int n) => Text(t, style: TextStyle(color: n == currentStep ? UColors.orangeDark : myGreyInactive, fontSize: 10, fontWeight: n == currentStep ? FontWeight.bold : FontWeight.normal));
+
     return Column(
       children: [
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [bar(1), const SizedBox(width: 10), bar(2), const SizedBox(width: 10), bar(3)]),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepBar(1), const SizedBox(width: 10), buildStepBar(2), const SizedBox(width: 10), buildStepBar(3)]),
         const SizedBox(height: 5),
-        const Text("Paso 2", style: TextStyle(color: UColors.orangeDark, fontSize: 10, fontWeight: FontWeight.bold)),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepLabel("Paso 1 ", 1), const SizedBox(width: 30), buildStepLabel("  Paso 2", 2), const SizedBox(width: 30), buildStepLabel("   Paso 3", 3)]),
       ],
     );
   }
