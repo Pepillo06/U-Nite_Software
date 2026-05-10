@@ -33,8 +33,6 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _obscureText = true;
 
-  static const Color myOrange = Color(0xFFF05100);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
