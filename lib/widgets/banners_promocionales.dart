@@ -6,7 +6,7 @@ class BannersPromocionales extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
-    
+
     if (width < 800) {
       return Column(
         children: [
@@ -50,11 +50,7 @@ class BannersPromocionales extends StatelessWidget {
           const SizedBox(height: 16),
           const Text(
             'Vende tus libros del semestre pasado o los muebles que\nya no necesitas a otros estudiantes de tu facultad.',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              height: 1.5,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
           ),
           const SizedBox(height: 32),
           ElevatedButton(
@@ -67,10 +63,14 @@ class BannersPromocionales extends StatelessWidget {
               backgroundColor: Colors.white,
               foregroundColor: const Color(0xFFFF5722),
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Empezar a Vender',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            child: const Text(
+              'Empezar a Vender',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ),
         ],
       ),
