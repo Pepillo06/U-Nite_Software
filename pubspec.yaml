@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   rive: ^0.13.1
   lucide_icons: ^0.257.0
+  supabase_flutter: ^2.12.4
 
 dev_dependencies:
   flutter_test:
