@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'register_step3_page.dart';
+import 'user_model.dart';
 
 class RegisterStep2Page extends StatefulWidget {
-  const RegisterStep2Page({super.key});
+  final UserRegistrationModel model; // Recibe el modelo
+  const RegisterStep2Page({super.key, required this.model});
 
   @override
   State<RegisterStep2Page> createState() => _RegisterStep2PageState();
@@ -196,7 +198,19 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
       height: 50,
       width: 250,
       child: ElevatedButton(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterStep3Page())),
+        onPressed: () {
+          // 1. Guardamos la elección del perfil en el modelo antes de irnos
+          // Usamos widget.model porque el modelo vive en la clase padre (StatefulWidget)
+          widget.model.perfilSeleccionado = _selectedProfile;
+
+          // 2. Pasamos el modelo al Paso 3
+          Navigator.push(
+            context, 
+            MaterialPageRoute(
+              builder: (context) => RegisterStep3Page(model: widget.model),
+            ),
+          );
+        },
         style: ElevatedButton.styleFrom(backgroundColor: UColors.orangeDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,

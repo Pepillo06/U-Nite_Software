@@ -1,9 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'login_page.dart';
+import 'user_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterStep3Page extends StatefulWidget {
-  const RegisterStep3Page({super.key});
+  final UserRegistrationModel model;
+  const RegisterStep3Page({super.key, required this.model});
 
   @override
   State<RegisterStep3Page> createState() => _RegisterStep3PageState();
@@ -32,6 +35,8 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
   final TextEditingController _universidadController = TextEditingController();
   final TextEditingController _carreraController = TextEditingController();
   final TextEditingController _correoController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   // Variables para controlar las selecciones
   String? _selectedUniversidad;
@@ -201,6 +206,21 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                 icon: Icons.email,
                               ),
                               const SizedBox(height: 20),
+                              _buildFormField(
+                                label: "CONTRASEÑA",
+                                isRequired: true,
+                                hint: "Crea una contraseña segura",
+                                icon: Icons.lock,
+                                controller: _passwordController,
+                                isPassword: true, // Nueva propiedad que usaremos abajo
+                                obscureText: _obscurePassword,
+                                onSuffixIconPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 20),
                             ],
                           ),
                         ),
@@ -236,12 +256,71 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const LoginPage()),
-            (route) => false,
+        onPressed: () async {
+          // Mostramos un indicador de carga para que el usuario no de clic mil veces
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(child: CircularProgressIndicator()),
           );
+
+          if (_passwordController.text.length < 6) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("La contraseña debe tener al menos 6 caracteres")),
+            );
+            return; // Detiene la ejecución aquí
+          }
+
+          final supabase = Supabase.instance.client;
+
+          try {
+            // 1. Crear el usuario en Supabase Auth
+            // widget.model tiene los datos de los pasos anteriores
+            // correoController tiene el del paso actual
+            final AuthResponse res = await supabase.auth.signUp(
+              email: _correoController.text.trim(),
+              password: _passwordController.text.trim(), // Asegúrate de tener este controller
+            );
+
+            final String? userId = res.user?.id;
+
+            if (userId != null) {
+              // 2. Insertar en la tabla de PostgreSQL de tu compañero
+              // Usamos widget.model para acceder a lo que guardamos en Paso 1 y 2
+              await supabase.from('estudiantes').insert({
+                'id': userId, 
+                'primer_nombre': widget.model.nombre,
+                'primer_apellido': widget.model.apellido,
+                'cedula': int.tryParse(widget.model.cedula ?? '0'),
+                'correo': _correoController.text.trim(),
+                'universidad': _selectedUniversidad, // Variable del Paso 3
+                'carrera': _selectedCarrera,        // Variable del Paso 3
+                // Si tienes más campos en la tabla, agrégalos aquí
+              });
+
+              // Cerramos el indicador de carga
+              if (!mounted) return;
+              Navigator.of(context).pop();
+
+              // 3. Éxito: Vamos al Login
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            }
+          } catch (e) {
+            // Si algo falla, cerramos la carga y mostramos el error
+            if (!mounted) return;
+            Navigator.of(context).pop();
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Error al registrar: ${e.toString()}"),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: UColors.orangeDark,
@@ -293,6 +372,9 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
     String? selectedValue,
     ValueChanged<String?>? onChanged,
     TextEditingController? controller,
+    bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onSuffixIconPressed,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,10 +427,21 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                       )
                     : TextFormField(
                         controller: controller,
+                        obscureText: obscureText,
                         decoration: InputDecoration(
                           hintText: hint,
                           hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
                           border: InputBorder.none,
+                          suffixIcon: isPassword 
+                            ? IconButton(
+                                icon: Icon(
+                                  obscureText ? Icons.visibility_off : Icons.visibility,
+                                  color: Colors.black38,
+                                  size: 20,
+                                ),
+                                onPressed: onSuffixIconPressed,
+                              )
+                            : null,
                         ),
                       ),
               ),
