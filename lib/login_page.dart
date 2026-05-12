@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart'; // 1. IMPORTAMOS SUPABA
 import 'register_page.dart';
 import 'market.dart';
 import 'theme.dart';
-import 'test_landing_page.dart'; // 2. IMPORTAMOS TU PÁGINA DE PRUEBAS
+//import 'test_landing_page.dart'; 
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -50,7 +50,7 @@ class _LoginPageState extends State<LoginPage> {
       if (res.user != null && mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const TestLandingPage()),
+          MaterialPageRoute(builder: (context) => const MarketPage()),
         );
       }
     } on AuthException catch (error) {

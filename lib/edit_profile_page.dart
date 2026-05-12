@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'profile_page.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -87,7 +88,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _universidadController.text = data['universidad'] ?? '';
         _carreraController.text = data['carrera'] ?? '';
         _semestreController.text = data['semestre']?.toString() ?? '';
-        _biografiaAcademicaController.text = data['biografia_academica'] ?? '';
+        _biografiaAcademicaController.text = data['biografia'] ?? '';
         _biografiaVentasController.text = data['biografia_ventas'] ?? '';
         
         if (data['fecha_nacimiento'] != null) {
@@ -116,6 +117,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         //'biografia_ventas': _biografiaVentasController.text.trim(),
         //'fecha_nacimiento': _selectedFechaNacimiento?.toIso8601String(),
       }).eq('id', _userId!);
+      //Navigator.pop(context, true);  //Esto es lo que hace que se recargue el nombre en el profile_page
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -156,23 +158,38 @@ class _EditProfilePageState extends State<EditProfilePage> {
           // --- COLUMNA IZQUIERDA: MENÚ ---
           Padding(
             padding: const EdgeInsets.fromLTRB(40, 30, 20, 30),
-            child: Container(
-              width: 250,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildMenuItem(Icons.person_outline, "Información Personal", "personal", _personalKey),
-                  _buildMenuItem(Icons.school_outlined, "Perfil Académico", "academico", _academicKey),
-                  _buildMenuItem(Icons.storefront_outlined, "Perfil Vendedor", "vendedor", _vendedorKey),
-                  _buildMenuItem(Icons.lock_outline, "Privacidad y Seguridad", "seguridad", _seguridadKey),
-                ],
-              ),
+            child: Column( // Envolvemos el Container en una Column
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // BOTÓN DE REGRESAR
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.pop(context, true), // O Navigator.push si prefieres recargar
+                    icon: const Icon(Icons.arrow_back, color: Colors.black54),
+                    label: const Text("Volver al perfil", style: TextStyle(color: Colors.black54)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: 250,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildMenuItem(Icons.person_outline, "Información Personal", "personal", _personalKey),
+                      _buildMenuItem(Icons.school_outlined, "Perfil Académico", "academico", _academicKey),
+                      _buildMenuItem(Icons.storefront_outlined, "Perfil Vendedor", "vendedor", _vendedorKey),
+                      _buildMenuItem(Icons.lock_outline, "Privacidad y Seguridad", "seguridad", _seguridadKey),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 

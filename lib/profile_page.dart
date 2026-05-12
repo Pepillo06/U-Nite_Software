@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'edit_profile_page.dart';
+import 'market.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -61,6 +62,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   builder: (context) => const EditProfilePage(),
                 ),
               );
+              if (result == true) {
+                _obtenerDatosPerfil(); // <--- Recarga el FutureBuilder
+              }
               
               // Si el resultado es true, significa que se guardaron cambios, 
               // recargamos la información del perfil.
