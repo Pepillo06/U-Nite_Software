@@ -26,27 +26,3 @@ class UNITEApp extends StatelessWidget {
     );
   }
 }
-
-/* class MiAnimacion extends StatelessWidget {
-  const MiAnimacion({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Animación Rive'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Center(
-        child: SizedBox(
-          width: 300,
-          height: 300,
-          child: RiveAnimation.asset(
-            'assests.dart/19762-37175-star-rating-animation.riv',
-            fit: BoxFit.contain,
-          ),
-        ),
-      ),
-    );
-  }
-} */
