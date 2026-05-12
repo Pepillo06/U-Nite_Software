@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
-import 'home_page.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'post_item.dart';
 
 void main() {
   runApp(const UNITEApp());
@@ -19,7 +19,8 @@ class UNITEApp extends StatelessWidget {
         textTheme: GoogleFonts.lexendTextTheme(),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      //home: const HomePage(),
+      home: const PublicarArticuloPage(),
       debugShowCheckedModeBanner: false,
     );
   }
