@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'register_step3_page.dart';
+import 'theme.dart';
 
 class RegisterStep2Page extends StatefulWidget {
   const RegisterStep2Page({super.key});
@@ -9,24 +10,6 @@ class RegisterStep2Page extends StatefulWidget {
   State<RegisterStep2Page> createState() => _RegisterStep2PageState();
 }
 
-// ───────────────────────────────────────────────────────────────
-// Paleta de colores
-// ───────────────────────────────────────────────────────────────
-class UColors {
-  static const orange = Color(0xFFF36900);
-  static const orangeLight = Color(0xFFF57b00);
-  static const orangeDark = Color(0xFFF05600);
-  static const sectionPink = Color(0xFFFDE8E0);
-  static const textDark = Color(0xFF1A1A1A);
-  static const textGray = Color(0xFF5B4137);
-  static const white = Color(0xFFFFFFFF);
-  static const cardBorder = Color(0xFFEEEEEE);
-  static const greenIcon = Color(0xFF4CAF7D);
-  static const blueIcon = Color(0xFF5B8DEF);
-  static const footerBg = Color(0xFFF5F5F5);
-  static const greenDark = Color(0xFF245000);
-  static const Color heroBackground = Color.fromARGB(255, 255, 204, 167);
-}
 
 class _RegisterStep2PageState extends State<RegisterStep2Page> {
   int _selectedProfile = 1;

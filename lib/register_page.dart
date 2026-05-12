@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'register_step2_page.dart';
+import 'theme.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -10,24 +11,6 @@ class RegisterPage extends StatefulWidget {
   State<RegisterPage> createState() => _RegisterPageState();
 }
 
-// ───────────────────────────────────────────────────────────────
-// Paleta de colores
-// ───────────────────────────────────────────────────────────────
-class UColors {
-  static const orange = Color(0xFFF36900);
-  static const orangeLight = Color(0xFFF57b00);
-  static const orangeDark = Color(0xFFF05600);
-  static const sectionPink = Color(0xFFFDE8E0);
-  static const textDark = Color(0xFF1A1A1A);
-  static const textGray = Color(0xFF5B4137);
-  static const white = Color(0xFFFFFFFF);
-  static const cardBorder = Color(0xFFEEEEEE);
-  static const greenIcon = Color(0xFF4CAF7D);
-  static const blueIcon = Color(0xFF5B8DEF);
-  static const footerBg = Color(0xFFF5F5F5);
-  static const greenDark = Color(0xFF245000);
-  static const Color heroBackground = Color.fromARGB(255, 255, 204, 167);
-}
 
 class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _nombreController = TextEditingController();
@@ -48,7 +31,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       // Evita que el teclado redimensione el fondo y dañe el layout en móvil
-      resizeToAvoidBottomInset: true, 
+      resizeToAvoidBottomInset: true,
       body: LayoutBuilder(
         builder: (context, constraints) {
           // Detectamos si es móvil por el ancho o si el alto es muy reducido
@@ -61,7 +44,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Image.asset(
                   'assets/background.jpg',
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey),
+                  errorBuilder: (context, error, stackTrace) =>
+                      Container(color: Colors.grey),
                 ),
               ),
               Positioned.fill(
@@ -76,13 +60,16 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: Container(
                   width: isMobile ? constraints.maxWidth * 0.9 : 500,
                   // CAMBIO AQUÍ: Definimos un alto fijo para Web para que no crezca
-                  height: isMobile ? null : 650, 
+                  height: isMobile ? null : 650,
                   constraints: BoxConstraints(
                     maxWidth: 500,
                     // En móvil usamos el 85% de la pantalla para que no se corte por el teclado
                     maxHeight: isMobile ? constraints.maxHeight * 0.85 : 700,
                   ),
-                  margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(15.0),
@@ -96,7 +83,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   padding: EdgeInsets.all(isMobile ? 20.0 : 40.0),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min, // La columna interna se ajusta
+                    mainAxisSize:
+                        MainAxisSize.min, // La columna interna se ajusta
                     children: [
                       Image.asset(
                         'assets/logo.png',
@@ -111,9 +99,10 @@ class _RegisterPageState extends State<RegisterPage> {
                         "Registro de Usuario",
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            fontSize: isMobile ? 22 : 28,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.black87),
+                          fontSize: isMobile ? 22 : 28,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.black87,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       const Text(
@@ -137,7 +126,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                 controller: _fechaController,
                                 icon: Icons.calendar_today_outlined,
                                 readOnly: true,
-                                onTap: () => setState(() => _showCalendar = !_showCalendar),
+                                onTap: () => setState(
+                                  () => _showCalendar = !_showCalendar,
+                                ),
                               ),
                               if (_showCalendar) _buildCalendarWidget(),
                               const SizedBox(height: 20),
@@ -152,8 +143,12 @@ class _RegisterPageState extends State<RegisterPage> {
                                   FilteringTextInputFormatter.digitsOnly,
                                   LengthLimitingTextInputFormatter(8),
                                 ],
-                                onChanged: (val) => setState(() => _cedulaError = null),
-                                onForbiddenCharacter: () => setState(() => _cedulaError = "*Valor de campo inválido"),
+                                onChanged: (val) =>
+                                    setState(() => _cedulaError = null),
+                                onForbiddenCharacter: () => setState(
+                                  () =>
+                                      _cedulaError = "*Valor de campo inválido",
+                                ),
                               ),
                               const SizedBox(height: 10),
                             ],
@@ -180,30 +175,46 @@ class _RegisterPageState extends State<RegisterPage> {
       Expanded(
         flex: isMobile ? 0 : 1,
         child: _buildFormField(
-          "Nombre", "Ej. Juan",
+          "Nombre",
+          "Ej. Juan",
           controller: _nombreController,
           errorText: _nombreError,
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]'))],
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(
+              RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]'),
+            ),
+          ],
           onChanged: (val) => setState(() => _nombreError = null),
-          onForbiddenCharacter: () => setState(() => _nombreError = "*Valor de campo inválido"),
+          onForbiddenCharacter: () =>
+              setState(() => _nombreError = "*Valor de campo inválido"),
         ),
       ),
       SizedBox(width: isMobile ? 0 : 20, height: isMobile ? 20 : 0),
       Expanded(
         flex: isMobile ? 0 : 1,
         child: _buildFormField(
-          "Apellido", "Ej. Pérez",
+          "Apellido",
+          "Ej. Pérez",
           controller: _apellidoController,
           errorText: _apellidoError,
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]'))],
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(
+              RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]'),
+            ),
+          ],
           onChanged: (val) => setState(() => _apellidoError = null),
-          onForbiddenCharacter: () => setState(() => _apellidoError = "*Valor de campo inválido"),
+          onForbiddenCharacter: () =>
+              setState(() => _apellidoError = "*Valor de campo inválido"),
         ),
       ),
     ];
 
-    return isMobile 
-        ? Column(children: fields.map((e) => e is Expanded ? (e as Expanded).child : e).toList()) 
+    return isMobile
+        ? Column(
+            children: fields
+                .map((e) => e is Expanded ? (e as Expanded).child : e)
+                .toList(),
+          )
         : Row(crossAxisAlignment: CrossAxisAlignment.start, children: fields);
   }
 
@@ -237,16 +248,28 @@ class _RegisterPageState extends State<RegisterPage> {
       height: 50,
       child: ElevatedButton(
         onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterStep2Page()));
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const RegisterStep2Page()),
+          );
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: UColors.orangeDark,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8.0),
+          ),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text("Siguiente Paso", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(
+              "Siguiente Paso",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             SizedBox(width: 8),
             Icon(Icons.arrow_forward, color: Colors.white, size: 20),
           ],
@@ -257,19 +280,53 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildProgressIndicator({required int currentStep}) {
     const Color myGreyInactive = Color(0xFFCFCFCF);
-    Widget buildStepBar(int n) => Container(width: 60, height: 4, decoration: BoxDecoration(color: n == currentStep ? UColors.orangeDark : myGreyInactive, borderRadius: BorderRadius.circular(2)));
-    Widget buildStepLabel(String t, int n) => Text(t, style: TextStyle(color: n == currentStep ? UColors.orangeDark : myGreyInactive, fontSize: 10, fontWeight: n == currentStep ? FontWeight.bold : FontWeight.normal));
+    Widget buildStepBar(int n) => Container(
+      width: 60,
+      height: 4,
+      decoration: BoxDecoration(
+        color: n == currentStep ? UColors.orangeDark : myGreyInactive,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+    Widget buildStepLabel(String t, int n) => Text(
+      t,
+      style: TextStyle(
+        color: n == currentStep ? UColors.orangeDark : myGreyInactive,
+        fontSize: 10,
+        fontWeight: n == currentStep ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
 
     return Column(
       children: [
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepBar(1), const SizedBox(width: 10), buildStepBar(2), const SizedBox(width: 10), buildStepBar(3)]),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            buildStepBar(1),
+            const SizedBox(width: 10),
+            buildStepBar(2),
+            const SizedBox(width: 10),
+            buildStepBar(3),
+          ],
+        ),
         const SizedBox(height: 5),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepLabel("Paso 1 ", 1), const SizedBox(width: 30), buildStepLabel("  Paso 2", 2), const SizedBox(width: 30), buildStepLabel("   Paso 3", 3)]),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            buildStepLabel("Paso 1 ", 1),
+            const SizedBox(width: 30),
+            buildStepLabel("  Paso 2", 2),
+            const SizedBox(width: 30),
+            buildStepLabel("   Paso 3", 3),
+          ],
+        ),
       ],
     );
   }
 
-  Widget _buildFormField(String label, String hint, {
+  Widget _buildFormField(
+    String label,
+    String hint, {
     required TextEditingController controller,
     String? errorText,
     IconData? icon,
@@ -284,14 +341,23 @@ class _RegisterPageState extends State<RegisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Colors.black54,
+          ),
+        ),
         const SizedBox(height: 8),
         RawKeyboardListener(
           focusNode: FocusNode(),
           onKey: (event) {
             if (event is RawKeyDownEvent && event.character != null) {
               if (label == "Nombre" || label == "Apellido") {
-                if (RegExp(r'[0-9!@#<>?":_`~;[\]\\|=+)(*&^%$]').hasMatch(event.character!)) {
+                if (RegExp(
+                  r'[0-9!@#<>?":_`~;[\]\\|=+)(*&^%$]',
+                ).hasMatch(event.character!)) {
                   onForbiddenCharacter?.call();
                 }
               }
@@ -317,17 +383,46 @@ class _RegisterPageState extends State<RegisterPage> {
             decoration: InputDecoration(
               hintText: hint,
               errorText: errorText,
-              errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 11),
+              errorStyle: const TextStyle(
+                color: Colors.redAccent,
+                fontSize: 11,
+              ),
               hintStyle: const TextStyle(color: Colors.black26, fontSize: 14),
               fillColor: Colors.white,
               filled: true,
-              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0), borderSide: const BorderSide(color: Colors.black12)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0), borderSide: const BorderSide(color: Colors.black12)),
-              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0), borderSide: const BorderSide(color: Colors.redAccent, width: 1.5)),
-              focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0), borderSide: const BorderSide(color: Colors.redAccent, width: 2.0)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0), borderSide: const BorderSide(color: myOrange, width: 1.5)),
-              suffixIcon: icon != null ? Icon(icon, color: Colors.black38, size: 20) : null,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 16,
+                horizontal: 16,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(color: Colors.black12),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(color: Colors.black12),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(
+                  color: Colors.redAccent,
+                  width: 1.5,
+                ),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(
+                  color: Colors.redAccent,
+                  width: 2.0,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: const BorderSide(color: myOrange, width: 1.5),
+              ),
+              suffixIcon: icon != null
+                  ? Icon(icon, color: Colors.black38, size: 20)
+                  : null,
             ),
           ),
         ),

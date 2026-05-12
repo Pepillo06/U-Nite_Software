@@ -4,59 +4,7 @@ import 'dart:async';
 import 'dart:ui'; // Necesario para el efecto de Blur
 import 'login_page.dart';
 import 'register_page.dart';
-
-void main() => runApp(const UNITEApp());
-
-class UNITEApp extends StatelessWidget {
-  const UNITEApp({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'U-NITE',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        textTheme: GoogleFonts.lexendTextTheme(),
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFE8521A)),
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
-    );
-  }
-}
-
-// ───────────────────────────────────────────────────────────────
-// Paleta de colores
-// ───────────────────────────────────────────────────────────────
-class UColors {
-  static const orange = Color(0xFFF36900);
-  static const orangeLight = Color(0xFFF57b00);
-  static const orangeDark = Color(0xFFF05600);
-  static const sectionPink = Color(0xFFFDE8E0);
-  static const textDark = Color(0xFF1A1A1A);
-  static const textGray = Color(0xFF5B4137);
-  static const white = Color(0xFFFFFFFF);
-  static const cardBorder = Color(0xFFEEEEEE);
-  static const greenIcon = Color(0xFF4CAF7D);
-  static const blueIcon = Color(0xFF5B8DEF);
-  static const footerBg = Color(0xFFF5F5F5);
-  static const greenDark = Color(0xFF245000);
-  static const Color heroBackground = Color.fromARGB(255, 255, 204, 167);
-    
-    // Agrega esta decoración reutilizable
-  static BoxDecoration decoracionVignette = BoxDecoration(
-    gradient: LinearGradient(
-        begin: Alignment.centerLeft,  // Empieza en el borde izquierdo
-        end: Alignment.centerRight,   // Termina en el borde derecho
-        colors: [
-          UColors.heroBackground,     // Borde izquierdo fuerte (#FADDD3) [cite: 2]
-          UColors.white,              // CENTRO DIFUMINADO (Blanco) [cite: 2]
-          UColors.heroBackground,     // Borde derecho fuerte (#FADDD3) [cite: 2]
-        ],
-        // Los stops definen qué tan ancha es la franja blanca central
-        stops: const [0.0, 0.5, 1.0], // 0.5 es el centro exacto
-      ),
-  );
-}
+import 'theme.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  HOME PAGE
@@ -115,20 +63,23 @@ class _Navbar extends StatelessWidget {
       color: UColors.white,
       // Reducimos el padding horizontal en móvil (de 40 a 15)
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 15 : 40, 
-        vertical: 16
+        horizontal: isMobile ? 15 : 40,
+        vertical: 16,
       ),
       child: Row(
         children: [
           // Logo: En móvil ocultamos el texto del logo si es muy pequeño para ganar espacio
           Row(
             children: [
-              Image.asset('images/Logo_U-NITE_SoloU.png', height: isMobile ? 35 : 45),
+              Image.asset(
+                'images/Logo_U-NITE_SoloU.png',
+                height: isMobile ? 35 : 45,
+              ),
               if (!isMobile) // Solo muestra el texto del logo en pantallas grandes
-                Image.asset('images/Logo_texto_U-NITE.png', height: 20)
+                Image.asset('images/Logo_texto_U-NITE.png', height: 20),
             ],
           ),
-          
+
           const Spacer(),
 
           // Iniciar Sesión: Ajustamos padding y tamaño de letra
@@ -142,8 +93,8 @@ class _Navbar extends StatelessWidget {
             style: TextButton.styleFrom(
               // Padding dinámico: más pequeño en móvil
               padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 12 : 24, 
-                vertical: isMobile ? 10 : 20
+                horizontal: isMobile ? 12 : 24,
+                vertical: isMobile ? 10 : 20,
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
@@ -202,7 +153,8 @@ class _HeroSectionState extends State<_HeroSection> {
       'badgeTextColor': UColors.greenDark,
       'titlePart1': 'Conecta con tu ',
       'titlePart2': 'Campus',
-      'description': 'Descubre compañeros, únete a grupos de estudio y mantente al día con todo lo que sucede en la comunidad U-NITE.',
+      'description':
+          'Descubre compañeros, únete a grupos de estudio y mantente al día con todo lo que sucede en la comunidad U-NITE.',
       'image': 'images/hero_students.png',
       'btnColor': UColors.orange,
     },
@@ -212,7 +164,8 @@ class _HeroSectionState extends State<_HeroSection> {
       'badgeTextColor': UColors.orange,
       'titlePart1': 'Tu ',
       'titlePart2': 'Marketplace Universitario',
-      'description': 'La red exclusiva para comprar, vender, alquilar e intercambiar entre estudiantes de forma segura y sencilla.',
+      'description':
+          'La red exclusiva para comprar, vender, alquilar e intercambiar entre estudiantes de forma segura y sencilla.',
       'image': 'images/hero_notebook.png',
       'btnColor': UColors.greenDark,
     },
@@ -224,8 +177,11 @@ class _HeroSectionState extends State<_HeroSection> {
     _timer = Timer.periodic(const Duration(seconds: 15), (Timer timer) {
       _virtualPage++;
       if (_pageController.hasClients) {
-        _pageController.animateToPage(_virtualPage,
-            duration: const Duration(milliseconds: 800), curve: Curves.easeInOutCubic);
+        _pageController.animateToPage(
+          _virtualPage,
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeInOutCubic,
+        );
       }
     });
   }
@@ -246,34 +202,46 @@ class _HeroSectionState extends State<_HeroSection> {
       children: [
         SizedBox(
           // En móvil le damos un poco más de altura total para que quepa todo en vertical
-          height: isMobile ? 750 : 600, 
+          height: isMobile ? 750 : 600,
           child: PageView.builder(
             controller: _pageController,
             onPageChanged: (int page) => setState(() => _virtualPage = page),
             itemBuilder: (context, index) {
               final slide = slides[index % slides.length];
               // Decidimos qué constructor usar según el dispositivo
-              return isMobile ? _buildMobileSlide(slide) : _buildWebSlide(slide);
+              return isMobile
+                  ? _buildMobileSlide(slide)
+                  : _buildWebSlide(slide);
             },
           ),
         ),
         // Flechas (opcional ocultarlas en móvil si prefieren swipe)
         if (!isMobile) ...[
-           Positioned(
-            left: 20, top: 0, bottom: 0,
+          Positioned(
+            left: 20,
+            top: 0,
+            bottom: 0,
             child: _NavButton(
               icon: Icons.arrow_back_ios_new,
-              onTap: () => _pageController.previousPage(duration: const Duration(milliseconds: 500), curve: Curves.ease),
+              onTap: () => _pageController.previousPage(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.ease,
+              ),
             ),
           ),
           Positioned(
-            right: 20, top: 0, bottom: 0,
+            right: 20,
+            top: 0,
+            bottom: 0,
             child: _NavButton(
               icon: Icons.arrow_forward_ios,
-              onTap: () => _pageController.nextPage(duration: const Duration(milliseconds: 500), curve: Curves.ease),
+              onTap: () => _pageController.nextPage(
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.ease,
+              ),
             ),
           ),
-        ]
+        ],
       ],
     );
   }
@@ -281,8 +249,13 @@ class _HeroSectionState extends State<_HeroSection> {
   // --- TU CÓDIGO ACTUAL (VERSIÓN WEB) INTACTO ---
   Widget _buildWebSlide(Map<String, dynamic> slide) {
     final Color primaryColor = slide['btnColor'];
-    final Color secondaryColor = primaryColor == UColors.orange ? UColors.greenDark : UColors.orange;
-    final UButtonStyle currentButtonStyle = (slide['btnColor'].value == UColors.orange.value) ? UButtonStyle.orange : UButtonStyle.green;
+    final Color secondaryColor = primaryColor == UColors.orange
+        ? UColors.greenDark
+        : UColors.orange;
+    final UButtonStyle currentButtonStyle =
+        (slide['btnColor'].value == UColors.orange.value)
+        ? UButtonStyle.orange
+        : UButtonStyle.green;
 
     return Container(
       width: double.infinity,
@@ -303,13 +276,14 @@ class _HeroSectionState extends State<_HeroSection> {
         children: [
           Expanded(
             flex: 5,
-            child: _buildTextContent(slide, currentButtonStyle, isMobile: false),
+            child: _buildTextContent(
+              slide,
+              currentButtonStyle,
+              isMobile: false,
+            ),
           ),
           const SizedBox(width: 40),
-          Expanded(
-            flex: 5,
-            child: _buildImageContent(slide, isMobile: false),
-          ),
+          Expanded(flex: 5, child: _buildImageContent(slide, isMobile: false)),
         ],
       ),
     );
@@ -318,7 +292,10 @@ class _HeroSectionState extends State<_HeroSection> {
   // --- NUEVA VERSIÓN MÓVIL ---
   Widget _buildMobileSlide(Map<String, dynamic> slide) {
     final Color primaryColor = slide['btnColor'];
-    final UButtonStyle currentButtonStyle = (slide['btnColor'].value == UColors.orange.value) ? UButtonStyle.orange : UButtonStyle.green;
+    final UButtonStyle currentButtonStyle =
+        (slide['btnColor'].value == UColors.orange.value)
+        ? UButtonStyle.orange
+        : UButtonStyle.green;
 
     return Container(
       width: double.infinity,
@@ -343,10 +320,16 @@ class _HeroSectionState extends State<_HeroSection> {
   }
 
   // Métodos auxiliares para no repetir código de widgets internos
-  Widget _buildTextContent(Map<String, dynamic> slide, UButtonStyle style, {required bool isMobile}) {
+  Widget _buildTextContent(
+    Map<String, dynamic> slide,
+    UButtonStyle style, {
+    required bool isMobile,
+  }) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -354,16 +337,30 @@ class _HeroSectionState extends State<_HeroSection> {
             color: slide['badgeColor'],
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Text(slide['badge'], style: GoogleFonts.lexend(color: slide['badgeTextColor'], fontWeight: FontWeight.w700, fontSize: 10)),
+          child: Text(
+            slide['badge'],
+            style: GoogleFonts.lexend(
+              color: slide['badgeTextColor'],
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+            ),
+          ),
         ),
         const SizedBox(height: 25),
         RichText(
           textAlign: isMobile ? TextAlign.center : TextAlign.left,
           text: TextSpan(
-            style: GoogleFonts.lexend(color: UColors.textDark, fontSize: isMobile ? 32 : 50, height: 1.1),
+            style: GoogleFonts.lexend(
+              color: UColors.textDark,
+              fontSize: isMobile ? 32 : 50,
+              height: 1.1,
+            ),
             children: [
               TextSpan(text: slide['titlePart1']),
-              TextSpan(text: slide['titlePart2'], style: TextStyle(color: slide['btnColor'])),
+              TextSpan(
+                text: slide['titlePart2'],
+                style: TextStyle(color: slide['btnColor']),
+              ),
             ],
           ),
         ),
@@ -371,21 +368,27 @@ class _HeroSectionState extends State<_HeroSection> {
         Text(
           slide['description'],
           textAlign: isMobile ? TextAlign.center : TextAlign.left,
-          style: GoogleFonts.lexend(color: UColors.textGray, fontSize: isMobile ? 15 : 17, height: 1.5),
+          style: GoogleFonts.lexend(
+            color: UColors.textGray,
+            fontSize: isMobile ? 15 : 17,
+            height: 1.5,
+          ),
         ),
         const SizedBox(height: 35),
         Row(
-          mainAxisAlignment: isMobile ? MainAxisAlignment.center : MainAxisAlignment.start,
+          mainAxisAlignment: isMobile
+              ? MainAxisAlignment.center
+              : MainAxisAlignment.start,
           children: [
             UButtonPrimary(
-              text: 'Empezar', 
-              style: style, 
+              text: 'Empezar',
+              style: style,
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const LoginPage()),
                 );
-              }
+              },
             ),
             const SizedBox(width: 12),
             UButtonSecondary(text: 'Saber más', style: style, onPressed: () {}),
@@ -395,7 +398,10 @@ class _HeroSectionState extends State<_HeroSection> {
     );
   }
 
-  Widget _buildImageContent(Map<String, dynamic> slide, {required bool isMobile}) {
+  Widget _buildImageContent(
+    Map<String, dynamic> slide, {
+    required bool isMobile,
+  }) {
     return SizedBox(
       height: isMobile ? 250 : 450,
       width: double.infinity,
@@ -423,7 +429,7 @@ class _WhyUNITESection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Ya no necesitamos la variable isMobile para el alineamiento si queremos todo centrado
-    
+
     return Container(
       color: UColors.white,
       padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 20),
@@ -432,13 +438,13 @@ class _WhyUNITESection extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 900),
           child: Column(
             // 1. CAMBIAMOS ESTO A CENTER PARA TODO (WEB Y MÓVIL)
-            crossAxisAlignment: CrossAxisAlignment.center, 
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // --- TÍTULO ---
               const Text(
                 '¿Por qué usar U-NITE?',
                 // 2. FORZAMOS EL CENTRADO DEL TEXTO
-                textAlign: TextAlign.center, 
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: UColors.textDark,
                   fontWeight: FontWeight.w900,
@@ -446,9 +452,9 @@ class _WhyUNITESection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               // --- LÍNEA NARANJA ---
-              // Al estar en una Column con CrossAxisAlignment.center, 
+              // Al estar en una Column con CrossAxisAlignment.center,
               // el Container se centrará automáticamente.
               Container(
                 width: 50,
@@ -472,21 +478,24 @@ class _WhyUNITESection extends StatelessWidget {
                     iconBg: const Color(0xFFD4EDDA),
                     iconColor: const Color(0xFF2E7D32),
                     title: 'Seguridad',
-                    description: 'Transacciones protegidas y sistema de reputación interna para que compres y vendas con total tranquilidad.',
+                    description:
+                        'Transacciones protegidas y sistema de reputación interna para que compres y vendas con total tranquilidad.',
                   ),
                   _buildCard(
                     iconData: Icons.savings_rounded,
                     iconBg: const Color(0xFFD6E4FF),
                     iconColor: UColors.blueIcon,
                     title: 'Ahorro',
-                    description: 'Precios pensados para estudiantes. Encuentra materiales y gadgets a una fracción de su costo original.',
+                    description:
+                        'Precios pensados para estudiantes. Encuentra materiales y gadgets a una fracción de su costo original.',
                   ),
                   _buildCard(
                     iconData: Icons.groups_rounded,
                     iconBg: const Color(0xFFFFEDD8),
                     iconColor: UColors.orange,
                     title: 'Grupos de Estudio',
-                    description: 'Encuentra compañeros para tus materias y únete a grupos de estudio específicos de tu facultad.',
+                    description:
+                        'Encuentra compañeros para tus materias y únete a grupos de estudio específicos de tu facultad.',
                   ),
                 ],
               ),
@@ -498,7 +507,13 @@ class _WhyUNITESection extends StatelessWidget {
   }
 
   // Pequeña función auxiliar para no repetir tanto código de las tarjetas
-  Widget _buildCard({required IconData iconData, required Color iconBg, required Color iconColor, required String title, required String description}) {
+  Widget _buildCard({
+    required IconData iconData,
+    required Color iconBg,
+    required Color iconColor,
+    required String title,
+    required String description,
+  }) {
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 280),
       child: _FeatureCard(
@@ -543,21 +558,27 @@ class _FeatureCardState extends State<_FeatureCard> {
       onExit: (_) => setState(() => isHovered = false),
       cursor: SystemMouseCursors.click, // Cambia el puntero a una mano
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250), // Duración de la transición
+        duration: const Duration(
+          milliseconds: 250,
+        ), // Duración de la transición
         curve: Curves.easeOutCubic, // Curva de animación fluida
         padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 60),
         // EFECTO DE ESCALA Y POSICIÓN
-        transform: isHovered 
-            ? (Matrix4.identity()..translate(0, -12, 0)..scale(1.03)) 
+        transform: isHovered
+            ? (Matrix4.identity()
+                ..translate(0, -12, 0)
+                ..scale(1.03))
             : Matrix4.identity(),
         decoration: BoxDecoration(
           color: UColors.white,
-          borderRadius: BorderRadius.circular(20), // Un poco más redondeado se ve más moderno
+          borderRadius: BorderRadius.circular(
+            20,
+          ), // Un poco más redondeado se ve más moderno
           boxShadow: [
             BoxShadow(
               // Si hay hover, la sombra es más grande y suave
-              color: isHovered 
-                  ? Colors.black.withOpacity(0.12) 
+              color: isHovered
+                  ? Colors.black.withOpacity(0.12)
                   : Colors.black.withOpacity(0.07),
               blurRadius: isHovered ? 30 : 20,
               offset: isHovered ? const Offset(0, 15) : const Offset(0, 4),
@@ -565,7 +586,9 @@ class _FeatureCardState extends State<_FeatureCard> {
           ],
           // El borde se vuelve sutilmente más oscuro en hover
           border: Border.all(
-            color: isHovered ? UColors.greenDark.withOpacity(0.3) : UColors.cardBorder, 
+            color: isHovered
+                ? UColors.greenDark.withOpacity(0.3)
+                : UColors.cardBorder,
             width: 1.5,
           ),
         ),
@@ -627,14 +650,21 @@ class _CatalogSection extends StatelessWidget {
     return Container(
       decoration: UColors.decoracionVignette,
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 40, // Reducimos un poco el padding lateral en Web para pegar más las tarjetas al borde
-        vertical: 60
+        horizontal: isMobile
+            ? 20
+            : 40, // Reducimos un poco el padding lateral en Web para pegar más las tarjetas al borde
+        vertical: 60,
       ),
-      child: Center( // Center para que el ConstrainedBox funcione
+      child: Center(
+        // Center para que el ConstrainedBox funcione
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1300), // Aumentamos de 900 a 1200 para dar más aire en Web
+          constraints: const BoxConstraints(
+            maxWidth: 1300,
+          ), // Aumentamos de 900 a 1200 para dar más aire en Web
           child: Column(
-            crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+            crossAxisAlignment: isMobile
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
             children: [
               Text(
                 'EXPLORA EL CAMPUS',
@@ -646,23 +676,23 @@ class _CatalogSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              
-              isMobile 
-                ? Column(
-                    children: [
-                      _titleText(),
-                      const SizedBox(height: 10),
-                      _viewAllButton(),
-                    ],
-                  )
-                : Row(
-                    children: [
-                      _titleText(),
-                      const Spacer(),
-                      _viewAllButton(),
-                    ],
-                  ),
-                  
+
+              isMobile
+                  ? Column(
+                      children: [
+                        _titleText(),
+                        const SizedBox(height: 10),
+                        _viewAllButton(),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        _titleText(),
+                        const Spacer(),
+                        _viewAllButton(),
+                      ],
+                    ),
+
               const SizedBox(height: 40),
 
               Center(
@@ -703,7 +733,8 @@ class _CatalogSection extends StatelessWidget {
   }
 
   Widget _titleText() {
-    return const Center( // Agrega este Center
+    return const Center(
+      // Agrega este Center
       child: Text(
         'Lo que puedes encontrar',
         textAlign: TextAlign.center,
@@ -758,10 +789,12 @@ class _ProductCardState extends State<_ProductCard> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 700;
-    
+
     // --- CAMBIO EN EL TAMAÑO ---
     // En Web ahora miden 350px de ancho para verse más imponentes
-    final double cardWidth = isMobile ? MediaQuery.of(context).size.width * 0.85 : 350;
+    final double cardWidth = isMobile
+        ? MediaQuery.of(context).size.width * 0.85
+        : 350;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -775,7 +808,9 @@ class _ProductCardState extends State<_ProductCard> {
         transformAlignment: Alignment.center,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20), // Un poco más redondeado para el nuevo tamaño
+          borderRadius: BorderRadius.circular(
+            20,
+          ), // Un poco más redondeado para el nuevo tamaño
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(_isHovered ? 0.12 : 0.06),
@@ -791,21 +826,25 @@ class _ProductCardState extends State<_ProductCard> {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
                   child: SizedBox(
-                    height: isMobile ? 220 : 260, // Aumentamos la altura de la imagen en Web
+                    height: isMobile
+                        ? 220
+                        : 260, // Aumentamos la altura de la imagen en Web
                     width: double.infinity,
-                    child: Image.asset(
-                      widget.imageAsset,
-                      fit: BoxFit.cover,
-                    ),
+                    child: Image.asset(widget.imageAsset, fit: BoxFit.cover),
                   ),
                 ),
                 Positioned(
                   top: 15,
                   left: 15,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
@@ -849,12 +888,19 @@ class _ProductCardState extends State<_ProductCard> {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           widget.location,
-                          style: const TextStyle(color: Colors.grey, fontSize: 14),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 14,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -885,29 +931,29 @@ class _StudyGroupSection extends StatelessWidget {
       decoration: UColors.decoracionVignette,
       // Ajustamos el padding: menos horizontal en móvil
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 25 : 60, 
-        vertical: 80
+        horizontal: isMobile ? 25 : 60,
+        vertical: 80,
       ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1400),
           // Si es móvil usamos Column, si es Web usamos Row
-          child: isMobile 
-            ? Column(
-                children: [
-                  _buildImage(isMobile),
-                  const SizedBox(height: 40),
-                  _buildTextContent(isMobile),
-                ],
-              )
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(flex: 5, child: _buildImage(isMobile)),
-                  const SizedBox(width: 60),
-                  Expanded(flex: 5, child: _buildTextContent(isMobile)),
-                ],
-              ),
+          child: isMobile
+              ? Column(
+                  children: [
+                    _buildImage(isMobile),
+                    const SizedBox(height: 40),
+                    _buildTextContent(isMobile),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(flex: 5, child: _buildImage(isMobile)),
+                    const SizedBox(width: 60),
+                    Expanded(flex: 5, child: _buildTextContent(isMobile)),
+                  ],
+                ),
         ),
       ),
     );
@@ -936,7 +982,9 @@ class _StudyGroupSection extends StatelessWidget {
   Widget _buildTextContent(bool isMobile) {
     return Column(
       // Centramos el texto si es móvil
-      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         // Badge "ACADEMIC PULSE"
@@ -991,7 +1039,7 @@ class _StudyGroupSection extends StatelessWidget {
           text: 'Explorar grupos',
           icon: Icons.group_add,
           onPressed: () {},
-        )
+        ),
       ],
     );
   }
@@ -1021,7 +1069,10 @@ class _RentalSectionState extends State<_RentalSection> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted) setState(() => _currentIndex = (_currentIndex + 1) % _rentalItems.length);
+      if (mounted)
+        setState(
+          () => _currentIndex = (_currentIndex + 1) % _rentalItems.length,
+        );
     });
   }
 
@@ -1039,8 +1090,8 @@ class _RentalSectionState extends State<_RentalSection> {
     return Container(
       // Padding exterior que se ajusta en móvil
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 60, 
-        vertical: 80
+        horizontal: isMobile ? 20 : 60,
+        vertical: 80,
       ),
       child: Container(
         // En móvil dejamos que la altura sea automática (flexible)
@@ -1071,7 +1122,9 @@ class _RentalSectionState extends State<_RentalSection> {
                   key: ValueKey('bg_icon_$_currentIndex'),
                   alignment: Alignment.topLeft,
                   child: Transform.translate(
-                    offset: isMobile ? const Offset(-30, -30) : const Offset(-60, -60),
+                    offset: isMobile
+                        ? const Offset(-30, -30)
+                        : const Offset(-60, -60),
                     child: Icon(
                       currentItem['icon'],
                       size: isMobile ? 250 : 400,
@@ -1084,25 +1137,28 @@ class _RentalSectionState extends State<_RentalSection> {
               // --- CONTENIDO PRINCIPAL ---
               Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 30 : 70, 
-                  vertical: isMobile ? 40 : 0
+                  horizontal: isMobile ? 30 : 70,
+                  vertical: isMobile ? 40 : 0,
                 ),
-                child: isMobile 
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildPhotoStack(currentItem, isMobile),
-                        const SizedBox(height: 40),
-                        _buildTextContent(isMobile),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Expanded(flex: 5, child: _buildTextContent(isMobile)),
-                        const SizedBox(width: 60),
-                        Expanded(flex: 5, child: _buildPhotoStack(currentItem, isMobile)),
-                      ],
-                    ),
+                child: isMobile
+                    ? Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildPhotoStack(currentItem, isMobile),
+                          const SizedBox(height: 40),
+                          _buildTextContent(isMobile),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(flex: 5, child: _buildTextContent(isMobile)),
+                          const SizedBox(width: 60),
+                          Expanded(
+                            flex: 5,
+                            child: _buildPhotoStack(currentItem, isMobile),
+                          ),
+                        ],
+                      ),
               ),
             ],
           ),
@@ -1114,7 +1170,9 @@ class _RentalSectionState extends State<_RentalSection> {
   // Widget de Textos separado
   Widget _buildTextContent(bool isMobile) {
     return Column(
-      crossAxisAlignment: isMobile ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+      crossAxisAlignment: isMobile
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _buildBadge(),
@@ -1158,15 +1216,15 @@ class _RentalSectionState extends State<_RentalSection> {
         switchInCurve: Curves.easeOutQuart,
         transitionBuilder: (Widget child, Animation<double> animation) {
           final isEntering = child.key == ValueKey('image_$_currentIndex');
-          
+
           return AnimatedBuilder(
             animation: animation,
             builder: (context, _) {
               double blur = (1 - animation.value) * 12;
-              double slide = isEntering 
-                  ? (1 - animation.value) * 100 
+              double slide = isEntering
+                  ? (1 - animation.value) * 100
                   : (animation.value - 1) * 100;
-              
+
               return Opacity(
                 opacity: animation.value,
                 child: ImageFiltered(
@@ -1199,7 +1257,7 @@ class _RentalSectionState extends State<_RentalSection> {
             color: Colors.black.withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
-          )
+          ),
         ],
       ),
       child: ClipRRect(
@@ -1229,7 +1287,12 @@ class _RentalSectionState extends State<_RentalSection> {
       ),
       child: const Text(
         'NUEVO: ALQUILER FLEX',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1.2),
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
@@ -1248,8 +1311,8 @@ class _CTASection extends StatelessWidget {
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 25 : 60, 
-        vertical: 80
+        horizontal: isMobile ? 25 : 60,
+        vertical: 80,
       ),
       child: Column(
         children: [
@@ -1264,9 +1327,9 @@ class _CTASection extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            isMobile 
-              ? 'Crea tu cuenta hoy mismo y empieza a ahorrar mientras conectas con miles de estudiantes.'
-              : 'Crea tu cuenta hoy mismo y empieza a ahorrar\nmientras conectas con miles de estudiantes.',
+            isMobile
+                ? 'Crea tu cuenta hoy mismo y empieza a ahorrar mientras conectas con miles de estudiantes.'
+                : 'Crea tu cuenta hoy mismo y empieza a ahorrar\nmientras conectas con miles de estudiantes.',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: UColors.textGray,
@@ -1285,24 +1348,26 @@ class _CTASection extends StatelessWidget {
             },
           ),
           const SizedBox(height: 30),
-          
+
           // --- SOLUCIÓN AL OVERFLOW DE BADGES ---
-          isMobile 
-            ? Column( // En móvil, uno sobre otro
-                children: const [
-                  _CheckBadge(text: 'Verificación rápida'),
-                  SizedBox(height: 12),
-                  _CheckBadge(text: 'Sin comisiones ocultas'),
-                ],
-              )
-            : Row( // En web, uno al lado del otro
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  _CheckBadge(text: 'Verificación rápida'),
-                  SizedBox(width: 24),
-                  _CheckBadge(text: 'Sin comisiones ocultas'),
-                ],
-              ),
+          isMobile
+              ? Column(
+                  // En móvil, uno sobre otro
+                  children: const [
+                    _CheckBadge(text: 'Verificación rápida'),
+                    SizedBox(height: 12),
+                    _CheckBadge(text: 'Sin comisiones ocultas'),
+                  ],
+                )
+              : Row(
+                  // En web, uno al lado del otro
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    _CheckBadge(text: 'Verificación rápida'),
+                    SizedBox(width: 24),
+                    _CheckBadge(text: 'Sin comisiones ocultas'),
+                  ],
+                ),
         ],
       ),
     );
@@ -1316,9 +1381,14 @@ class _CheckBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min, // Importante para que Column no los estire
+      mainAxisSize:
+          MainAxisSize.min, // Importante para que Column no los estire
       children: [
-        const Icon(Icons.check_circle_outline, color: Color(0xFF4CAF50), size: 18),
+        const Icon(
+          Icons.check_circle_outline,
+          color: Color(0xFF4CAF50),
+          size: 18,
+        ),
         const SizedBox(width: 8),
         Text(
           text,
@@ -1346,31 +1416,34 @@ class _Footer extends StatelessWidget {
     return Container(
       color: const Color(0xFFF8F8F8),
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 30 : 60, 
-        vertical: 40
+        horizontal: isMobile ? 30 : 60,
+        vertical: 40,
       ),
-      child: Column( // Usamos Column como base
+      child: Column(
+        // Usamos Column como base
         children: [
-          isMobile 
-            ? Column( // DISEÑO MÓVIL
-                children: [
-                  _buildBrand(),
-                  const SizedBox(height: 30),
-                  _buildLinks(isMobile),
-                  const SizedBox(height: 30),
-                  _buildIcons(),
-                ],
-              )
-            : Row( // DISEÑO WEB
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildBrand(),
-                  const Spacer(),
-                  _buildLinks(isMobile),
-                  const SizedBox(width: 32),
-                  _buildIcons(),
-                ],
-              ),
+          isMobile
+              ? Column(
+                  // DISEÑO MÓVIL
+                  children: [
+                    _buildBrand(),
+                    const SizedBox(height: 30),
+                    _buildLinks(isMobile),
+                    const SizedBox(height: 30),
+                    _buildIcons(),
+                  ],
+                )
+              : Row(
+                  // DISEÑO WEB
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildBrand(),
+                    const Spacer(),
+                    _buildLinks(isMobile),
+                    const SizedBox(width: 32),
+                    _buildIcons(),
+                  ],
+                ),
         ],
       ),
     );
@@ -1392,11 +1465,7 @@ class _Footer extends StatelessWidget {
         SizedBox(height: 6),
         Text(
           '© 2026 U-NITE. El marketplace exclusivo para\ntu comunidad universitaria.',
-          style: TextStyle(
-            color: UColors.textGray,
-            fontSize: 13,
-            height: 1.5,
-          ),
+          style: TextStyle(color: UColors.textGray, fontSize: 13, height: 1.5),
         ),
       ],
     );
@@ -1445,7 +1514,11 @@ class _FooterLink extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: const TextStyle(color: UColors.textGray, fontSize: 13, fontWeight: FontWeight.w500),
+        style: const TextStyle(
+          color: UColors.textGray,
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }
@@ -1458,7 +1531,8 @@ class _FooterIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 36, height: 36,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: const Color(0xFFEEEEEE), width: 1.5),
@@ -1525,7 +1599,9 @@ class UButtonPrimary extends StatelessWidget {
         : [const Color(0xFF245000), const Color(0xFF4CAF7D)];
 
     return Container(
-      constraints: const BoxConstraints(maxWidth: 300), // Evita que crezca demasiado
+      constraints: const BoxConstraints(
+        maxWidth: 300,
+      ), // Evita que crezca demasiado
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(30),
         boxShadow: [
@@ -1533,7 +1609,7 @@ class UButtonPrimary extends StatelessWidget {
             color: colors[0].withOpacity(0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
-          )
+          ),
         ],
       ),
       child: Material(
@@ -1548,8 +1624,8 @@ class UButtonPrimary extends StatelessWidget {
             borderRadius: BorderRadius.circular(30),
             child: Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: isSmall ? 20 : 35, 
-                vertical: isSmall ? 10 : 12
+                horizontal: isSmall ? 20 : 35,
+                vertical: isSmall ? 10 : 12,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1559,7 +1635,8 @@ class UButtonPrimary extends StatelessWidget {
                     Icon(icon, size: isSmall ? 18 : 20, color: Colors.white),
                     const SizedBox(width: 8),
                   ],
-                  Flexible( // <--- Esto evita el overflow
+                  Flexible(
+                    // <--- Esto evita el overflow
                     child: Text(
                       text,
                       textAlign: TextAlign.center,
@@ -1621,8 +1698,8 @@ class UButtonSecondary extends StatelessWidget {
           child: Container(
             constraints: const BoxConstraints(maxWidth: 280),
             padding: EdgeInsets.symmetric(
-              horizontal: isSmall ? 20 : 30, 
-              vertical: isSmall ? 9 : 11
+              horizontal: isSmall ? 20 : 30,
+              vertical: isSmall ? 9 : 11,
             ),
             child: ShaderMask(
               shaderCallback: (bounds) => LinearGradient(
@@ -1636,7 +1713,8 @@ class UButtonSecondary extends StatelessWidget {
                     Icon(icon, size: isSmall ? 18 : 20, color: Colors.white),
                     const SizedBox(width: 8),
                   ],
-                  Flexible( // <--- Esto evita el overflow
+                  Flexible(
+                    // <--- Esto evita el overflow
                     child: Text(
                       text,
                       textAlign: TextAlign.center,
@@ -1675,7 +1753,7 @@ class GradientOutlinePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     Rect rect = Offset.zero & size;
     RRect rRect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
-    
+
     Paint paint = Paint()
       ..shader = gradient.createShader(rect)
       ..style = PaintingStyle.stroke

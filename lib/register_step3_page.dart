@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'login_page.dart';
+import 'market.dart';
+import 'theme.dart';
 
 class RegisterStep3Page extends StatefulWidget {
   const RegisterStep3Page({super.key});
@@ -9,24 +10,6 @@ class RegisterStep3Page extends StatefulWidget {
   State<RegisterStep3Page> createState() => _RegisterStep3PageState();
 }
 
-// ───────────────────────────────────────────────────────────────
-// Paleta de colores
-// ───────────────────────────────────────────────────────────────
-class UColors {
-  static const orange = Color(0xFFF36900);
-  static const orangeLight = Color(0xFFF57b00);
-  static const orangeDark = Color(0xFFF05600);
-  static const sectionPink = Color(0xFFFDE8E0);
-  static const textDark = Color(0xFF1A1A1A);
-  static const textGray = Color(0xFF5B4137);
-  static const white = Color(0xFFFFFFFF);
-  static const cardBorder = Color(0xFFEEEEEE);
-  static const greenIcon = Color(0xFF4CAF7D);
-  static const blueIcon = Color(0xFF5B8DEF);
-  static const footerBg = Color(0xFFF5F5F5);
-  static const greenDark = Color(0xFF245000);
-  static const Color heroBackground = Color.fromARGB(255, 255, 204, 167);
-}
 
 class _RegisterStep3PageState extends State<RegisterStep3Page> {
   final TextEditingController _universidadController = TextEditingController();
@@ -40,7 +23,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
   // Listado de Universidades
   final List<String> _universidades = [
     "No estoy estudiando actualmente",
-    "Universidad Metropolitana"
+    "Universidad Metropolitana",
   ];
 
   // Mapa de Carreras de la UNIMET
@@ -77,7 +60,8 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                 child: Image.asset(
                   'assets/background.jpg',
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey),
+                  errorBuilder: (context, error, stackTrace) =>
+                      Container(color: Colors.grey),
                 ),
               ),
               Positioned.fill(
@@ -97,7 +81,10 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                     maxWidth: 500,
                     maxHeight: isMobile ? constraints.maxHeight * 0.9 : 650,
                   ),
-                  margin: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 20.0,
+                    vertical: 20.0,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(15.0),
@@ -118,7 +105,11 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                         'assets/logo.png',
                         height: isMobile ? 60 : 80,
                         errorBuilder: (context, error, stackTrace) =>
-                            const Icon(Icons.school, size: 60, color: UColors.orangeDark),
+                            const Icon(
+                              Icons.school,
+                              size: 60,
+                              color: UColors.orangeDark,
+                            ),
                       ),
                       const SizedBox(height: 20),
 
@@ -127,12 +118,15 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                       const SizedBox(height: 30),
 
                       // --- TÍTULO (Centrado dinámico) ---
-                      const SizedBox(width: double.infinity,
+                      const SizedBox(
+                        width: double.infinity,
                         child: Text(
                           "Datos Universitarios",
-                          textAlign: TextAlign.center, // <-- Forzamos el centrado siempre
+                          textAlign: TextAlign
+                              .center, // <-- Forzamos el centrado siempre
                           style: TextStyle(
-                            fontSize: 28, // Puedes dejarlo fijo o usar el isMobile de antes
+                            fontSize:
+                                28, // Puedes dejarlo fijo o usar el isMobile de antes
                             fontWeight: FontWeight.w900,
                             color: Colors.black87,
                           ),
@@ -141,14 +135,15 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                       const SizedBox(height: 8),
                       const Text(
                         "Casi terminamos. Cuéntanos sobre tus estudios.",
-                        textAlign: TextAlign.center, // <-- Forzamos el centrado siempre
+                        textAlign: TextAlign
+                            .center, // <-- Forzamos el centrado siempre
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.black54,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      
+
                       const SizedBox(height: 20),
 
                       // SECCIÓN DE SCROLL INTERNO
@@ -170,7 +165,8 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                 onChanged: (value) {
                                   setState(() {
                                     _selectedUniversidad = value;
-                                    _selectedCarrera = null; // Reiniciar carrera si cambia la universidad
+                                    _selectedCarrera =
+                                        null; // Reiniciar carrera si cambia la universidad
                                   });
                                 },
                               ),
@@ -179,18 +175,32 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                               // Carrera (Se habilita solo si es la UNIMET)
                               _buildFormField(
                                 label: "CARRERA / FACULTAD",
-                                optionalText: _selectedUniversidad == "Universidad Metropolitana" ? null : "No disponible",
-                                hint: _selectedUniversidad == "Universidad Metropolitana" 
-                                    ? "Selecciona tu carrera" 
+                                optionalText:
+                                    _selectedUniversidad ==
+                                        "Universidad Metropolitana"
+                                    ? null
+                                    : "No disponible",
+                                hint:
+                                    _selectedUniversidad ==
+                                        "Universidad Metropolitana"
+                                    ? "Selecciona tu carrera"
                                     : "N/A",
                                 icon: Icons.menu_book,
                                 isDropdown: true,
                                 // Solo mostramos carreras si seleccionó UNIMET
-                                dropdownItems: _selectedUniversidad == "Universidad Metropolitana" ? _carrerasUnimet : [],
+                                dropdownItems:
+                                    _selectedUniversidad ==
+                                        "Universidad Metropolitana"
+                                    ? _carrerasUnimet
+                                    : [],
                                 selectedValue: _selectedCarrera,
-                                onChanged: _selectedUniversidad == "Universidad Metropolitana" 
-                                  ? (value) => setState(() => _selectedCarrera = value)
-                                  : null, // Deshabilitado si no es la UNIMET
+                                onChanged:
+                                    _selectedUniversidad ==
+                                        "Universidad Metropolitana"
+                                    ? (value) => setState(
+                                        () => _selectedCarrera = value,
+                                      )
+                                    : null, // Deshabilitado si no es la UNIMET
                               ),
                               const SizedBox(height: 25),
                               _buildFormField(
@@ -239,7 +249,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
         onPressed: () {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const LoginPage()),
+            MaterialPageRoute(builder: (context) => const MarketPage()),
             (route) => false,
           );
         },
@@ -254,13 +264,24 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
           children: [
             const Text(
               "Finalizar Registro",
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-              child: const Icon(Icons.check, color: UColors.orangeDark, size: 16),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check,
+                color: UColors.orangeDark,
+                size: 16,
+              ),
             ),
           ],
         ),
@@ -270,14 +291,46 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
 
   Widget _buildProgressIndicator({required int currentStep}) {
     const Color myGreyInactive = Color(0xFFCFCFCF);
-    Widget buildStepBar(int n) => Container(width: 60, height: 4, decoration: BoxDecoration(color: n == currentStep ? UColors.orangeDark : myGreyInactive, borderRadius: BorderRadius.circular(2)));
-    Widget buildStepLabel(String t, int n) => Text(t, style: TextStyle(color: n == currentStep ? UColors.orangeDark : myGreyInactive, fontSize: 10, fontWeight: n == currentStep ? FontWeight.bold : FontWeight.normal));
+    Widget buildStepBar(int n) => Container(
+      width: 60,
+      height: 4,
+      decoration: BoxDecoration(
+        color: n == currentStep ? UColors.orangeDark : myGreyInactive,
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+    Widget buildStepLabel(String t, int n) => Text(
+      t,
+      style: TextStyle(
+        color: n == currentStep ? UColors.orangeDark : myGreyInactive,
+        fontSize: 10,
+        fontWeight: n == currentStep ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
 
     return Column(
       children: [
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepBar(1), const SizedBox(width: 10), buildStepBar(2), const SizedBox(width: 10), buildStepBar(3)]),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            buildStepBar(1),
+            const SizedBox(width: 10),
+            buildStepBar(2),
+            const SizedBox(width: 10),
+            buildStepBar(3),
+          ],
+        ),
         const SizedBox(height: 5),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [buildStepLabel("Paso 1 ", 1), const SizedBox(width: 30), buildStepLabel("  Paso 2", 2), const SizedBox(width: 30), buildStepLabel("   Paso 3", 3)]),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            buildStepLabel("Paso 1 ", 1),
+            const SizedBox(width: 30),
+            buildStepLabel("  Paso 2", 2),
+            const SizedBox(width: 30),
+            buildStepLabel("   Paso 3", 3),
+          ],
+        ),
       ],
     );
   }
@@ -303,15 +356,25 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             RichText(
               text: TextSpan(
                 text: label,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black54,
+                ),
                 children: [
                   if (isRequired)
-                    const TextSpan(text: " *", style: TextStyle(color: Colors.red)),
+                    const TextSpan(
+                      text: " *",
+                      style: TextStyle(color: Colors.red),
+                    ),
                 ],
               ),
             ),
             if (optionalText != null)
-              Text(optionalText, style: const TextStyle(fontSize: 11, color: Colors.black38)),
+              Text(
+                optionalText,
+                style: const TextStyle(fontSize: 11, color: Colors.black38),
+              ),
           ],
         ),
         const SizedBox(height: 8),
@@ -331,23 +394,37 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                     ? DropdownButtonHideUnderline(
                         child: DropdownButtonFormField<String>(
                           value: selectedValue,
-                          hint: Text(hint, style: const TextStyle(fontSize: 14, color: Colors.black38)),
+                          hint: Text(
+                            hint,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black38,
+                            ),
+                          ),
                           isExpanded: true,
                           items: dropdownItems?.map((String value) {
                             return DropdownMenuItem<String>(
                               value: value,
-                              child: Text(value, style: const TextStyle(fontSize: 14)),
+                              child: Text(
+                                value,
+                                style: const TextStyle(fontSize: 14),
+                              ),
                             );
                           }).toList(),
                           onChanged: onChanged,
-                          decoration: const InputDecoration(border: InputBorder.none),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                          ),
                         ),
                       )
                     : TextFormField(
                         controller: controller,
                         decoration: InputDecoration(
                           hintText: hint,
-                          hintStyle: const TextStyle(color: Colors.black38, fontSize: 14),
+                          hintStyle: const TextStyle(
+                            color: Colors.black38,
+                            fontSize: 14,
+                          ),
                           border: InputBorder.none,
                         ),
                       ),

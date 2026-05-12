@@ -1,6 +1,8 @@
-import 'dart:ui'; // Necesario para ImageFilter.blur
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'register_page.dart';
+import 'market.dart';
+import 'theme.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -9,24 +11,7 @@ class LoginPage extends StatefulWidget {
   _LoginPageState createState() => _LoginPageState();
 }
 
-// ───────────────────────────────────────────────────────────────
-// Paleta de colores
-// ───────────────────────────────────────────────────────────────
-class UColors {
-  static const orange = Color(0xFFF36900);
-  static const orangeLight = Color(0xFFF57b00);
-  static const orangeDark = Color(0xFFF05600);
-  static const sectionPink = Color(0xFFFDE8E0);
-  static const textDark = Color(0xFF1A1A1A);
-  static const textGray = Color(0xFF5B4137);
-  static const white = Color(0xFFFFFFFF);
-  static const cardBorder = Color(0xFFEEEEEE);
-  static const greenIcon = Color(0xFF4CAF7D);
-  static const blueIcon = Color(0xFF5B8DEF);
-  static const footerBg = Color(0xFFF5F5F5);
-  static const greenDark = Color(0xFF245000);
-  static const Color heroBackground = Color.fromARGB(255, 255, 204, 167);
-}
+
 
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
@@ -174,7 +159,12 @@ class _LoginPageState extends State<LoginPage> {
                                 width: double.infinity,
                                 height: 50,
                                 child: ElevatedButton(
-                                  onPressed: () {},
+                                  onPressed: () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const MarketPage()),
+                                    );
+                                  },
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: UColors.orangeDark,
                                     shape: RoundedRectangleBorder(
