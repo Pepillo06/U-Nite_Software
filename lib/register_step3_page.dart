@@ -283,7 +283,8 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
               data: {
                 'primer_nombre': widget.model.nombre,
                 'primer_apellido': widget.model.apellido,
-                'cedula': widget.model.cedula, 
+                'cedula': widget.model.cedula,
+                'universidad': _selectedUniversidad, 
                 'carrera': _selectedCarrera, 
               },
             );
