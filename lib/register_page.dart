@@ -39,10 +39,10 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _cedulaController = TextEditingController();
 
   void _goToStep2() {
-    registrationModel.nombre = _nombreController.text;
-    registrationModel.apellido = _apellidoController.text;
-    registrationModel.cedula = _cedulaController.text;
-    registrationModel.fechaNacimiento = _fechaController.text;
+    registrationModel.nombre = _nombreController.text.trim();
+    registrationModel.apellido = _apellidoController.text.trim();
+    registrationModel.cedula = _cedulaController.text.trim();
+    registrationModel.fechaNacimiento = _fechaController.text.trim();
 
     Navigator.push(
       context,

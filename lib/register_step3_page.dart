@@ -280,6 +280,12 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             final AuthResponse res = await supabase.auth.signUp(
               email: _correoController.text.trim(),
               password: _passwordController.text.trim(), // Asegúrate de tener este controller
+              data: {
+                'primer_nombre': widget.model.nombre,
+                'primer_apellido': widget.model.apellido,
+                'cedula': widget.model.cedula, 
+                'carrera': _selectedCarrera, 
+              },
             );
 
             final String? userId = res.user?.id;
@@ -287,16 +293,16 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             if (userId != null) {
               // 2. Insertar en la tabla de PostgreSQL de tu compañero
               // Usamos widget.model para acceder a lo que guardamos en Paso 1 y 2
-              await supabase.from('estudiantes').insert({
-                'id': userId, 
-                'primer_nombre': widget.model.nombre,
-                'primer_apellido': widget.model.apellido,
-                'cedula': int.tryParse(widget.model.cedula ?? '0'),
-                'correo': _correoController.text.trim(),
-                'universidad': _selectedUniversidad, // Variable del Paso 3
-                'carrera': _selectedCarrera,        // Variable del Paso 3
-                // Si tienes más campos en la tabla, agrégalos aquí
-              });
+              // await supabase.from('usuarios').insert({
+              //   'id': userId, 
+              //   'primer_nombre': widget.model.nombre,
+              //   'primer_apellido': widget.model.apellido,
+              //   'cedula': int.tryParse(widget.model.cedula ?? '0'),
+              //   'correo': _correoController.text.trim(),
+              //   //'universidad': _selectedUniversidad, // Variable del Paso 3
+              //   //'carrera': _selectedCarrera,        // Variable del Paso 3
+              //   // Si tienes más campos en la tabla, agrégalos aquí
+              // });
 
               // Cerramos el indicador de carga
               if (!mounted) return;
