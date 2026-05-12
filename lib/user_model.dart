@@ -1,5 +1,3 @@
-import 'register_page.dart';
-
 class UserRegistrationModel {
   // Datos del Paso 1
   String? nombre;
