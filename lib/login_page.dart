@@ -1,8 +1,10 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // 1. IMPORTAMOS SUPABASE
 import 'register_page.dart';
 import 'market.dart';
 import 'theme.dart';
+import 'test_landing_page.dart'; // 2. IMPORTAMOS TU PÁGINA DE PRUEBAS
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -17,6 +19,68 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscureText = true;
+  
+  // --- AÑADIMOS ESTA VARIABLE PARA CONTROLAR EL ESTADO DE CARGA ---
+  bool _isLoading = false;
+
+  // --- FUNCIÓN QUE CONECTA CON SUPABASE AL PRESIONAR EL BOTÓN ---
+  Future<void> _iniciarSesion() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, ingresa tu correo y contraseña')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true; // Encendemos la animación de carga
+    });
+
+    try {
+      // Hacemos la petición a Supabase
+      final res = await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      // Si todo sale bien y el widget sigue visible, navegamos a la landing page
+      if (res.user != null && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const TestLandingPage()),
+        );
+      }
+    } on AuthException catch (error) {
+      // Atrapa errores específicos de login (contraseña incorrecta, correo no existe, etc.)
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.message), 
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      // Cualquier otro error inesperado
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ocurrió un error inesperado al iniciar sesión'), 
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Apagamos la animación de carga
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -154,31 +218,37 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: 30),
 
-                              // --- BOTÓN ENTRAR ---
+                              // --- BOTÓN ENTRAR (AQUÍ CONECTAMOS LA LÓGICA) ---
                               SizedBox(
                                 width: double.infinity,
                                 height: 50,
                                 child: ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(builder: (context) => const MarketPage()),
-                                    );
-                                  },
+                                  // Deshabilitamos el botón si está cargando para evitar doble clic
+                                  onPressed: _isLoading ? null : _iniciarSesion,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: UColors.orangeDark,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8.0),
                                     ),
                                   ),
-                                  child: const Text(
-                                    "Ingresar",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                                  // Mostramos el indicador de carga o el texto
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2.5,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "Ingresar",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                 ),
                               ),
                             ],
@@ -244,7 +314,7 @@ class _LoginPageState extends State<LoginPage> {
       prefixIcon: Icon(icon, color: Colors.black38, size: 20),
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.black26, fontSize: 14),
-      fillColor: Color(0xFFF9F9F9),
+      fillColor: const Color(0xFFF9F9F9),
       filled: true,
       contentPadding: const EdgeInsets.symmetric(vertical: 15),
       border: OutlineInputBorder(
