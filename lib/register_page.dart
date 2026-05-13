@@ -22,6 +22,30 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _cedulaController = TextEditingController();
 
   void _goToStep2() {
+    setState(() {
+      // Validamos cada campo y asignamos mensaje si está vacío
+      _nombreError = _nombreController.text.trim().isEmpty 
+          ? "* El nombre es obligatorio" 
+          : null;
+      _apellidoError = _apellidoController.text.trim().isEmpty 
+          ? "* El apellido es obligatorio" 
+          : null;
+      _cedulaError = _cedulaController.text.trim().isEmpty 
+          ? "* La cédula es obligatoria" 
+          : null;
+      _fechaError = _fechaController.text.trim().isEmpty 
+          ? "* La fecha es obligatoria" 
+          : null;
+    });
+
+    // Si alguno tiene error, detenemos la ejecución
+    if (_nombreError != null || 
+        _apellidoError != null || 
+        _cedulaError != null || 
+        _fechaError != null) {
+      return;
+    }
+
     registrationModel.nombre = _nombreController.text.trim();
     registrationModel.apellido = _apellidoController.text.trim();
     registrationModel.cedula = _cedulaController.text.trim();
@@ -38,6 +62,7 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _nombreError;
   String? _apellidoError;
   String? _cedulaError;
+  String? _fechaError;
 
   bool _showCalendar = false;
   DateTime _selectedDate = DateTime.now();
@@ -141,6 +166,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 "Fecha de Nacimiento",
                                 "dd/mm/yyyy",
                                 controller: _fechaController,
+                                errorText: _fechaError,
                                 icon: Icons.calendar_today_outlined,
                                 readOnly: true,
                                 onTap: () => setState(

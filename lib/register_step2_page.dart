@@ -88,7 +88,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                             runSpacing: 20,
                             alignment: WrapAlignment.center,
                             children: [
-                              _buildResponsiveCard(0, "Comprador", "Busco comprar libros, herramientas y materiales universitarios.", Icons.person, Colors.green.withValues(alpha: 0.2), Colors.green[800]!, isMobile),
+                              //_buildResponsiveCard(0, "Comprador", "Busco comprar libros, herramientas y materiales universitarios.", Icons.person, Colors.green.withValues(alpha: 0.2), Colors.green[800]!, isMobile),
                               _buildResponsiveCard(1, "Vendedor", "Quiero publicar artículos u ofrecer materiales a otros estudiantes.", Icons.local_offer, UColors.orangeDark.withValues(alpha: 0.2), UColors.orangeDark, isMobile),
                               _buildResponsiveCard(2, "Estudiante", "Quiero conectar para grupos de estudio o proyectos de materias.", Icons.groups, Colors.blue.withValues(alpha: 0.2), Colors.blue[800]!, isMobile),
                             ],

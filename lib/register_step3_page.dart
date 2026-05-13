@@ -23,6 +23,10 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
   // Variables para controlar las selecciones
   String? _selectedUniversidad;
   String? _selectedCarrera;
+  String? _universidadError;
+  String? _carreraError;
+  String? _correoError;
+  String? _passwordError;
 
   // Listado de Universidades
   final List<String> _universidades = [
@@ -163,6 +167,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                 isRequired: true,
                                 hint: "Selecciona tu universidad",
                                 icon: Icons.school,
+                                errorText: _universidadError,
                                 isDropdown: true,
                                 dropdownItems: _universidades,
                                 selectedValue: _selectedUniversidad,
@@ -190,6 +195,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                     ? "Selecciona tu carrera"
                                     : "N/A",
                                 icon: Icons.menu_book,
+                                errorText: _carreraError,
                                 isDropdown: true,
                                 // Solo mostramos carreras si seleccionó UNIMET
                                 dropdownItems:
@@ -213,6 +219,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                 //hintColor: UColors.orangeDark.withOpacity(0.5),
                                 controller: _correoController,
                                 icon: Icons.email,
+                                errorText: _correoError,
                               ),
                               const SizedBox(height: 20),
                               _buildFormField(
@@ -220,6 +227,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                 isRequired: true,
                                 hint: "Crea una contraseña segura",
                                 icon: Icons.lock,
+                                errorText: _passwordError,
                                 controller: _passwordController,
                                 isPassword: true, // Nueva propiedad que usaremos abajo
                                 obscureText: _obscurePassword,
@@ -266,6 +274,32 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
       height: 50,
       child: ElevatedButton(
         onPressed: () async {
+          setState(() {
+            _universidadError = _selectedUniversidad == null ? "Selecciona una universidad" : null;
+            
+            // Validamos carrera solo si seleccionó UNIMET
+            if (_selectedUniversidad == "Universidad Metropolitana") {
+              _carreraError = _selectedCarrera == null ? "Selecciona tu carrera" : null;
+            } else {
+              _carreraError = null;
+            }
+
+            _correoError = _correoController.text.trim().isEmpty ? "El correo es obligatorio" : null;
+            
+            if (_passwordController.text.isEmpty) {
+              _passwordError = "La contraseña es obligatoria";
+            } else if (_passwordController.text.length < 6) {
+              _passwordError = "La contraseña debe contener mínimo 6 caracteres";
+            } else {
+              _passwordError = null;
+            }
+          });
+
+          // Si hay algún error, detenemos la ejecución
+          if (_universidadError != null || _carreraError != null || 
+              _correoError != null || _passwordError != null) {
+            return;
+          }
           // Mostramos un indicador de carga para que el usuario no de clic mil veces
           showDialog(
             context: context,
@@ -434,6 +468,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
     bool isPassword = false,
     bool obscureText = false,
     VoidCallback? onSuffixIconPressed,
+    String? errorText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,11 +506,18 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: Colors.black12, width: 1.0),
+            border: Border.all(
+              color: errorText != null ? Colors.redAccent : Colors.black12, 
+              width: errorText != null ? 1.5 : 1.0,
+            ),
           ),
           child: Row(
             children: [
-              Icon(icon, color: Colors.brown[400], size: 20),
+              Icon(
+                icon, 
+                color: errorText != null ? Colors.redAccent : Colors.brown[400], 
+                size: 20
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: isDropdown
@@ -531,6 +573,14 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             ],
           ),
         ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 5, left: 8),
+            child: Text(
+              errorText,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+            ),
+          ),
       ],
     );
   }
