@@ -3,6 +3,7 @@ import 'theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_page.dart';
 import 'post_item.dart';
+import 'login_page.dart';
 
 
 // ==========================================
@@ -242,6 +243,24 @@ final List<_Producto> _productosPrueba = [
 // WIDGETS
 // ==========================================
 
+// Función auxiliar para verificar si el usuario está logueado
+bool _verificarAutenticacion(BuildContext context) {
+  if (Supabase.instance.client.auth.currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Debes iniciar sesión para realizar esta acción'),
+        backgroundColor: UColors.orange,
+      ),
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+    return false;
+  }
+  return true;
+}
+
 // ------------------------------------------
 // 1. Barra de Navegación Superior
 // ------------------------------------------
@@ -360,23 +379,37 @@ class _BarraNavegacionSuperiorState extends State<BarraNavegacionSuperior> {
             children: [
               IconButton(
                 icon: const Icon(Icons.notifications_none),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Notificaciones'),
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    _mostrarMensaje(context, 'Abriendo Notificaciones');
+                  }
+                },
               ),
               IconButton(
                 icon: const Icon(Icons.message_outlined),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Mensajes'),
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    _mostrarMensaje(context, 'Abriendo Mensajes');
+                  }
+                },
               ),
               IconButton(
                 icon: const Icon(Icons.shopping_cart_outlined),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Carrito'),
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    _mostrarMensaje(context, 'Abriendo Carrito');
+                  }
+                },
               ),
               const SizedBox(width: 16),
               ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const PublicarArticuloPage()),
-                  );
+                  if (_verificarAutenticacion(context)) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const PublicarArticuloPage()),
+                    );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: UColors.orange,
@@ -399,12 +432,14 @@ class _BarraNavegacionSuperiorState extends State<BarraNavegacionSuperior> {
               // ---------------------------------------------------
               InkWell(
                 onTap: () async {
-                  // Navegamos de forma real a la pantalla de Perfil
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ProfilePage()),
-                  );
-                  _cargarDatosUsuario(); // Volvemos a llamar a la función que pide los datos a Supabase
+                  if (_verificarAutenticacion(context)) {
+                    // Navegamos de forma real a la pantalla de Perfil
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ProfilePage()),
+                    );
+                    _cargarDatosUsuario(); // Volvemos a llamar a la función que pide los datos a Supabase
+                  }
                 },
                 borderRadius: BorderRadius.circular(24),
                 child: Padding(
@@ -603,12 +638,14 @@ class _TarjetaProducto extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => _PantallaDetalleProducto(producto: producto),
-          ),
-        );
+        if (_verificarAutenticacion(context)) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => _PantallaDetalleProducto(producto: producto),
+            ),
+          );
+        }
       },
 
       borderRadius: BorderRadius.circular(12),

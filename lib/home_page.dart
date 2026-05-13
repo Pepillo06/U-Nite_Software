@@ -5,6 +5,7 @@ import 'dart:ui'; // Necesario para el efecto de Blur
 import 'login_page.dart';
 import 'register_page.dart';
 import 'theme.dart';
+import 'market.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  HOME PAGE
@@ -106,6 +107,33 @@ class _Navbar extends StatelessWidget {
                 color: UColors.textDark,
                 fontWeight: FontWeight.w700,
                 // Fuente más pequeña en móvil
+                fontSize: isMobile ? 13 : 15,
+              ),
+            ),
+          ),
+
+          // Entrar como invitado
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MarketPage()),
+              );
+            },
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 24,
+                vertical: isMobile ? 10 : 20,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            child: Text(
+              'Entrar como invitado',
+              style: TextStyle(
+                color: UColors.orange,
+                fontWeight: FontWeight.w700,
                 fontSize: isMobile ? 13 : 15,
               ),
             ),
@@ -1491,7 +1519,7 @@ class _Footer extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: const [
         _FooterIcon(Icons.share_outlined),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         _FooterIcon(Icons.language_outlined),
       ],
     );
