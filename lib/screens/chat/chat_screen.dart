@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+
 class ChatScreen extends StatefulWidget {
   final String nombreOtro;
   final bool showAppBar;
@@ -43,6 +44,21 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+        Future<void> _adjuntarArchivo() async {
+        // En web mostramos un mensaje informativo
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Función de archivos disponible en la app móvil',
+              style: GoogleFonts.lexend(color: Colors.white, fontSize: 13),
+            ),
+            backgroundColor: const Color(0xFFF36900),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
   @override
   Widget build(BuildContext context) {
     final inicial = widget.nombreOtro.isNotEmpty
@@ -70,11 +86,8 @@ class _ChatScreenState extends State<ChatScreen> {
           : null,
       body: Column(
         children: [
-          // Header del chat cuando no hay AppBar (desktop)
           if (!widget.showAppBar) _buildDesktopChatHeader(inicial),
-          // Separador "Hoy"
           _buildDaySeparator(),
-          // Mensajes
           Expanded(
             child: ListView.builder(
               controller: _scroll,
@@ -97,7 +110,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // Header para móvil (dentro del AppBar)
   Widget _buildChatHeaderTitle(String inicial) {
     return Row(
       children: [
@@ -155,7 +167,6 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // Header para desktop (encima de los mensajes, sin AppBar)
   Widget _buildDesktopChatHeader(String inicial) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -165,7 +176,6 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       child: Row(
         children: [
-          // Info del usuario
           Stack(
             children: [
               CircleAvatar(
@@ -217,7 +227,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
           const Spacer(),
-          // Tarjeta del producto
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -299,7 +308,7 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: const Icon(Icons.attach_file_rounded,
                 color: Color(0xFF5B4137), size: 22),
-            onPressed: () {},
+            onPressed: _adjuntarArchivo,
           ),
           Expanded(
             child: Container(
@@ -339,7 +348,6 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// ── Botón enviar estilo Duolingo ──────────────────────────────
 class _SendButton extends StatefulWidget {
   final VoidCallback onPressed;
   const _SendButton({required this.onPressed});
@@ -392,7 +400,6 @@ class _SendButtonState extends State<_SendButton> {
   }
 }
 
-// ── Burbuja de mensaje ────────────────────────────────────────
 class _BurbujaMensaje extends StatelessWidget {
   final String texto, hora;
   final bool isMe;
@@ -415,8 +422,7 @@ class _BurbujaMensaje extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 4),
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.65),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isMe
                   ? const Color(0xFFFFB598)

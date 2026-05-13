@@ -11,12 +11,30 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   int _selectedIndex = 0;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   final List<Map<String, dynamic>> _chats = const [
     {'nombre': 'Elena Martínez', 'preview': '¿Sigue disponible la calculadora?', 'hora': '14:20', 'online': true, 'unread': 0},
     {'nombre': 'Javier Ruiz', 'preview': '¡Perfecto, nos vemos en la biblio!', 'hora': 'Ayer', 'online': false, 'unread': 0},
     {'nombre': 'Sofía Castro', 'preview': 'Gracias por el libro de química.', 'hora': 'Lunes', 'online': false, 'unread': 3},
   ];
+
+  List<Map<String, dynamic>> get _chatsFiltrados {
+    if (_searchQuery.isEmpty) return _chats;
+    return _chats.where((chat) {
+      final nombre = chat['nombre'].toString().toLowerCase();
+      final preview = chat['preview'].toString().toLowerCase();
+      final query = _searchQuery.toLowerCase();
+      return nombre.contains(query) || preview.contains(query);
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +58,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           child: _buildChatList(onTap: (i) {
             setState(() => _selectedIndex = i);
             Navigator.push(context, MaterialPageRoute(
-              builder: (_) => ChatScreen(nombreOtro: _chats[i]['nombre']),
+              builder: (_) => ChatScreen(nombreOtro: _chatsFiltrados[i]['nombre']),
             ));
           }),
         ),
@@ -71,10 +89,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ),
         Expanded(
-          child: ChatScreen(
-            nombreOtro: _chats[_selectedIndex]['nombre'],
-            showAppBar: false,
-          ),
+          child: _chatsFiltrados.isEmpty
+              ? Center(
+                  child: Text(
+                    'No se encontraron chats',
+                    style: GoogleFonts.lexend(
+                      color: const Color(0xFF5B4137),
+                      fontSize: 15,
+                    ),
+                  ),
+                )
+              : ChatScreen(
+                  nombreOtro: _chatsFiltrados[
+                      _selectedIndex.clamp(0, _chatsFiltrados.length - 1)
+                  ]['nombre'],
+                  showAppBar: false,
+                ),
         ),
       ],
     );
@@ -104,7 +134,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
           border: Border.all(color: const Color(0xFFE3BFB1)),
         ),
         child: TextField(
-          style: GoogleFonts.lexend(fontSize: 14),
+          controller: _searchController,
+          style: GoogleFonts.lexend(fontSize: 14, color: const Color(0xFF1A1A1A)),
+          onChanged: (value) => setState(() => _searchQuery = value),
           decoration: InputDecoration(
             hintText: 'Buscar chats...',
             hintStyle: GoogleFonts.lexend(
@@ -113,6 +145,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ),
             prefixIcon: const Icon(Icons.search,
                 color: Color(0xFF5B4137), size: 20),
+            // X para limpiar la búsqueda
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.close,
+                        color: Color(0xFF5B4137), size: 18),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  )
+                : null,
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
           ),
@@ -122,10 +165,32 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildChatList({required void Function(int) onTap}) {
+    final chats = _chatsFiltrados;
+
+    if (chats.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 40,
+                color: const Color(0xFF5B4137).withOpacity(0.3)),
+            const SizedBox(height: 12),
+            Text(
+              'No se encontraron chats',
+              style: GoogleFonts.lexend(
+                color: const Color(0xFF5B4137),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return ListView.builder(
-      itemCount: _chats.length,
+      itemCount: chats.length,
       itemBuilder: (context, i) {
-        final chat = _chats[i];
+        final chat = chats[i];
         return _ChatTile(
           nombre: chat['nombre'],
           preview: chat['preview'],
@@ -133,6 +198,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           isActive: i == _selectedIndex,
           isOnline: chat['online'],
           unreadCount: chat['unread'],
+          searchQuery: _searchQuery,
           onTap: () => onTap(i),
         );
       },
@@ -141,7 +207,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 }
 
 class _ChatTile extends StatelessWidget {
-  final String nombre, preview, hora;
+  final String nombre, preview, hora, searchQuery;
   final bool isActive, isOnline;
   final int unreadCount;
   final VoidCallback onTap;
@@ -154,7 +220,37 @@ class _ChatTile extends StatelessWidget {
     required this.isOnline,
     required this.unreadCount,
     required this.onTap,
+    this.searchQuery = '',
   });
+
+  // Resalta el texto que coincide con la búsqueda
+  Widget _buildHighlightedText(String text, String query, TextStyle style) {
+    if (query.isEmpty) return Text(text, style: style, overflow: TextOverflow.ellipsis);
+
+    final lowerText = text.toLowerCase();
+    final lowerQuery = query.toLowerCase();
+    final index = lowerText.indexOf(lowerQuery);
+
+    if (index == -1) return Text(text, style: style, overflow: TextOverflow.ellipsis);
+
+    return RichText(
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: style,
+        children: [
+          TextSpan(text: text.substring(0, index)),
+          TextSpan(
+            text: text.substring(index, index + query.length),
+            style: style.copyWith(
+              backgroundColor: const Color(0xFFFFB598),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(text: text.substring(index + query.length)),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -202,23 +298,21 @@ class _ChatTile extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
+                        child: _buildHighlightedText(
                           nombre,
-                          style: GoogleFonts.lexend(
+                          searchQuery,
+                          GoogleFonts.lexend(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                             color: const Color(0xFF1A1A1A),
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      Text(
-                        hora,
-                        style: GoogleFonts.lexend(
-                          fontSize: 11,
-                          color: const Color(0xFF5B4137),
-                        ),
-                      ),
+                      Text(hora,
+                          style: GoogleFonts.lexend(
+                            fontSize: 11,
+                            color: const Color(0xFF5B4137),
+                          )),
                       if (unreadCount > 0) ...[
                         const SizedBox(width: 6),
                         Container(
@@ -228,29 +322,25 @@ class _ChatTile extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
                           child: Center(
-                            child: Text(
-                              '$unreadCount',
-                              style: GoogleFonts.lexend(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                            child: Text('$unreadCount',
+                                style: GoogleFonts.lexend(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                )),
                           ),
                         ),
                       ],
                     ],
                   ),
                   const SizedBox(height: 3),
-                  Text(
+                  _buildHighlightedText(
                     preview,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.lexend(
+                    searchQuery,
+                    GoogleFonts.lexend(
                       fontSize: 12,
                       color: const Color(0xFF5B4137),
-                      fontWeight:
-                          isActive ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
                 ],
