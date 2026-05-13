@@ -5,6 +5,7 @@ import 'dart:ui'; // Necesario para el efecto de Blur
 import 'login_page.dart';
 import 'register_page.dart';
 import 'theme.dart';
+import 'market.dart';
 
 // ═══════════════════════════════════════════════════════════════
 //  HOME PAGE
@@ -106,6 +107,33 @@ class _Navbar extends StatelessWidget {
                 color: UColors.textDark,
                 fontWeight: FontWeight.w700,
                 // Fuente más pequeña en móvil
+                fontSize: isMobile ? 13 : 15,
+              ),
+            ),
+          ),
+
+          // Entrar como invitado
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const MarketPage()),
+              );
+            },
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 24,
+                vertical: isMobile ? 10 : 20,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            child: Text(
+              'Entrar como invitado',
+              style: TextStyle(
+                color: UColors.orange,
+                fontWeight: FontWeight.w700,
                 fontSize: isMobile ? 13 : 15,
               ),
             ),
@@ -410,7 +438,7 @@ class _HeroSectionState extends State<_HeroSection> {
         child: Image.asset(
           slide['image'],
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             color: slide['btnColor'].withOpacity(0.1),
             child: Icon(Icons.image, color: slide['btnColor'], size: 50),
           ),
@@ -776,7 +804,6 @@ class _ProductCard extends StatefulWidget {
     required this.title,
     required this.price,
     required this.location,
-    super.key,
   });
 
   @override
@@ -969,7 +996,7 @@ class _StudyGroupSection extends StatelessWidget {
         child: Image.asset(
           'images/study_group.jpg',
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             color: const Color(0xFFFDE8E0),
             child: const Icon(Icons.groups, size: 50, color: UColors.orange),
           ),
@@ -1069,10 +1096,11 @@ class _RentalSectionState extends State<_RentalSection> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _currentIndex = (_currentIndex + 1) % _rentalItems.length,
         );
+      }
     });
   }
 
@@ -1267,7 +1295,7 @@ class _RentalSectionState extends State<_RentalSection> {
           height: isMobile ? 280 : 420, // Altura ajustada para móvil
           width: isMobile ? double.infinity : 600,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             height: isMobile ? 280 : 420,
             color: Colors.white10,
             child: const Icon(Icons.image, color: Colors.white24, size: 50),

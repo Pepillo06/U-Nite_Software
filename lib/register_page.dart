@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'register_step2_page.dart';
 import 'theme.dart';
+import 'user_model.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -13,14 +14,55 @@ class RegisterPage extends StatefulWidget {
 
 
 class _RegisterPageState extends State<RegisterPage> {
+  final UserRegistrationModel registrationModel = UserRegistrationModel();
+
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidoController = TextEditingController();
   final TextEditingController _fechaController = TextEditingController();
   final TextEditingController _cedulaController = TextEditingController();
 
+  void _goToStep2() {
+    setState(() {
+      // Validamos cada campo y asignamos mensaje si está vacío
+      _nombreError = _nombreController.text.trim().isEmpty 
+          ? "* El nombre es obligatorio" 
+          : null;
+      _apellidoError = _apellidoController.text.trim().isEmpty 
+          ? "* El apellido es obligatorio" 
+          : null;
+      _cedulaError = _cedulaController.text.trim().isEmpty 
+          ? "* La cédula es obligatoria" 
+          : null;
+      _fechaError = _fechaController.text.trim().isEmpty 
+          ? "* La fecha es obligatoria" 
+          : null;
+    });
+
+    // Si alguno tiene error, detenemos la ejecución
+    if (_nombreError != null || 
+        _apellidoError != null || 
+        _cedulaError != null || 
+        _fechaError != null) {
+      return;
+    }
+
+    registrationModel.nombre = _nombreController.text.trim();
+    registrationModel.apellido = _apellidoController.text.trim();
+    registrationModel.cedula = _cedulaController.text.trim();
+    registrationModel.fechaNacimiento = _fechaController.text.trim();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RegisterStep2Page(model: registrationModel),
+      ),
+    );
+  }
+
   String? _nombreError;
   String? _apellidoError;
   String? _cedulaError;
+  String? _fechaError;
 
   bool _showCalendar = false;
   DateTime _selectedDate = DateTime.now();
@@ -51,7 +93,7 @@ class _RegisterPageState extends State<RegisterPage> {
               Positioned.fill(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                  child: Container(color: Colors.black.withOpacity(0.3)),
+                  child: Container(color: Colors.black.withValues(alpha: 0.3)),
                 ),
               ),
 
@@ -75,7 +117,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     borderRadius: BorderRadius.circular(15.0),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
@@ -124,6 +166,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 "Fecha de Nacimiento",
                                 "dd/mm/yyyy",
                                 controller: _fechaController,
+                                errorText: _fechaError,
                                 icon: Icons.calendar_today_outlined,
                                 readOnly: true,
                                 onTap: () => setState(
@@ -212,7 +255,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return isMobile
         ? Column(
             children: fields
-                .map((e) => e is Expanded ? (e as Expanded).child : e)
+                .map((e) => e is Expanded ? (e).child : e)
                 .toList(),
           )
         : Row(crossAxisAlignment: CrossAxisAlignment.start, children: fields);
@@ -247,12 +290,8 @@ class _RegisterPageState extends State<RegisterPage> {
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const RegisterStep2Page()),
-          );
-        },
+        // Cambiamos el código interno por la llamada a la función corregida
+        onPressed: _goToStep2, 
         style: ElevatedButton.styleFrom(
           backgroundColor: UColors.orangeDark,
           shape: RoundedRectangleBorder(
@@ -350,10 +389,10 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
         const SizedBox(height: 8),
-        RawKeyboardListener(
+        KeyboardListener(
           focusNode: FocusNode(),
-          onKey: (event) {
-            if (event is RawKeyDownEvent && event.character != null) {
+          onKeyEvent: (event) {
+            if (event is KeyDownEvent && event.character != null) {
               if (label == "Nombre" || label == "Apellido") {
                 if (RegExp(
                   r'[0-9!@#<>?":_`~;[\]\\|=+)(*&^%$]',

@@ -2,9 +2,13 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'market.dart';
 import 'theme.dart';
+import 'login_page.dart';
+import 'user_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterStep3Page extends StatefulWidget {
-  const RegisterStep3Page({super.key});
+  final UserRegistrationModel model;
+  const RegisterStep3Page({super.key, required this.model});
 
   @override
   State<RegisterStep3Page> createState() => _RegisterStep3PageState();
@@ -12,13 +16,17 @@ class RegisterStep3Page extends StatefulWidget {
 
 
 class _RegisterStep3PageState extends State<RegisterStep3Page> {
-  final TextEditingController _universidadController = TextEditingController();
-  final TextEditingController _carreraController = TextEditingController();
   final TextEditingController _correoController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _obscurePassword = true;
 
   // Variables para controlar las selecciones
   String? _selectedUniversidad;
   String? _selectedCarrera;
+  String? _universidadError;
+  String? _carreraError;
+  String? _correoError;
+  String? _passwordError;
 
   // Listado de Universidades
   final List<String> _universidades = [
@@ -67,7 +75,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
               Positioned.fill(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                  child: Container(color: Colors.black.withOpacity(0.3)),
+                  child: Container(color: Colors.black.withValues(alpha: 0.3)),
                 ),
               ),
 
@@ -90,7 +98,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                     borderRadius: BorderRadius.circular(15.0),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
@@ -159,6 +167,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                 isRequired: true,
                                 hint: "Selecciona tu universidad",
                                 icon: Icons.school,
+                                errorText: _universidadError,
                                 isDropdown: true,
                                 dropdownItems: _universidades,
                                 selectedValue: _selectedUniversidad,
@@ -186,6 +195,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                     ? "Selecciona tu carrera"
                                     : "N/A",
                                 icon: Icons.menu_book,
+                                errorText: _carreraError,
                                 isDropdown: true,
                                 // Solo mostramos carreras si seleccionó UNIMET
                                 dropdownItems:
@@ -209,6 +219,23 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                                 //hintColor: UColors.orangeDark.withOpacity(0.5),
                                 controller: _correoController,
                                 icon: Icons.email,
+                                errorText: _correoError,
+                              ),
+                              const SizedBox(height: 20),
+                              _buildFormField(
+                                label: "CONTRASEÑA",
+                                isRequired: true,
+                                hint: "Crea una contraseña segura",
+                                icon: Icons.lock,
+                                errorText: _passwordError,
+                                controller: _passwordController,
+                                isPassword: true, // Nueva propiedad que usaremos abajo
+                                obscureText: _obscurePassword,
+                                onSuffixIconPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
                               ),
                               const SizedBox(height: 20),
                             ],
@@ -246,12 +273,104 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const MarketPage()),
-            (route) => false,
+        onPressed: () async {
+          setState(() {
+            _universidadError = _selectedUniversidad == null ? "Selecciona una universidad" : null;
+            
+            // Validamos carrera solo si seleccionó UNIMET
+            if (_selectedUniversidad == "Universidad Metropolitana") {
+              _carreraError = _selectedCarrera == null ? "Selecciona tu carrera" : null;
+            } else {
+              _carreraError = null;
+            }
+
+            _correoError = _correoController.text.trim().isEmpty ? "El correo es obligatorio" : null;
+            
+            if (_passwordController.text.isEmpty) {
+              _passwordError = "La contraseña es obligatoria";
+            } else if (_passwordController.text.length < 6) {
+              _passwordError = "La contraseña debe contener mínimo 6 caracteres";
+            } else {
+              _passwordError = null;
+            }
+          });
+
+          // Si hay algún error, detenemos la ejecución
+          if (_universidadError != null || _carreraError != null || 
+              _correoError != null || _passwordError != null) {
+            return;
+          }
+          // Mostramos un indicador de carga para que el usuario no de clic mil veces
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(child: CircularProgressIndicator()),
           );
+
+          if (_passwordController.text.length < 6) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("La contraseña debe tener al menos 6 caracteres")),
+            );
+            return; // Detiene la ejecución aquí
+          }
+
+          final supabase = Supabase.instance.client;
+
+          try {
+            // 1. Crear el usuario en Supabase Auth
+            // widget.model tiene los datos de los pasos anteriores
+            // correoController tiene el del paso actual
+            final AuthResponse res = await supabase.auth.signUp(
+              email: _correoController.text.trim(),
+              password: _passwordController.text.trim(), // Asegúrate de tener este controller
+              data: {
+                'primer_nombre': widget.model.nombre,
+                'primer_apellido': widget.model.apellido,
+                'cedula': widget.model.cedula,
+                'universidad': _selectedUniversidad, 
+                'carrera': _selectedCarrera, 
+              },
+            );
+
+            final String? userId = res.user?.id;
+
+            if (userId != null) {
+              // 2. Insertar en la tabla de PostgreSQL de tu compañero
+              // Usamos widget.model para acceder a lo que guardamos en Paso 1 y 2
+              // await supabase.from('usuarios').insert({
+              //   'id': userId, 
+              //   'primer_nombre': widget.model.nombre,
+              //   'primer_apellido': widget.model.apellido,
+              //   'cedula': int.tryParse(widget.model.cedula ?? '0'),
+              //   'correo': _correoController.text.trim(),
+              //   //'universidad': _selectedUniversidad, // Variable del Paso 3
+              //   //'carrera': _selectedCarrera,        // Variable del Paso 3
+              //   // Si tienes más campos en la tabla, agrégalos aquí
+              // });
+
+              // Cerramos el indicador de carga
+              if (!mounted) return;
+              Navigator.of(context).pop();
+
+              // 3. Éxito: Vamos al Login
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                (route) => false,
+              );
+            }
+          } catch (e) {
+            // Si algo falla, cerramos la carga y mostramos el error
+            if (!mounted) return;
+            Navigator.of(context).pop();
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Error al registrar: ${e.toString()}"),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+          }
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: UColors.orangeDark,
@@ -346,6 +465,10 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
     String? selectedValue,
     ValueChanged<String?>? onChanged,
     TextEditingController? controller,
+    bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onSuffixIconPressed,
+    String? errorText,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,17 +506,24 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8.0),
-            border: Border.all(color: Colors.black12, width: 1.0),
+            border: Border.all(
+              color: errorText != null ? Colors.redAccent : Colors.black12, 
+              width: errorText != null ? 1.5 : 1.0,
+            ),
           ),
           child: Row(
             children: [
-              Icon(icon, color: Colors.brown[400], size: 20),
+              Icon(
+                icon, 
+                color: errorText != null ? Colors.redAccent : Colors.brown[400], 
+                size: 20
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: isDropdown
                     ? DropdownButtonHideUnderline(
                         child: DropdownButtonFormField<String>(
-                          value: selectedValue,
+                          initialValue: selectedValue,
                           hint: Text(
                             hint,
                             style: const TextStyle(
@@ -419,6 +549,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                       )
                     : TextFormField(
                         controller: controller,
+                        obscureText: obscureText,
                         decoration: InputDecoration(
                           hintText: hint,
                           hintStyle: const TextStyle(
@@ -426,12 +557,30 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                             fontSize: 14,
                           ),
                           border: InputBorder.none,
+                          suffixIcon: isPassword 
+                            ? IconButton(
+                                icon: Icon(
+                                  obscureText ? Icons.visibility_off : Icons.visibility,
+                                  color: Colors.black38,
+                                  size: 20,
+                                ),
+                                onPressed: onSuffixIconPressed,
+                              )
+                            : null,
                         ),
                       ),
               ),
             ],
           ),
         ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 5, left: 8),
+            child: Text(
+              errorText,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+            ),
+          ),
       ],
     );
   }

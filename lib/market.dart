@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'profile_page.dart';
+import 'post_item.dart';
+import 'login_page.dart';
 
 
 // ==========================================
@@ -27,7 +31,7 @@ class _MarketPageState extends State<MarketPage> {
       backgroundColor: UColors.footerBg,
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: _BarraNavegacionSuperior()),
+          const SliverToBoxAdapter(child: BarraNavegacionSuperior()),
           SliverToBoxAdapter(
             child: _FiltrosCategorias(
               categoriaActual: _categoriaSeleccionada,
@@ -239,11 +243,76 @@ final List<_Producto> _productosPrueba = [
 // WIDGETS
 // ==========================================
 
+// Función auxiliar para verificar si el usuario está logueado
+bool _verificarAutenticacion(BuildContext context) {
+  if (Supabase.instance.client.auth.currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Debes iniciar sesión para realizar esta acción'),
+        backgroundColor: UColors.orange,
+      ),
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+    return false;
+  }
+  return true;
+}
+
 // ------------------------------------------
 // 1. Barra de Navegación Superior
 // ------------------------------------------
-class _BarraNavegacionSuperior extends StatelessWidget {
-  const _BarraNavegacionSuperior();
+// ------------------------------------------
+// 1. Barra de Navegación Superior (Integrada con Supabase)
+// ------------------------------------------
+class BarraNavegacionSuperior extends StatefulWidget {
+  const BarraNavegacionSuperior({super.key});
+
+  @override
+  State<BarraNavegacionSuperior> createState() => _BarraNavegacionSuperiorState();
+}
+
+class _BarraNavegacionSuperiorState extends State<BarraNavegacionSuperior> {
+  final supabase = Supabase.instance.client;
+  String? nombreCompleto;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatosUsuario();
+  }
+
+  Future<void> _cargarDatosUsuario() async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        setState(() => isLoading = false);
+        return;
+      }
+
+      // Hacemos el SELECT pidiendo primer_nombre y apellido
+      // (OJO: verifica que tu columna en la BD se llame 'apellido' o 'primer_apellido')
+      final response = await supabase
+          .from('usuarios')
+          .select('primer_nombre, primer_apellido')
+          .eq('id', user.id)
+          .single();
+
+      final nombre = response['primer_nombre'] as String? ?? '';
+      final apellido = response['primer_apellido'] as String? ?? '';
+
+      setState(() {
+        nombreCompleto = '$nombre $apellido'.trim();
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error al cargar el nombre: $e');
+      setState(() => isLoading = false);
+    }
+  }
 
   void _mostrarMensaje(BuildContext context, String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -261,7 +330,6 @@ class _BarraNavegacionSuperior extends StatelessWidget {
           // Logo
           InkWell(
             onTap: () {
-              // Navegar al inicio del marketplace
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const MarketPage()),
                 (route) => false,
@@ -272,18 +340,17 @@ class _BarraNavegacionSuperior extends StatelessWidget {
                 Image.asset(
                   'assets/logo.png',
                   height: 40,
-                  errorBuilder:
-                      (context, error, stackTrace) => const Icon(
-                        Icons.school,
-                        size: 40,
-                        color: UColors.orange,
-                      ),
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.school,
+                    size: 40,
+                    color: UColors.orange,
+                  ),
                 ),
               ],
             ),
           ),
-
           const SizedBox(width: 40),
+          
           // Buscador
           Expanded(
             child: Container(
@@ -301,41 +368,54 @@ class _BarraNavegacionSuperior extends StatelessWidget {
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
                 ),
-                onSubmitted: (value) =>
-                    _mostrarMensaje(context, 'Buscando: $value'),
+                onSubmitted: (value) => _mostrarMensaje(context, 'Buscando: $value'),
               ),
             ),
           ),
           const SizedBox(width: 40),
-          // Iconos y Botón
+          
+          // Iconos de acción y Botón Vender
           Row(
             children: [
               IconButton(
                 icon: const Icon(Icons.notifications_none),
-                onPressed: () =>
-                    _mostrarMensaje(context, 'Abriendo Notificaciones'),
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    _mostrarMensaje(context, 'Abriendo Notificaciones');
+                  }
+                },
               ),
               IconButton(
                 icon: const Icon(Icons.message_outlined),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Mensajes'),
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    _mostrarMensaje(context, 'Abriendo Mensajes');
+                  }
+                },
               ),
               IconButton(
                 icon: const Icon(Icons.shopping_cart_outlined),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Carrito'),
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    _mostrarMensaje(context, 'Abriendo Carrito');
+                  }
+                },
               ),
               const SizedBox(width: 16),
               ElevatedButton(
-                onPressed: () =>
-                    _mostrarMensaje(context, 'Navegando a Publicar Artículo'),
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const PublicarArticuloPage()),
+                    );
+                  }
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: UColors.orange,
-
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 18,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -346,23 +426,58 @@ class _BarraNavegacionSuperior extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
+
+              // ---------------------------------------------------
+              // NUEVO BOTÓN DE PERFIL (AVATAR + NOMBRE + APELLIDO)
+              // ---------------------------------------------------
               InkWell(
-                onTap: () =>
-                    _mostrarMensaje(context, 'Abriendo Perfil de Usuario'),
-                child: CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.grey.shade200,
-                  backgroundImage: const NetworkImage(
-                    'https://i.pravatar.cc/150?img=68',
+                onTap: () async {
+                  if (_verificarAutenticacion(context)) {
+                    // Navegamos de forma real a la pantalla de Perfil
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ProfilePage()),
+                    );
+                    _cargarDatosUsuario(); // Volvemos a llamar a la función que pide los datos a Supabase
+                  }
+                },
+                borderRadius: BorderRadius.circular(24),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage: const NetworkImage(
+                          'https://i.pravatar.cc/150?img=68', // Mantengo el placeholder de tu compañero
+                        ),
+                        onBackgroundImageError: (exception, stackTrace) {},
+                        child: const Icon(Icons.person, color: Colors.grey),
+                      ),
+                      const SizedBox(width: 10),
+                      // Lógica para mostrar estado de carga o el Nombre y Apellido
+                      isLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: UColors.orange),
+                            )
+                          : Text(
+                              nombreCompleto?.isNotEmpty == true
+                                  ? nombreCompleto!
+                                  : 'Mi Perfil', // Fallback por si el usuario no tiene nombre registrado
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: Colors.black87,
+                              ),
+                            ),
+                    ],
                   ),
-                  onBackgroundImageError:
-                      (
-                        exception,
-                        stackTrace,
-                      ) {}, // Evita error si falla la imagen
-                  child: const Icon(Icons.person, color: Colors.grey),
                 ),
               ),
+              // ---------------------------------------------------
             ],
           ),
         ],
@@ -523,12 +638,14 @@ class _TarjetaProducto extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => _PantallaDetalleProducto(producto: producto),
-          ),
-        );
+        if (_verificarAutenticacion(context)) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => _PantallaDetalleProducto(producto: producto),
+            ),
+          );
+        }
       },
 
       borderRadius: BorderRadius.circular(12),
@@ -538,7 +655,7 @@ class _TarjetaProducto extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -746,7 +863,7 @@ class _BannersPromocionales extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: UColors.greenIcon.withOpacity(0.2),
+        color: UColors.greenIcon.withValues(alpha: 0.2),
 
         borderRadius: BorderRadius.circular(12),
       ),
@@ -777,7 +894,7 @@ class _BannersPromocionales extends StatelessWidget {
           Text(
             'Encuentros exclusivos en puntos seguros dentro del campus universitario.',
             style: TextStyle(
-              color: UColors.greenDark.withOpacity(0.8),
+              color: UColors.greenDark.withValues(alpha: 0.8),
 
               fontSize: 16,
               fontStyle: FontStyle.italic,
@@ -806,7 +923,7 @@ class _PantallaDetalleProducto extends StatelessWidget {
       backgroundColor: UColors.white,
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: _BarraNavegacionSuperior()),
+          const SliverToBoxAdapter(child: BarraNavegacionSuperior()),
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(
