@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'register_step2_page.dart';
 import 'theme.dart';
+import 'user_model.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -13,10 +14,26 @@ class RegisterPage extends StatefulWidget {
 
 
 class _RegisterPageState extends State<RegisterPage> {
+  final UserRegistrationModel registrationModel = UserRegistrationModel();
+
   final TextEditingController _nombreController = TextEditingController();
   final TextEditingController _apellidoController = TextEditingController();
   final TextEditingController _fechaController = TextEditingController();
   final TextEditingController _cedulaController = TextEditingController();
+
+  void _goToStep2() {
+    registrationModel.nombre = _nombreController.text.trim();
+    registrationModel.apellido = _apellidoController.text.trim();
+    registrationModel.cedula = _cedulaController.text.trim();
+    registrationModel.fechaNacimiento = _fechaController.text.trim();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RegisterStep2Page(model: registrationModel),
+      ),
+    );
+  }
 
   String? _nombreError;
   String? _apellidoError;
@@ -247,12 +264,8 @@ class _RegisterPageState extends State<RegisterPage> {
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const RegisterStep2Page()),
-          );
-        },
+        // Cambiamos el código interno por la llamada a la función corregida
+        onPressed: _goToStep2, 
         style: ElevatedButton.styleFrom(
           backgroundColor: UColors.orangeDark,
           shape: RoundedRectangleBorder(
