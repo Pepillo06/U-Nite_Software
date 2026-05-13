@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'home_page.dart';
-import 'screens/chat/chat_list_screen.dart';
+
 
 void main() {
   runApp(const UNITEApp());
@@ -20,7 +20,7 @@ class UNITEApp extends StatelessWidget {
         textTheme: GoogleFonts.lexendTextTheme(),
         useMaterial3: true,
       ),
-      home: const ChatListScreen(),
+      home: const HomePage(),
       debugShowCheckedModeBanner: false,
     );
   }
