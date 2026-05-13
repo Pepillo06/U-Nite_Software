@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:dotted_border/dotted_border.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Definición de tipos de transacción
 enum TransactionType { venta, alquiler, trueque }
@@ -29,6 +30,99 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
   String? _selectedCategory;
   String? _selectedCondition;
   bool _campusPickup = true;
+  bool _isLoading = false;
+
+  Future<void> _publicarArticulo() async {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes iniciar sesión para publicar.')),
+      );
+      return;
+    }
+
+    if (_titleController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El título es obligatorio.')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Subir imágenes al storage de Supabase
+      final List<String> imageUrls = [];
+      for (int i = 0; i < _selectedImages.length; i++) {
+        try {
+          final bytes = _selectedImages[i];
+          final path =
+              '${user.id}/${DateTime.now().millisecondsSinceEpoch}_$i.jpg';
+          await supabase.storage
+              .from('foto_producto')
+              .uploadBinary(path, bytes);
+          final url = supabase.storage.from('foto_producto').getPublicUrl(path);
+          imageUrls.add(url);
+        } catch (_) {
+          // Si el bucket no existe o falla, simplemente no se agrega la imagen
+        }
+      }
+
+      // 2. Construir el JSON de modalidades
+      final Map<String, dynamic> modalidades = {};
+      if (_selectedTypes.contains(TransactionType.venta)) {
+        modalidades['venta'] = {
+          'precio': double.tryParse(_priceController.text) ?? 0.0,
+        };
+      }
+      if (_selectedTypes.contains(TransactionType.alquiler)) {
+        modalidades['alquiler'] = _rentalOptions
+            .map(
+              (opt) => {
+                'costo': double.tryParse(opt['controller'].text) ?? 0.0,
+                'unidad_tiempo': opt['unit'],
+              },
+            )
+            .toList();
+      }
+      if (_selectedTypes.contains(TransactionType.trueque)) {
+        modalidades['trueque'] = {
+          'descripcion': _tradeForController.text.trim(),
+        };
+      }
+      modalidades['campus_pickup'] = _campusPickup;
+      modalidades['imagenes'] = imageUrls;
+
+      // 3. Insertar el anuncio en la tabla
+      await supabase.from('anuncios_marketplace').insert({
+        'vendedor_id': user.id,
+        'titulo': _titleController.text.trim(),
+        'descripcion': _descriptionController.text.trim(),
+        'categoria': _selectedCategory,
+        'estado_producto': _selectedCondition?.toLowerCase(),
+        'disponible': true,
+        'fecha_publicacion': DateTime.now().toIso8601String(),
+        'detalles_modalidades': modalidades,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Artículo publicado exitosamente!')),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al publicar: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -440,20 +534,26 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                                                   });
                                                 });
                                               },
-                                              child: Container(
-                                                width: 25,
-                                                height: 25,
-                                                decoration: BoxDecoration(
-                                                  color: const Color(
-                                                    0xFF2D4B03,
+                                              child: MouseRegion(
+                                                cursor:
+                                                    SystemMouseCursors.click,
+                                                child: Container(
+                                                  width: 25,
+                                                  height: 25,
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(
+                                                      0xFF2D4B03,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          8,
+                                                        ),
                                                   ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                ),
-                                                child: const Icon(
-                                                  Icons.add,
-                                                  color: Colors.white,
-                                                  size: 20,
+                                                  child: const Icon(
+                                                    Icons.add,
+                                                    color: Colors.white,
+                                                    size: 20,
+                                                  ),
                                                 ),
                                               ),
                                             )
@@ -465,14 +565,18 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                                                   );
                                                 });
                                               },
-                                              child: const SizedBox(
-                                                width: 25,
-                                                height: 25,
-                                                child: Center(
-                                                  child: FaIcon(
-                                                    FontAwesomeIcons.trashCan,
-                                                    color: Color(0xFF8F7065),
-                                                    size: 20,
+                                              child: MouseRegion(
+                                                cursor:
+                                                    SystemMouseCursors.click,
+                                                child: const SizedBox(
+                                                  width: 25,
+                                                  height: 25,
+                                                  child: Center(
+                                                    child: FaIcon(
+                                                      FontAwesomeIcons.trashCan,
+                                                      color: Color(0xFF8F7065),
+                                                      size: 20,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -627,45 +731,48 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                       });
                     }
                   },
-                  child: DottedBorder(
-                    color: const Color(0xFFE3BFB1),
-                    strokeWidth: 2,
-                    dashPattern: const [8, 4],
-                    borderType: BorderType.RRect,
-                    radius: const Radius.circular(10),
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: DottedBorder(
+                      color: const Color(0xFFE3BFB1),
+                      strokeWidth: 2,
+                      dashPattern: const [8, 4],
+                      borderType: BorderType.RRect,
+                      radius: const Radius.circular(10),
 
-                    child: Container(
-                      width: double.infinity,
-                      height: 160,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        // Eliminamos el border: Border.all(...) anterior
-                      ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          FaIcon(
-                            FontAwesomeIcons.cloudArrowUp,
-                            color: Color(0xFFDCDDDE),
-                            size: 40,
-                          ),
-                          SizedBox(height: 10),
-                          Text(
-                            "Arrastra y suelta las imágenes",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Text(
-                            "o haz clic para buscar en tu equipo",
-                            style: TextStyle(
+                      child: Container(
+                        width: double.infinity,
+                        height: 160,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          // Eliminamos el border: Border.all(...) anterior
+                        ),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            FaIcon(
+                              FontAwesomeIcons.cloudArrowUp,
                               color: Color(0xFFDCDDDE),
-                              fontSize: 14,
+                              size: 40,
                             ),
-                          ),
-                        ],
+                            SizedBox(height: 10),
+                            Text(
+                              "Arrastra y suelta las imágenes",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              "o haz clic para buscar en tu equipo",
+                              style: TextStyle(
+                                color: Color(0xFFDCDDDE),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -721,20 +828,23 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                                   _selectedImages.removeAt(index);
                                 });
                               },
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.shade400,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 1.5,
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.click,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade400,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 1.5,
+                                    ),
                                   ),
-                                ),
-                                child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 12, // Tamaño del icono
+                                  child: const Icon(
+                                    Icons.close,
+                                    color: Colors.white,
+                                    size: 12, // Tamaño del icono
+                                  ),
                                 ),
                               ),
                             ),
@@ -743,7 +853,6 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                       ),
                     );
                   }),
-
                   // Cuadro con el "+"
                   GestureDetector(
                     onTap: () async {
@@ -762,16 +871,19 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                         });
                       }
                     },
-                    child: DottedBorder(
-                      color: const Color(0xFFE3BFB1),
-                      strokeWidth: 1.5,
-                      dashPattern: const [4, 2],
-                      borderType: BorderType.RRect,
-                      radius: const Radius.circular(8),
-                      child: const SizedBox(
-                        width: 70,
-                        height: 70,
-                        child: Icon(Icons.add, color: Color(0xFFE3BFB1)),
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: DottedBorder(
+                        color: const Color(0xFFE3BFB1),
+                        strokeWidth: 1.5,
+                        dashPattern: const [4, 2],
+                        borderType: BorderType.RRect,
+                        radius: const Radius.circular(8),
+                        child: const SizedBox(
+                          width: 70,
+                          height: 70,
+                          child: Icon(Icons.add, color: Color(0xFFE3BFB1)),
+                        ),
                       ),
                     ),
                   ),
@@ -787,28 +899,37 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
         const SizedBox(height: 30),
 
         // Botón Publicar
-        Container(
-          width: double.infinity,
-          height: 60,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF25A22),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Publicar',
-                style: TextStyle(
-                  //fontFamily: 'Outfit',
-                  fontSize: 18,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+        GestureDetector(
+          onTap: _isLoading ? null : _publicarArticulo,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: Container(
+              width: double.infinity,
+              height: 60,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF25A22),
+                borderRadius: BorderRadius.circular(10),
               ),
-              SizedBox(width: 10),
-              Icon(Icons.send, color: Colors.white, size: 20),
-            ],
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Publicar',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Icon(Icons.send, color: Colors.white, size: 20),
+                      ],
+                    ),
+            ),
           ),
         ),
       ],
@@ -826,36 +947,39 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
   ) {
     bool isSelected = _selectedTypes.contains(type);
     return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            if (_selectedTypes.contains(type)) {
-              _selectedTypes.remove(type);
-            } else {
-              _selectedTypes.add(type);
-            }
-          });
-        },
-        child: Container(
-          // 1. Cambia el alineamiento a center para que el texto quede en medio
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? const Color(0xFF2D4B03)
-                : const Color(0xFFF5F3F3),
-            borderRadius: BorderRadius.circular(9),
-          ),
-          margin: const EdgeInsets.all(10),
-          //alignment: MainAxisAlignment.center,
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              //fontFamily: 'Outfit',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () {
+            setState(() {
+              if (_selectedTypes.contains(type)) {
+                _selectedTypes.remove(type);
+              } else {
+                _selectedTypes.add(type);
+              }
+            });
+          },
+          child: Container(
+            // 1. Cambia el alineamiento a center para que el texto quede en medio
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
               color: isSelected
-                  ? const Color.fromARGB(255, 255, 255, 255)
-                  : darkText,
-              fontWeight: FontWeight.bold,
+                  ? const Color(0xFF2D4B03)
+                  : const Color(0xFFF5F3F3),
+              borderRadius: BorderRadius.circular(9),
+            ),
+            margin: const EdgeInsets.all(10),
+            //alignment: MainAxisAlignment.center,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                //fontFamily: 'Outfit',
+                color: isSelected
+                    ? const Color.fromARGB(255, 255, 255, 255)
+                    : darkText,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -966,20 +1090,23 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
           _selectedCondition = title;
         });
       },
-      child: Container(
-        margin: const EdgeInsets.only(right: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFF6100) : unselectedBg,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          title,
-          style: TextStyle(
-            //fontFamily: 'Outfit',
-            fontSize: 14,
-            color: darkText,
-            fontWeight: FontWeight.w500,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          margin: const EdgeInsets.only(right: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFFF6100) : unselectedBg,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            title,
+            style: TextStyle(
+              //fontFamily: 'Outfit',
+              fontSize: 14,
+              color: darkText,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ),
