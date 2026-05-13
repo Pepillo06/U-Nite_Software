@@ -88,8 +88,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _universidadController.text = data['universidad'] ?? '';
         _carreraController.text = data['carrera'] ?? '';
         _semestreController.text = data['semestre']?.toString() ?? '';
-        _biografiaAcademicaController.text = data['biografia'] ?? '';
-        _biografiaVentasController.text = data['biografia_ventas'] ?? '';
+        _biografiaAcademicaController.text = data['biografia_academica'] ?? '';
+        _biografiaVentasController.text = data['biografia_vendedor'] ?? '';
         
         if (data['fecha_nacimiento'] != null) {
           _selectedFechaNacimiento = DateTime.parse(data['fecha_nacimiento']);
@@ -113,8 +113,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         'universidad': _universidadController.text.trim(),
         'carrera': _carreraController.text.trim(),
         //'semestre': int.tryParse(_semestreController.text),
-        'biografia': _biografiaAcademicaController.text.trim(),
-        //'biografia_ventas': _biografiaVentasController.text.trim(),
+        'biografia_academica': _biografiaAcademicaController.text.trim(),
+        'biografia_vendedor': _biografiaVentasController.text.trim(),
         //'fecha_nacimiento': _selectedFechaNacimiento?.toIso8601String(),
       }).eq('id', _userId!);
       //Navigator.pop(context, true);  //Esto es lo que hace que se recargue el nombre en el profile_page

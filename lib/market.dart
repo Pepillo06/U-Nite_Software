@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_page.dart';
 import 'post_item.dart';
 import 'login_page.dart';
+import 'screens/chat/chat_list_screen.dart';
 
 
 // ==========================================
@@ -11,7 +12,6 @@ import 'login_page.dart';
 // ==========================================
 class MarketPage extends StatefulWidget {
   const MarketPage({super.key});
-
   @override
   State<MarketPage> createState() => _MarketPageState();
 }
@@ -389,7 +389,10 @@ class _BarraNavegacionSuperiorState extends State<BarraNavegacionSuperior> {
                 icon: const Icon(Icons.message_outlined),
                 onPressed: () {
                   if (_verificarAutenticacion(context)) {
-                    _mostrarMensaje(context, 'Abriendo Mensajes');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const ChatListScreen()),
+                    );
                   }
                 },
               ),
