@@ -5,9 +5,10 @@ import 'market.dart';
 import 'theme.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({Key? key}) : super(key: key);
+  const LoginPage({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _LoginPageState createState() => _LoginPageState();
 }
 
@@ -36,7 +37,7 @@ class _LoginPageState extends State<LoginPage> {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
               child: Container(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
               ),
             ),
           ),
@@ -57,7 +58,7 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(15.0),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 30,
                           offset: const Offset(0, 10),
                         ),

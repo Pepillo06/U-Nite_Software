@@ -1,7 +1,7 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
-export "FLUTTER_ROOT=C:\Users\Angel\OneDrive\Desktop\flutter\flutter"
-export "FLUTTER_APPLICATION_PATH=C:\Users\Angel\OneDrive\Desktop\U-Nite_Software"
+export "FLUTTER_ROOT=C:\Users\Administrador\Flutter Antigravity\flutter"
+export "FLUTTER_APPLICATION_PATH=C:\Users\Administrador\Downloads\Proyecto Software\U-Nite_Software"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
 export "FLUTTER_TARGET=lib\main.dart"
 export "FLUTTER_BUILD_DIR=build"

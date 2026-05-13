@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'home_page.dart';
 
-
 void main() {
   runApp(const UNITEApp());
 }
@@ -20,6 +19,7 @@ class UNITEApp extends StatelessWidget {
         textTheme: GoogleFonts.lexendTextTheme(),
         useMaterial3: true,
       ),
+      //home: const HomePage(),
       home: const HomePage(),
       debugShowCheckedModeBanner: false,
     );

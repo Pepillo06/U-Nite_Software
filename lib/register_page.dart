@@ -51,7 +51,7 @@ class _RegisterPageState extends State<RegisterPage> {
               Positioned.fill(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                  child: Container(color: Colors.black.withOpacity(0.3)),
+                  child: Container(color: Colors.black.withValues(alpha: 0.3)),
                 ),
               ),
 
@@ -75,7 +75,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     borderRadius: BorderRadius.circular(15.0),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
@@ -212,7 +212,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return isMobile
         ? Column(
             children: fields
-                .map((e) => e is Expanded ? (e as Expanded).child : e)
+                .map((e) => e is Expanded ? (e).child : e)
                 .toList(),
           )
         : Row(crossAxisAlignment: CrossAxisAlignment.start, children: fields);
@@ -350,10 +350,10 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
         const SizedBox(height: 8),
-        RawKeyboardListener(
+        KeyboardListener(
           focusNode: FocusNode(),
-          onKey: (event) {
-            if (event is RawKeyDownEvent && event.character != null) {
+          onKeyEvent: (event) {
+            if (event is KeyDownEvent && event.character != null) {
               if (label == "Nombre" || label == "Apellido") {
                 if (RegExp(
                   r'[0-9!@#<>?":_`~;[\]\\|=+)(*&^%$]',

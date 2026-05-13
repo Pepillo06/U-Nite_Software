@@ -34,7 +34,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
               Positioned.fill(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                  child: Container(color: Colors.black.withOpacity(0.3)),
+                  child: Container(color: Colors.black.withValues(alpha: 0.3)),
                 ),
               ),
 
@@ -53,7 +53,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                     borderRadius: BorderRadius.circular(15.0),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
@@ -86,9 +86,9 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
                             runSpacing: 20,
                             alignment: WrapAlignment.center,
                             children: [
-                              _buildResponsiveCard(0, "Comprador", "Busco comprar libros, herramientas y materiales universitarios.", Icons.person, Colors.green.withOpacity(0.2), Colors.green[800]!, isMobile),
-                              _buildResponsiveCard(1, "Vendedor", "Quiero publicar artículos u ofrecer materiales a otros estudiantes.", Icons.local_offer, UColors.orangeDark.withOpacity(0.2), UColors.orangeDark, isMobile),
-                              _buildResponsiveCard(2, "Estudiante", "Quiero conectar para grupos de estudio o proyectos de materias.", Icons.groups, Colors.blue.withOpacity(0.2), Colors.blue[800]!, isMobile),
+                              _buildResponsiveCard(0, "Comprador", "Busco comprar libros, herramientas y materiales universitarios.", Icons.person, Colors.green.withValues(alpha: 0.2), Colors.green[800]!, isMobile),
+                              _buildResponsiveCard(1, "Vendedor", "Quiero publicar artículos u ofrecer materiales a otros estudiantes.", Icons.local_offer, UColors.orangeDark.withValues(alpha: 0.2), UColors.orangeDark, isMobile),
+                              _buildResponsiveCard(2, "Estudiante", "Quiero conectar para grupos de estudio o proyectos de materias.", Icons.groups, Colors.blue.withValues(alpha: 0.2), Colors.blue[800]!, isMobile),
                             ],
                           ),
                         ),
@@ -153,7 +153,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
           color: isSelected ? const Color(0xFFFFF5F0) : Colors.white,
           borderRadius: BorderRadius.circular(15),
           border: Border.all(color: isSelected ? UColors.orangeDark : const Color.fromARGB(255, 255, 255, 255), width: 2),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center, // CENTRA TODO VERTICALMENTE

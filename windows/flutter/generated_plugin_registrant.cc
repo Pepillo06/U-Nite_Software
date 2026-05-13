@@ -6,9 +6,12 @@
 
 #include "generated_plugin_registrant.h"
 
+#include <desktop_drop/desktop_drop_plugin.h>
 #include <rive_native/rive_native_plugin.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
+  DesktopDropPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("DesktopDropPlugin"));
   RiveNativePluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("RiveNativePlugin"));
 }

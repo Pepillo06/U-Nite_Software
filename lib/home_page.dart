@@ -410,7 +410,7 @@ class _HeroSectionState extends State<_HeroSection> {
         child: Image.asset(
           slide['image'],
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             color: slide['btnColor'].withOpacity(0.1),
             child: Icon(Icons.image, color: slide['btnColor'], size: 50),
           ),
@@ -776,7 +776,6 @@ class _ProductCard extends StatefulWidget {
     required this.title,
     required this.price,
     required this.location,
-    super.key,
   });
 
   @override
@@ -969,7 +968,7 @@ class _StudyGroupSection extends StatelessWidget {
         child: Image.asset(
           'images/study_group.jpg',
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             color: const Color(0xFFFDE8E0),
             child: const Icon(Icons.groups, size: 50, color: UColors.orange),
           ),
@@ -1069,10 +1068,11 @@ class _RentalSectionState extends State<_RentalSection> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _currentIndex = (_currentIndex + 1) % _rentalItems.length,
         );
+      }
     });
   }
 
@@ -1267,7 +1267,7 @@ class _RentalSectionState extends State<_RentalSection> {
           height: isMobile ? 280 : 420, // Altura ajustada para móvil
           width: isMobile ? double.infinity : 600,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             height: isMobile ? 280 : 420,
             color: Colors.white10,
             child: const Icon(Icons.image, color: Colors.white24, size: 50),
@@ -1491,7 +1491,7 @@ class _Footer extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: const [
         _FooterIcon(Icons.share_outlined),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         _FooterIcon(Icons.language_outlined),
       ],
     );

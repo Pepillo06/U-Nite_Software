@@ -538,7 +538,7 @@ class _TarjetaProducto extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -746,7 +746,7 @@ class _BannersPromocionales extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: UColors.greenIcon.withOpacity(0.2),
+        color: UColors.greenIcon.withValues(alpha: 0.2),
 
         borderRadius: BorderRadius.circular(12),
       ),
@@ -777,7 +777,7 @@ class _BannersPromocionales extends StatelessWidget {
           Text(
             'Encuentros exclusivos en puntos seguros dentro del campus universitario.',
             style: TextStyle(
-              color: UColors.greenDark.withOpacity(0.8),
+              color: UColors.greenDark.withValues(alpha: 0.8),
 
               fontSize: 16,
               fontStyle: FontStyle.italic,

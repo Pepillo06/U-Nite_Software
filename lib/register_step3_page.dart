@@ -12,8 +12,6 @@ class RegisterStep3Page extends StatefulWidget {
 
 
 class _RegisterStep3PageState extends State<RegisterStep3Page> {
-  final TextEditingController _universidadController = TextEditingController();
-  final TextEditingController _carreraController = TextEditingController();
   final TextEditingController _correoController = TextEditingController();
 
   // Variables para controlar las selecciones
@@ -67,7 +65,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
               Positioned.fill(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-                  child: Container(color: Colors.black.withOpacity(0.3)),
+                  child: Container(color: Colors.black.withValues(alpha: 0.3)),
                 ),
               ),
 
@@ -90,7 +88,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                     borderRadius: BorderRadius.circular(15.0),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 30,
                         offset: const Offset(0, 10),
                       ),
@@ -393,7 +391,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                 child: isDropdown
                     ? DropdownButtonHideUnderline(
                         child: DropdownButtonFormField<String>(
-                          value: selectedValue,
+                          initialValue: selectedValue,
                           hint: Text(
                             hint,
                             style: const TextStyle(
