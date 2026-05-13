@@ -3,6 +3,7 @@ import 'theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_page.dart';
 import 'post_item.dart';
+import 'screens/chat/chat_list_screen.dart';
 
 
 // ==========================================
@@ -10,7 +11,6 @@ import 'post_item.dart';
 // ==========================================
 class MarketPage extends StatefulWidget {
   const MarketPage({super.key});
-
   @override
   State<MarketPage> createState() => _MarketPageState();
 }
@@ -364,7 +364,10 @@ class _BarraNavegacionSuperiorState extends State<BarraNavegacionSuperior> {
               ),
               IconButton(
                 icon: const Icon(Icons.message_outlined),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Mensajes'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ChatListScreen()),
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.shopping_cart_outlined),

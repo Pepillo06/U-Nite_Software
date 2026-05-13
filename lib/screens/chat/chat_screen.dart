@@ -43,7 +43,7 @@ class _ChatScreenState extends State<ChatScreen> {
         .from('mensajes')
         .select()
         .eq('conversacion_id', widget.conversacionId)
-        .order('creado_en');
+        .order('creado_en', ascending: true);
     setState(() {
       _mensajes = List<Map<String, dynamic>>.from(data);
       _loading = false;
