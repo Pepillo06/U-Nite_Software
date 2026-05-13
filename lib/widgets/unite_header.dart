@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../market.dart';
+import '../screens/chat/chat_list_screen.dart';
 
 class UniteHeader extends StatelessWidget implements PreferredSizeWidget {
   final int currentIndex;
@@ -19,24 +21,34 @@ class UniteHeader extends StatelessWidget implements PreferredSizeWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
-          // Logo en texto puro (sin imagen)
-          Row(
-            children: [
-              // Ícono U estilizado en texto
-              Image.asset(
-                'images/Logo_U-NITE_SoloU.png',
-                height: 40,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'U-NITE',
-                style: GoogleFonts.lexend(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: const Color(0xFF245000),
+          // Logo
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MarketPage()),
+            ),
+            child: Row(
+              children: [
+                Image.asset(
+                  'images/Logo_U-NITE_SoloU.png',
+                  height: 40,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.school_rounded,
+                    color: Color(0xFFF36900),
+                    size: 40,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  'U-NITE',
+                  style: GoogleFonts.lexend(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF245000),
+                  ),
+                ),
+              ],
+            ),
           ),
 
           const Spacer(),
@@ -44,9 +56,15 @@ class UniteHeader extends StatelessWidget implements PreferredSizeWidget {
           // Nav links
           Row(
             children: [
-              _NavLink(label: 'UniExchange', onTap: () {}),
+              _NavLink(
+                label: 'UniExchange',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MarketPage()),
+                ),
+              ),
               const SizedBox(width: 32),
-              _NavLink(label: 'StudyMatch', onTap: () {}),
+ //             _NavLink(label: 'StudyMatch', onTap: () {}),
             ],
           ),
 
@@ -55,7 +73,7 @@ class UniteHeader extends StatelessWidget implements PreferredSizeWidget {
           // Íconos derecha
           Row(
             children: [
-              // Chat con badge — subrayado naranja si currentIndex == 2
+              // Chat con badge
               Column(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -82,7 +100,11 @@ class UniteHeader extends StatelessWidget implements PreferredSizeWidget {
                                   : const Color(0xFF4A4A4A),
                               size: 24,
                             ),
-                            onPressed: () {},
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const ChatListScreen()),
+                            ),
                           ),
                         ),
                         Positioned(
@@ -95,12 +117,11 @@ class UniteHeader extends StatelessWidget implements PreferredSizeWidget {
                             ),
                             child: Center(
                               child: Text('3',
-                                style: GoogleFonts.lexend(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                                  style: GoogleFonts.lexend(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  )),
                             ),
                           ),
                         ),
