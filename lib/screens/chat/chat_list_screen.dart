@@ -12,7 +12,7 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final _supabase = Supabase.instance.client;
-  int _selectedIndex = 0;
+  int _selectedIndex = -1;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List<Map<String, dynamic>> _conversaciones = [];
@@ -28,7 +28,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     try {
       final userId = _supabase.auth.currentUser?.id;
 
-      // Si no hay usuario logueado usamos datos de prueba
       if (userId == null) {
         setState(() {
           _conversaciones = [
@@ -65,7 +64,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
         final otroNombre =
             '${otro['primer_nombre']} ${otro['primer_apellido']}';
 
-        // Último mensaje
         final mensajes = await _supabase
             .from('mensajes')
             .select('contenido, creado_en')
@@ -81,7 +79,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ? _formatHora(mensajes[0]['creado_en'])
             : '';
 
-        // No leídos
         final noLeidos = await _supabase
             .from('mensajes')
             .select('id')
@@ -107,6 +104,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
     } catch (e) {
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _marcarLeidosDesktop(int index) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    final convId = _chatsFiltrados[index]['id'];
+    await _supabase
+        .from('mensajes')
+        .update({'leido': true})
+        .eq('conversacion_id', convId)
+        .eq('leido', false)
+        .neq('remitente_id', userId);
+    await _loadConversaciones();
   }
 
   String _formatHora(String timestamp) {
@@ -165,7 +175,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   anuncioId: _chatsFiltrados[i]['anuncio_id'],
                 ),
               ),
-            );
+            ).then((_) => _loadConversaciones());
           }),
         ),
       ],
@@ -173,6 +183,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildDesktopLayout() {
+    final idx = _selectedIndex.clamp(0, _chatsFiltrados.isEmpty ? 0 : _chatsFiltrados.length - 1);
     return Row(
       children: [
         Container(
@@ -188,7 +199,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
               _buildSearchBar(),
               Expanded(
                 child: _buildChatList(
-                  onTap: (i) => setState(() => _selectedIndex = i),
+                  onTap: (i) {
+                    setState(() => _selectedIndex = i);
+                    _marcarLeidosDesktop(i);
+                  },
                 ),
               ),
             ],
@@ -203,18 +217,32 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       child: Text('No hay conversaciones',
                           style: GoogleFonts.lexend(
                               color: const Color(0xFF5B4137), fontSize: 15)))
-                  : ChatScreen(
-                      conversacionId: _chatsFiltrados[
-                          _selectedIndex.clamp(
-                              0, _chatsFiltrados.length - 1)]['id'],
-                      nombreOtro: _chatsFiltrados[_selectedIndex.clamp(
-                          0, _chatsFiltrados.length - 1)]['otro_nombre'],
-                      otroUserId: _chatsFiltrados[_selectedIndex.clamp(
-                          0, _chatsFiltrados.length - 1)]['otro_id'],
-                      anuncioId: _chatsFiltrados[_selectedIndex.clamp(
-                          0, _chatsFiltrados.length - 1)]['anuncio_id'],
-                      showAppBar: false,
-                    ),
+                  : _selectedIndex == -1
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.forum_outlined,
+                                  size: 48,
+                                  color: const Color(0xFF5B4137).withOpacity(0.3)),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Selecciona un chat para comenzar',
+                                style: GoogleFonts.lexend(
+                                    color: const Color(0xFF5B4137),
+                                    fontSize: 15),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ChatScreen(
+                          key: ValueKey(_chatsFiltrados[idx]['id']),
+                          conversacionId: _chatsFiltrados[idx]['id'],
+                          nombreOtro: _chatsFiltrados[idx]['otro_nombre'],
+                          otroUserId: _chatsFiltrados[idx]['otro_id'],
+                          anuncioId: _chatsFiltrados[idx]['anuncio_id'],
+                          showAppBar: false,
+                        ),
         ),
       ],
     );
@@ -298,15 +326,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
       itemBuilder: (context, i) {
         final chat = chats[i];
         return _ChatTile(
-        nombre: chat['otro_nombre']?.toString() ?? 'Usuario',
-        preview: chat['preview']?.toString() ?? '',
-        hora: chat['hora']?.toString() ?? '',
-        isActive: i == _selectedIndex,
-        isOnline: false,
-        unreadCount: chat['unread'] ?? 0,
-        searchQuery: _searchQuery,
-        onTap: () => onTap(i),
-      );
+          nombre: chat['otro_nombre']?.toString() ?? 'Usuario',
+          preview: chat['preview']?.toString() ?? '',
+          hora: chat['hora']?.toString() ?? '',
+          isActive: i == _selectedIndex,
+          isOnline: false,
+          unreadCount: chat['unread'] ?? 0,
+          searchQuery: _searchQuery,
+          onTap: () => onTap(i),
+        );
       },
     );
   }

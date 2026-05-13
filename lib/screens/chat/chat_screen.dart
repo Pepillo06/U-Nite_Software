@@ -49,6 +49,18 @@ class _ChatScreenState extends State<ChatScreen> {
       _loading = false;
     });
     _scrollToBottom();
+    await _marcarComoLeidos();
+  }
+
+  Future<void> _marcarComoLeidos() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await _supabase
+        .from('mensajes')
+        .update({'leido': true})
+        .eq('conversacion_id', widget.conversacionId)
+        .eq('leido', false)
+        .neq('remitente_id', userId);
   }
 
   Future<void> _loadAnuncio() async {
@@ -76,6 +88,7 @@ class _ChatScreenState extends State<ChatScreen> {
           callback: (payload) {
             setState(() => _mensajes.add(payload.newRecord));
             _scrollToBottom();
+            _marcarComoLeidos();
           },
         )
         .subscribe();
@@ -100,7 +113,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) {
-      // Sin login — agrega localmente para pruebas
       setState(() {
         _mensajes.add({
           'contenido': text,
@@ -172,14 +184,12 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFFF36900)))
+                    child: CircularProgressIndicator(color: Color(0xFFF36900)))
                 : _mensajes.isEmpty
                     ? Center(
                         child: Text('Sé el primero en escribir 👋',
                             style: GoogleFonts.lexend(
-                                color: const Color(0xFF5B4137),
-                                fontSize: 14)))
+                                color: const Color(0xFF5B4137), fontSize: 14)))
                     : ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.symmetric(
@@ -319,7 +329,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
           const Spacer(),
-          // Tarjeta del anuncio si existe
           if (_anuncio != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -518,8 +527,7 @@ class _BurbujaMensaje extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 4),
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.65),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isMe
                   ? const Color(0xFFFFB598)
