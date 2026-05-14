@@ -24,11 +24,14 @@ class UniteHeader extends StatefulWidget implements PreferredSizeWidget {
 class _UniteHeaderState extends State<UniteHeader> {
   final _supabase = Supabase.instance.client;
   String? _nombreCompleto;
+  int _mensajesPendientes = 0;
 
   @override
   void initState() {
     super.initState();
     _cargarUsuario();
+    _cargarMensajesPendientes();
+    _suscribirseAMensajes();
   }
 
   Future<void> _cargarUsuario() async {
@@ -45,6 +48,38 @@ class _UniteHeaderState extends State<UniteHeader> {
             '${data['primer_nombre']} ${data['primer_apellido']}'.trim();
       });
     } catch (_) {}
+  }
+
+  Future<void> _cargarMensajesPendientes() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final result = await _supabase
+          .rpc('mensajes_pendientes', params: {'user_id': userId});
+      setState(() => _mensajesPendientes = result ?? 0);
+    } catch (e) {
+      debugPrint('Error mensajes pendientes: $e');
+    }
+  }
+
+  void _suscribirseAMensajes() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    _supabase
+        .channel('header_mensajes_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'mensajes',
+          callback: (_) => _cargarMensajesPendientes(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'mensajes',
+          callback: (_) => _cargarMensajesPendientes(),
+        )
+        .subscribe();
   }
 
   bool _verificarAutenticacion() {
@@ -169,31 +204,34 @@ class _UniteHeaderState extends State<UniteHeader> {
                             context,
                             MaterialPageRoute(
                                 builder: (_) => const ChatListScreen()),
-                          );
+                          ).then((_) => _cargarMensajesPendientes());
                         }
                       },
                     ),
                   ),
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFF6100),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text('3',
+                  if (_mensajesPendientes > 0)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF6100),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$_mensajesPendientes',
                             style: GoogleFonts.lexend(
                               color: Colors.white,
                               fontSize: 8,
                               fontWeight: FontWeight.w700,
-                            )),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
 
