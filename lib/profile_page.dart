@@ -46,7 +46,10 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Mi Perfil', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Mi Perfil',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: orangeDark,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -65,8 +68,8 @@ class _ProfilePageState extends State<ProfilePage> {
               if (result == true) {
                 _obtenerDatosPerfil(); // <--- Recarga el FutureBuilder
               }
-              
-              // Si el resultado es true, significa que se guardaron cambios, 
+
+              // Si el resultado es true, significa que se guardaron cambios,
               // recargamos la información del perfil.
               if (result == true) {
                 setState(() {
@@ -82,7 +85,9 @@ class _ProfilePageState extends State<ProfilePage> {
         future: _perfilFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: orangeDark));
+            return const Center(
+              child: CircularProgressIndicator(color: orangeDark),
+            );
           }
 
           if (snapshot.hasError) {
@@ -127,9 +132,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 Text(
                   '$nombre $apellido'.trim(),
                   style: const TextStyle(
-                    fontSize: 24, 
-                    fontWeight: FontWeight.w900, 
-                    color: Color(0xFF1A1A1A)
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF1A1A1A),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -151,16 +156,24 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: Colors.black.withOpacity(0.04),
                         blurRadius: 15,
                         offset: const Offset(0, 5),
-                      )
+                      ),
                     ],
                   ),
                   child: Column(
                     children: [
-                      _buildFilaDato(Icons.badge, 'Cédula de Identidad', cedula),
+                      _buildFilaDato(
+                        Icons.badge,
+                        'Cédula de Identidad',
+                        cedula,
+                      ),
                       const Divider(height: 1, color: cardBorder),
                       _buildFilaDato(Icons.school, 'Universidad', universidad),
                       const Divider(height: 1, color: cardBorder),
-                      _buildFilaDato(Icons.menu_book, 'Carrera / Facultad', carrera),
+                      _buildFilaDato(
+                        Icons.menu_book,
+                        'Carrera / Facultad',
+                        carrera,
+                      ),
                     ],
                   ),
                 ),
@@ -177,10 +190,17 @@ class _ProfilePageState extends State<ProfilePage> {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Icon(icono, color: const Color(0xFFF05600)),
-      title: Text(etiqueta, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+      title: Text(
+        etiqueta,
+        style: const TextStyle(fontSize: 12, color: Colors.black54),
+      ),
       subtitle: Text(
         valor,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black87),
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Colors.black87,
+        ),
       ),
     );
   }

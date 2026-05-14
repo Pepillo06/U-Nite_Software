@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_page.dart';
+import 'dart:typed_data';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -28,6 +29,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   bool _isLoadingData = true;
   bool _isSaving = false;
   String? _currentProfileUrl;
+  Uint8List? _newProfileImageBytes;
   String? _userId;
   List<Map<String, dynamic>> _misAnuncios = [];
   bool _isLoadingAnuncios = true;
@@ -88,15 +90,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
           .single();
 
       setState(() {
-        _currentProfileUrl = data['profile_image_url'];
+        _currentProfileUrl = data['foto_perfil_url'];
         _nombreController.text = data['primer_nombre'] ?? '';
         _apellidoController.text = data['primer_apellido'] ?? '';
         _cedulaController.text = data['cedula']?.toString() ?? '';
         _universidadController.text = data['universidad'] ?? '';
         _carreraController.text = data['carrera'] ?? '';
         _semestreController.text = data['semestre']?.toString() ?? '';
-        _biografiaAcademicaController.text = data['biografia'] ?? '';
-        _biografiaVentasController.text = data['biografia_ventas'] ?? '';
+        _biografiaAcademicaController.text = data['biografia_academica'] ?? '';
+        _biografiaVentasController.text = data['biografia_vendedor'] ?? '';
+        _newProfileImageBytes = null;
 
         if (data['fecha_nacimiento'] != null) {
           _selectedFechaNacimiento = DateTime.parse(data['fecha_nacimiento']);
@@ -131,6 +134,61 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      // Abrir selector de archivo (funciona en web y móvil)
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      setState(() => _newProfileImageBytes = bytes);
+
+      // Subir al bucket 'avatars'
+      final path = '$_userId/avatar.jpg';
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      // URL determinista + cache-buster para que el browser siempre recargue
+      final baseUrl = _supabase.storage.from('avatars').getPublicUrl(path);
+      final publicUrl = '$baseUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      await _supabase
+          .from('usuarios')
+          .update({'foto_perfil_url': publicUrl})
+          .eq('id', _userId!);
+
+      setState(() => _currentProfileUrl = publicUrl);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Foto de perfil actualizada.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al subir la foto: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   // --- FUNCIÓN DE ACTUALIZACIÓN EN SUPABASE ---
   Future<void> _updateUserData() async {
     setState(() => _isSaving = true);
@@ -143,8 +201,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
             'universidad': _universidadController.text.trim(),
             'carrera': _carreraController.text.trim(),
             //'semestre': int.tryParse(_semestreController.text),
-            'biografia': _biografiaAcademicaController.text.trim(),
-            //'biografia_ventas': _biografiaVentasController.text.trim(),
+            'biografia_academica': _biografiaAcademicaController.text.trim(),
+            'biografia_vendedor': _biografiaVentasController.text.trim(),
             //'fecha_nacimiento': _selectedFechaNacimiento?.toIso8601String(),
           })
           .eq('id', _userId!);
@@ -845,21 +903,53 @@ class _EditProfilePageState extends State<EditProfilePage> {
         Positioned(
           bottom: -30,
           left: 20,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: CircleAvatar(
-              radius: 45,
-              backgroundImage: _currentProfileUrl != null
-                  ? NetworkImage(_currentProfileUrl!)
-                  : null,
-              backgroundColor: Colors.grey[200],
-              child: _currentProfileUrl == null
-                  ? const Icon(Icons.person, size: 40)
-                  : null,
+          child: GestureDetector(
+            onTap: _pickAndUploadAvatar,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: CircleAvatar(
+                      radius: 45,
+                      backgroundImage: _newProfileImageBytes != null
+                          ? MemoryImage(_newProfileImageBytes!)
+                          : (_currentProfileUrl != null
+                                ? NetworkImage(_currentProfileUrl!)
+                                      as ImageProvider
+                                : null),
+                      backgroundColor: Colors.grey[200],
+                      child:
+                          (_newProfileImageBytes == null &&
+                              _currentProfileUrl == null)
+                          ? const Icon(Icons.person, size: 40)
+                          : null,
+                    ),
+                  ),
+                  // Badge de cámara
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF05600),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
