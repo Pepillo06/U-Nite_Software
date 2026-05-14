@@ -757,7 +757,7 @@ class _TarjetaAnuncio extends StatelessWidget {
     return InkWell(
       onTap: () {
         if (_verificarAutenticacion(context)) {
-          // Aquí puedes navegar al detalle del anuncio en el futuro
+          _mostrarDetalleAnuncio(context, anuncio);
         }
       },
       borderRadius: BorderRadius.circular(12),
@@ -894,6 +894,301 @@ class _TarjetaAnuncio extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------
+// Popup de Detalle de Anuncio
+// ------------------------------------------
+void _mostrarDetalleAnuncio(
+  BuildContext context,
+  Map<String, dynamic> anuncio,
+) {
+  final modalidades =
+      anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+  final imagenes = (modalidades['imagenes'] as List<dynamic>? ?? [])
+      .cast<String>();
+  final titulo = anuncio['titulo'] ?? '';
+  final descripcion = anuncio['descripcion'] ?? '';
+  final categoria = anuncio['categoria'] ?? '';
+  final estado = anuncio['estado_producto'] ?? '';
+
+  String precio = 'Consultar';
+  if (modalidades.containsKey('venta')) {
+    final p = modalidades['venta']['precio'];
+    precio = '\$${(p as num?)?.toStringAsFixed(2) ?? '0.00'}';
+  } else if (modalidades.containsKey('alquiler')) {
+    final alquiler = modalidades['alquiler'];
+    if (alquiler is List && alquiler.isNotEmpty) {
+      final costo = alquiler[0]['costo'];
+      final unidad = alquiler[0]['unidad_tiempo'] ?? '';
+      precio = '\$${(costo as num?)?.toStringAsFixed(2) ?? '0.00'}/$unidad';
+    }
+  } else if (modalidades.containsKey('trueque')) {
+    precio = 'Trueque';
+  }
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      int imagenSeleccionada = 0;
+      return StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 40,
+              vertical: 40,
+            ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 900),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Botón cerrar
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFFF5F5F5),
+                            shape: const CircleBorder(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide = constraints.maxWidth > 600;
+
+                          final imageSection = Column(
+                            children: [
+                              // Imagen principal
+                              Container(
+                                height: 320,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF5F5F5),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: imagenes.isNotEmpty
+                                      ? Image.network(
+                                          imagenes[imagenSeleccionada],
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                                Icons.image_not_supported,
+                                                size: 60,
+                                                color: Colors.grey,
+                                              ),
+                                        )
+                                      : const Icon(
+                                          Icons.image_not_supported,
+                                          size: 60,
+                                          color: Colors.grey,
+                                        ),
+                                ),
+                              ),
+                              // Miniaturas (solo si hay más de 1 imagen)
+                              if (imagenes.length > 1) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  height: 80,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: imagenes.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(width: 10),
+                                    itemBuilder: (context, i) {
+                                      return GestureDetector(
+                                        onTap: () => setStateDialog(
+                                          () => imagenSeleccionada = i,
+                                        ),
+                                        child: Container(
+                                          width: 80,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            border: Border.all(
+                                              color: imagenSeleccionada == i
+                                                  ? UColors.orange
+                                                  : Colors.transparent,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            child: Image.network(
+                                              imagenes[i],
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+
+                          final infoSection = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Badges
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  if (categoria.isNotEmpty)
+                                    _Badge(label: categoria),
+                                  if (estado.isNotEmpty)
+                                    _Badge(
+                                      label:
+                                          estado[0].toUpperCase() +
+                                          estado.substring(1),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              // Título
+                              Text(
+                                titulo,
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              // Precio
+                              Text(
+                                precio,
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  color: UColors.greenDark,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              // Descripción
+                              if (descripcion.isNotEmpty) ...[
+                                const Text(
+                                  'Descripción',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  descripcion,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    height: 1.6,
+                                    color: Color(0xFF444444),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                              // Botón contactar
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    if (_verificarAutenticacion(context)) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const ChatListScreen(),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.chat_bubble_outline),
+                                  label: const Text('Contactar Vendedor'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: UColors.orange,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+
+                          if (isWide) {
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(flex: 5, child: imageSection),
+                                const SizedBox(width: 32),
+                                Expanded(flex: 4, child: infoSection),
+                              ],
+                            );
+                          } else {
+                            return Column(
+                              children: [
+                                imageSection,
+                                const SizedBox(height: 24),
+                                infoSection,
+                              ],
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  const _Badge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
     );
   }
