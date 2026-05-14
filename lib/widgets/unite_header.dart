@@ -236,11 +236,11 @@ class _UniteHeaderState extends State<UniteHeader> {
               ),
 
               // Carrito
-              IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined,
-                    color: Color(0xFF4A4A4A), size: 22),
-                onPressed: () {},
-              ),
+              // IconButton(
+              //   icon: const Icon(Icons.shopping_cart_outlined,
+              //       color: Color(0xFF4A4A4A), size: 22),
+              //   onPressed: () {},
+              // ),
 
               const SizedBox(width: 8),
 
