@@ -7,6 +7,7 @@ import 'post_item.dart';
 import 'login_page.dart';
 import 'screens/chat/chat_list_screen.dart';
 import 'widgets/unite_header.dart';
+import 'screens/chat/chat_screen.dart';
 
 // ==========================================
 // PANTALLA PRINCIPAL DEL MARKETPLACE
@@ -1112,18 +1113,77 @@ void _mostrarDetalleAnuncio(
                                 width: double.infinity,
                                 height: 52,
                                 child: ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    if (_verificarAutenticacion(context)) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const ChatListScreen(),
-                                        ),
-                                      );
-                                    }
-                                  },
+                                    onPressed: () async {
+                                      if (!_verificarAutenticacion(context)) return;
+
+                                      final supabase = Supabase.instance.client;
+                                      final compradorId = supabase.auth.currentUser!.id;
+                                      final vendedorId = anuncio['vendedor_id']?.toString() ?? '';
+                                      final anuncioId = anuncio['id']?.toString();
+
+                                      if (vendedorId.isEmpty || vendedorId == compradorId) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('No puedes contactarte contigo mismo')),
+                                        );
+                                        return;
+                                      }
+
+                                      try {
+                                        final existentes = await supabase
+                                            .from('conversaciones')
+                                            .select('id')
+                                            .eq('comprador_id', compradorId)
+                                            .eq('vendedor_id', vendedorId);
+
+                                        String conversacionId;
+                                        if (existentes.isNotEmpty) {
+                                          conversacionId = existentes.first['id'];
+                                        } else {
+                                          final nueva = await supabase
+                                              .from('conversaciones')
+                                              .insert({
+                                                'comprador_id': compradorId,
+                                                'vendedor_id': vendedorId,
+                                                'anuncio_id': anuncioId,
+                                              })
+                                              .select('id')
+                                              .single();
+                                          conversacionId = nueva['id'];
+                                        }
+
+                                        final vendedorData = await supabase
+                                            .from('usuarios')
+                                            .select('primer_nombre, primer_apellido')
+                                            .eq('id', vendedorId)
+                                            .maybeSingle();
+
+                                        final nombreVendedor = vendedorData != null
+                                            ? '${vendedorData['primer_nombre']} ${vendedorData['primer_apellido']}'
+                                            : 'Vendedor';
+
+                                        // Guardar el navigator antes de cerrar el dialog
+                                        final nav = Navigator.of(context);
+                                        nav.pop(); // cierra el dialog
+
+                                        nav.push(
+                                          MaterialPageRoute(
+                                            builder: (_) => ChatScreen(
+                                              conversacionId: conversacionId,
+                                              nombreOtro: nombreVendedor,
+                                              otroUserId: vendedorId,
+                                              anuncioId: anuncioId,
+                                              showAppBar: true,
+                                            ),
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Error: $e')),
+                                          );
+                                        }
+                                      }
+                                    },
                                   icon: const Icon(Icons.chat_bubble_outline),
                                   label: const Text('Contactar Vendedor'),
                                   style: ElevatedButton.styleFrom(
