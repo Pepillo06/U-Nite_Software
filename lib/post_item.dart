@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'market.dart';
+import 'package:flutter/services.dart';
+
 
 // Definición de tipos de transacción
 enum TransactionType { venta, alquiler, trueque }
@@ -31,6 +34,9 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
   String? _selectedCondition;
   bool _campusPickup = true;
   bool _isLoading = false;
+  String? _titleError;
+  String? _descriptionError;
+  String? _priceError;
 
   Future<void> _publicarArticulo() async {
     final supabase = Supabase.instance.client;
@@ -43,12 +49,36 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
       return;
     }
 
+    bool hasError = false;
+
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El título es obligatorio.')),
-      );
-      return;
+      setState(() => _titleError = 'El nombre del artículo no puede estar vacío.');
+      hasError = true;
+    } else {
+      setState(() => _titleError = null);
     }
+
+    if (_descriptionController.text.trim().isEmpty) {
+      setState(() => _descriptionError = 'La descripción no puede estar vacía.');
+      hasError = true;
+    } else {
+      setState(() => _descriptionError = null);
+    }
+
+    if (_selectedTypes.contains(TransactionType.venta)) {
+      final priceText = _priceController.text.trim();
+      final price = double.tryParse(priceText);
+      if (priceText.isEmpty || price == null || price < 0) {
+        setState(() => _priceError = 'Ingresa un precio válido (número positivo).');
+        hasError = true;
+      } else {
+        setState(() => _priceError = null);
+      }
+    } else {
+      setState(() => _priceError = null);
+    }
+
+    if (hasError) return;
 
     setState(() => _isLoading = true);
 
@@ -164,108 +194,135 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
 
     return Scaffold(
       backgroundColor: background,
-      body: SingleChildScrollView(
-        child: Center(
-          // Agregamos Center para que en Web quede al medio
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24.0,
-                vertical: 60.0,
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  bool isDesktop = constraints.maxWidth > 900;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Título principal
-                      Column(
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            child: Center(
+              // Agregamos Center para que en Web quede al medio
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1000),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 60.0,
+                  ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      bool isDesktop = constraints.maxWidth > 900;
+                      return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Crear artículo', style: headerStyle),
-                          const SizedBox(height: 10),
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: isDesktop
-                                  ? constraints.maxWidth * 0.6
-                                  : constraints.maxWidth,
-                            ),
-                            child: const Text(
-                              'Completa los detalles para publicar en tu comunidad universitaria.',
-                              style: descriptionHeaderStyle,
-                            ),
+                          // Título principal
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Crear artículo', style: headerStyle),
+                              const SizedBox(height: 10),
+                              ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: isDesktop
+                                      ? constraints.maxWidth * 0.6
+                                      : constraints.maxWidth,
+                                ),
+                                child: const Text(
+                                  'Completa los detalles para publicar en tu comunidad universitaria.',
+                                  style: descriptionHeaderStyle,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 60),
+                          const SizedBox(height: 60),
 
-                      // Diseño Responsivo principal
-                      if (isDesktop)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: buildMainForm(
-                                headerStyle,
-                                descriptionHeaderStyle,
-                                labelStyle,
-                                inputStyle,
-                                primaryOrange,
-                                darkText,
-                                borderInput,
-                                unselectedConditionBg,
-                                background,
-                              ),
+                          // Diseño Responsivo principal
+                          if (isDesktop)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: buildMainForm(
+                                    headerStyle,
+                                    descriptionHeaderStyle,
+                                    labelStyle,
+                                    inputStyle,
+                                    primaryOrange,
+                                    darkText,
+                                    borderInput,
+                                    unselectedConditionBg,
+                                    background,
+                                  ),
+                                ),
+                                const SizedBox(width: 50),
+                                Expanded(
+                                  flex: 2,
+                                  child: buildRightPanel(
+                                    labelStyle,
+                                    primaryOrange,
+                                    darkText,
+                                    unselectedGrey,
+                                    background,
+                                    activeGreen,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Column(
+                              children: [
+                                buildMainForm(
+                                  headerStyle,
+                                  descriptionHeaderStyle,
+                                  labelStyle,
+                                  inputStyle,
+                                  primaryOrange,
+                                  darkText,
+                                  borderInput,
+                                  unselectedConditionBg,
+                                  background,
+                                ),
+                                const SizedBox(height: 40),
+                                buildRightPanel(
+                                  labelStyle,
+                                  primaryOrange,
+                                  darkText,
+                                  unselectedGrey,
+                                  background,
+                                  activeGreen,
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 50),
-                            Expanded(
-                              flex: 2,
-                              child: buildRightPanel(
-                                labelStyle,
-                                primaryOrange,
-                                darkText,
-                                unselectedGrey,
-                                background,
-                                activeGreen,
-                              ),
-                            ),
-                          ],
-                        )
-                      else
-                        Column(
-                          children: [
-                            buildMainForm(
-                              headerStyle,
-                              descriptionHeaderStyle,
-                              labelStyle,
-                              inputStyle,
-                              primaryOrange,
-                              darkText,
-                              borderInput,
-                              unselectedConditionBg,
-                              background,
-                            ),
-                            const SizedBox(height: 40),
-                            buildRightPanel(
-                              labelStyle,
-                              primaryOrange,
-                              darkText,
-                              unselectedGrey,
-                              background,
-                              activeGreen,
-                            ),
-                          ],
-                        ),
-                    ],
-                  );
-                },
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+          Positioned(
+            top: 16,
+            left: 16,
+            child: SafeArea(
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(50),
+                elevation: 2,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(50),
+                  onTap: () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const MarketPage()),
+                    );
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: Icon(Icons.arrow_back, color: Color(0xFF2E3137), size: 24),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -343,6 +400,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                 'Título',
                 controller: _titleController,
                 hintText: '¿Qué estás ofreciendo?',
+                errorText: _titleError,
               ),
               const SizedBox(height: 20),
 
@@ -400,7 +458,11 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                               'Precio fijo para venta',
                               controller: _priceController,
                               hintText: '\$ 0.00',
-                              keyboardType: TextInputType.number,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              errorText: _priceError,  // ← AGREGA ESTO
+                              inputFormatters: [           // ← AGREGA ESTO
+                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                              ],
                             ),
                             if (_selectedTypes.contains(
                               TransactionType.alquiler,
@@ -619,6 +681,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                 hintText:
                     'Cuéntanos más sobre el artículo que estás ofreciendo...',
                 maxLines: 6,
+                errorText: _descriptionError,
               ),
               const SizedBox(height: 20),
 
@@ -996,20 +1059,42 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
     required String hintText,
     TextInputType keyboardType = TextInputType.text,
     int maxLines = 1,
+    String? errorText,
+    List<TextInputFormatter>? inputFormatters,
   }) {
+    final bool hasError = errorText != null && errorText.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: labelStyle),
         const SizedBox(height: 5),
-        buildTextField(
-          borderInput,
-          inputStyle,
-          controller: controller,
-          hintText: hintText,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: hasError ? Colors.red.shade400 : borderInput),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+          child: TextField(
+            controller: controller,
+            style: inputStyle,
+            keyboardType: keyboardType,
+            maxLines: maxLines,
+            inputFormatters: inputFormatters,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              hintText: hintText,
+              hintStyle: inputStyle.copyWith(color: const Color(0xFF8C95A3)),
+            ),
+          ),
         ),
+        if (hasError) ...[
+          const SizedBox(height: 4),
+          Text(
+            errorText,
+            style: const TextStyle(color: Colors.red, fontSize: 12),
+          ),
+        ],
       ],
     );
   }
