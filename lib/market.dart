@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_page.dart';
 import 'post_item.dart';
-
+import 'login_page.dart';
+import 'screens/chat/chat_list_screen.dart';
+import 'widgets/unite_header.dart';
 
 // ==========================================
 // PANTALLA PRINCIPAL DEL MARKETPLACE
 // ==========================================
 class MarketPage extends StatefulWidget {
   const MarketPage({super.key});
-
   @override
   State<MarketPage> createState() => _MarketPageState();
 }
@@ -30,7 +32,21 @@ class _MarketPageState extends State<MarketPage> {
       backgroundColor: UColors.footerBg,
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: BarraNavegacionSuperior()),
+          const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
+          SliverToBoxAdapter(
+            child: _BarraSuperior(
+              onVender: () {
+                if (_verificarAutenticacion(context)) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PublicarArticuloPage(),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
           SliverToBoxAdapter(
             child: _FiltrosCategorias(
               categoriaActual: _categoriaSeleccionada,
@@ -52,6 +68,25 @@ class _MarketPageState extends State<MarketPage> {
   }
 }
 
+// ==========================================
+// FUNCIÓN AUXILIAR DE AUTENTICACIÓN
+// ==========================================
+bool _verificarAutenticacion(BuildContext context) {
+  if (Supabase.instance.client.auth.currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Debes iniciar sesión para realizar esta acción'),
+        backgroundColor: UColors.orange,
+      ),
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+    return false;
+  }
+  return true;
+}
 
 // ==========================================
 // MODELOS Y DATOS DE PRUEBA
@@ -235,215 +270,93 @@ final List<_Producto> _productosPrueba = [
   ),
 ];
 
-
-
-
 // ==========================================
 // WIDGETS
 // ==========================================
 
 // ------------------------------------------
-// 1. Barra de Navegación Superior
+// BARRA SUPERIOR (búsqueda + vender)
 // ------------------------------------------
-// ------------------------------------------
-// 1. Barra de Navegación Superior (Integrada con Supabase)
-// ------------------------------------------
-class BarraNavegacionSuperior extends StatefulWidget {
-  const BarraNavegacionSuperior({super.key});
+class _BarraSuperior extends StatefulWidget {
+  final VoidCallback onVender;
+  const _BarraSuperior({required this.onVender});
 
   @override
-  State<BarraNavegacionSuperior> createState() => _BarraNavegacionSuperiorState();
+  State<_BarraSuperior> createState() => _BarraSuperiorState();
 }
 
-class _BarraNavegacionSuperiorState extends State<BarraNavegacionSuperior> {
-  final supabase = Supabase.instance.client;
-  String? nombreCompleto;
-  bool isLoading = true;
+class _BarraSuperiorState extends State<_BarraSuperior> {
+  final _searchController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _cargarDatosUsuario();
-  }
-
-  Future<void> _cargarDatosUsuario() async {
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        setState(() => isLoading = false);
-        return;
-      }
-
-      // Hacemos el SELECT pidiendo primer_nombre y apellido
-      // (OJO: verifica que tu columna en la BD se llame 'apellido' o 'primer_apellido')
-      final response = await supabase
-          .from('usuarios')
-          .select('primer_nombre, primer_apellido')
-          .eq('id', user.id)
-          .single();
-
-      final nombre = response['primer_nombre'] as String? ?? '';
-      final apellido = response['primer_apellido'] as String? ?? '';
-
-      setState(() {
-        nombreCompleto = '$nombre $apellido'.trim();
-        isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error al cargar el nombre: $e');
-      setState(() => isLoading = false);
-    }
-  }
-
-  void _mostrarMensaje(BuildContext context, String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), duration: const Duration(seconds: 2)),
-    );
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
     return Container(
-      color: UColors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 16.0),
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 40,
+        vertical: 12,
+      ),
       child: Row(
         children: [
-          // Logo
-          InkWell(
-            onTap: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const MarketPage()),
-                (route) => false,
-              );
-            },
-            child: Row(
-              children: [
-                Image.asset(
-                  'assets/logo.png',
-                  height: 40,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.school,
-                    size: 40,
-                    color: UColors.orange,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 40),
-          
-          // Buscador
+          // Barra de búsqueda
           Expanded(
             child: Container(
-              height: 48,
+              height: 44,
               decoration: BoxDecoration(
-                color: UColors.footerBg,
+                color: const Color(0xFFF5F3F3),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: UColors.cardBorder),
+                border: Border.all(color: const Color(0xFFE3BFB1)),
               ),
               child: TextField(
+                controller: _searchController,
+                style: GoogleFonts.lexend(fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Buscar libros, muebles, electrónica...',
-                  hintStyle: TextStyle(color: Colors.grey.shade500),
-                  prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
+                  hintStyle: GoogleFonts.lexend(
+                    color: const Color(0xFF8F7065),
+                    fontSize: 14,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF8F7065),
+                    size: 20,
+                  ),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                onSubmitted: (value) => _mostrarMensaje(context, 'Buscando: $value'),
               ),
             ),
           ),
-          const SizedBox(width: 40),
-          
-          // Iconos de acción y Botón Vender
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Notificaciones'),
+          const SizedBox(width: 16),
+          // Botón Vender Artículo
+          ElevatedButton(
+            onPressed: widget.onVender,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: UColors.orange,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 20,
+                vertical: 12,
               ),
-              IconButton(
-                icon: const Icon(Icons.message_outlined),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Mensajes'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined),
-                onPressed: () => _mostrarMensaje(context, 'Abriendo Carrito'),
+            ),
+            child: Text(
+              isMobile ? 'Vender' : 'Vender Artículo',
+              style: GoogleFonts.lexend(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
-              const SizedBox(width: 16),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const PublicarArticuloPage()),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: UColors.orange,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Vender Artículo',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // ---------------------------------------------------
-              // NUEVO BOTÓN DE PERFIL (AVATAR + NOMBRE + APELLIDO)
-              // ---------------------------------------------------
-              InkWell(
-                onTap: () async {
-                  // Navegamos de forma real a la pantalla de Perfil
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ProfilePage()),
-                  );
-                  _cargarDatosUsuario(); // Volvemos a llamar a la función que pide los datos a Supabase
-                },
-                borderRadius: BorderRadius.circular(24),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage: const NetworkImage(
-                          'https://i.pravatar.cc/150?img=68', // Mantengo el placeholder de tu compañero
-                        ),
-                        onBackgroundImageError: (exception, stackTrace) {},
-                        child: const Icon(Icons.person, color: Colors.grey),
-                      ),
-                      const SizedBox(width: 10),
-                      // Lógica para mostrar estado de carga o el Nombre y Apellido
-                      isLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: UColors.orange),
-                            )
-                          : Text(
-                              nombreCompleto?.isNotEmpty == true
-                                  ? nombreCompleto!
-                                  : 'Mi Perfil', // Fallback por si el usuario no tiene nombre registrado
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: Colors.black87,
-                              ),
-                            ),
-                    ],
-                  ),
-                ),
-              ),
-              // ---------------------------------------------------
-            ],
+            ),
           ),
         ],
       ),
@@ -483,7 +396,6 @@ class _FiltrosCategorias extends StatelessWidget {
           children: List.generate(categorias.length, (index) {
             final nombre = categorias[index]['nombre'] as String;
             final esSeleccionado = categoriaActual == nombre;
-
             return Padding(
               padding: const EdgeInsets.only(right: 12.0),
               child: InkWell(
@@ -509,9 +421,12 @@ class _FiltrosCategorias extends StatelessWidget {
                       Text(
                         nombre,
                         style: TextStyle(
-                          color: esSeleccionado ? Colors.white : UColors.textDark,
-                          fontWeight:
-                              esSeleccionado ? FontWeight.bold : FontWeight.w500,
+                          color: esSeleccionado
+                              ? Colors.white
+                              : UColors.textDark,
+                          fontWeight: esSeleccionado
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                           fontSize: 15,
                         ),
                       ),
@@ -528,89 +443,144 @@ class _FiltrosCategorias extends StatelessWidget {
 }
 
 // ------------------------------------------
-// 3. Cuadrícula de Productos
+// 3. Cuadrícula de Productos (desde Supabase)
 // ------------------------------------------
-class _CuadriculaProductos extends StatelessWidget {
+class _CuadriculaProductos extends StatefulWidget {
   final String categoria;
   const _CuadriculaProductos({required this.categoria});
 
   @override
-  Widget build(BuildContext context) {
-    // Filtrado lógico
-    final productosFiltrados =
-        categoria == 'Todos'
-            ? _productosPrueba
-            : _productosPrueba.where((p) => p.categoria == categoria).toList();
+  State<_CuadriculaProductos> createState() => _CuadriculaProductosState();
+}
 
-    // Determine cross axis count based on screen width
+class _CuadriculaProductosState extends State<_CuadriculaProductos> {
+  final _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _anuncios = [];
+  bool _cargando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarAnuncios();
+  }
+
+  @override
+  void didUpdateWidget(_CuadriculaProductos oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.categoria != widget.categoria) {
+      _cargarAnuncios();
+    }
+  }
+
+  Future<void> _cargarAnuncios() async {
+    setState(() => _cargando = true);
+    try {
+      var query = _supabase
+          .from('anuncios_marketplace')
+          .select()
+          .eq('disponible', true)
+          .order('fecha_publicacion', ascending: false);
+
+      final data = await query;
+      List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(
+        data,
+      );
+
+      // Filtrar por categoría en cliente (más simple que en query)
+      if (widget.categoria != 'Todos') {
+        resultado = resultado
+            .where((a) => a['categoria'] == widget.categoria)
+            .toList();
+      }
+
+      setState(() {
+        _anuncios = resultado;
+        _cargando = false;
+      });
+    } catch (e) {
+      setState(() => _cargando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) {
+      return const SliverToBoxAdapter(
+        child: SizedBox(
+          height: 300,
+          child: Center(
+            child: CircularProgressIndicator(color: UColors.orange),
+          ),
+        ),
+      );
+    }
+
     double width = MediaQuery.of(context).size.width;
     int columnas = 4;
-    if (width < 600) {
+    if (width < 600)
       columnas = 1;
-    } else if (width < 900) {
+    else if (width < 900)
       columnas = 2;
-    } else if (width < 1200) {
+    else if (width < 1200)
       columnas = 3;
-    }
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
-      sliver:
-          productosFiltrados.isEmpty
-              ? SliverToBoxAdapter(
-                child: Container(
-                  height: 300,
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 64, color: UColors.textGray),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No hay productos en esta categoría',
-                        style: TextStyle(color: UColors.textGray, fontSize: 18),
-                      ),
-                    ],
-                  ),
+      sliver: _anuncios.isEmpty
+          ? SliverToBoxAdapter(
+              child: Container(
+                height: 300,
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off, size: 64, color: UColors.textGray),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No hay productos en esta categoría',
+                      style: TextStyle(color: UColors.textGray, fontSize: 18),
+                    ),
+                  ],
                 ),
-              )
-              : SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columnas,
-                  crossAxisSpacing: 24,
-                  mainAxisSpacing: 24,
-                  childAspectRatio: 0.9,
-                ),
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final producto = productosFiltrados[index];
-                  return _TarjetaProducto(producto: producto);
-                }, childCount: productosFiltrados.length),
               ),
+            )
+          : SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columnas,
+                crossAxisSpacing: 24,
+                mainAxisSpacing: 24,
+                childAspectRatio: 0.9,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _TarjetaAnuncio(anuncio: _anuncios[index]),
+                childCount: _anuncios.length,
+              ),
+            ),
     );
   }
 }
-
 
 // ------------------------------------------
 // 4. Tarjeta Individual de Producto
 // ------------------------------------------
 class _TarjetaProducto extends StatelessWidget {
   final _Producto producto;
-
   const _TarjetaProducto({required this.producto});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => _PantallaDetalleProducto(producto: producto),
-          ),
-        );
+        if (_verificarAutenticacion(context)) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  _PantallaDetalleProducto(producto: producto),
+            ),
+          );
+        }
       },
-
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
@@ -627,7 +597,6 @@ class _TarjetaProducto extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen
             Expanded(
               flex: 5,
               child: Stack(
@@ -642,18 +611,16 @@ class _TarjetaProducto extends StatelessWidget {
                       child: Image.network(
                         producto.imagenUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: UColors.textGray,
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_not_supported,
-                                color: Colors.grey,
-                                size: 40,
-                              ),
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: UColors.textGray,
+                          child: const Center(
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                              size: 40,
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -681,7 +648,6 @@ class _TarjetaProducto extends StatelessWidget {
                 ],
               ),
             ),
-            // Detalles
             Expanded(
               flex: 3,
               child: Padding(
@@ -703,7 +669,6 @@ class _TarjetaProducto extends StatelessWidget {
                       producto.precio,
                       style: const TextStyle(
                         color: UColors.greenDark,
-
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
@@ -741,6 +706,200 @@ class _TarjetaProducto extends StatelessWidget {
 }
 
 // ------------------------------------------
+// Tarjeta de Anuncio (datos desde Supabase)
+// ------------------------------------------
+class _TarjetaAnuncio extends StatelessWidget {
+  final Map<String, dynamic> anuncio;
+  const _TarjetaAnuncio({required this.anuncio});
+
+  String _getPrecio() {
+    final modalidades =
+        anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    if (modalidades.containsKey('venta')) {
+      final precio = modalidades['venta']['precio'];
+      return '\$${precio?.toStringAsFixed(2) ?? '0.00'}';
+    }
+    if (modalidades.containsKey('alquiler')) {
+      final alquiler = modalidades['alquiler'];
+      if (alquiler is List && alquiler.isNotEmpty) {
+        final costo = alquiler[0]['costo'];
+        final unidad = alquiler[0]['unidad_tiempo'] ?? '';
+        return '\$${costo?.toStringAsFixed(2) ?? '0.00'}/$unidad';
+      }
+    }
+    if (modalidades.containsKey('trueque')) return 'Trueque';
+    return 'Consultar';
+  }
+
+  String _getImagenUrl() {
+    final modalidades =
+        anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    final imagenes = modalidades['imagenes'] as List<dynamic>? ?? [];
+    return imagenes.isNotEmpty ? imagenes[0].toString() : '';
+  }
+
+  bool _esNuevo() {
+    final estado = (anuncio['estado_producto'] ?? '').toString().toLowerCase();
+    return estado == 'nuevo';
+  }
+
+  String _getEstadoBadge() {
+    final estado = (anuncio['estado_producto'] ?? '').toString();
+    if (estado.isEmpty) return 'Usado';
+    return estado[0].toUpperCase() + estado.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imagenUrl = _getImagenUrl();
+    final tieneImagen = imagenUrl.isNotEmpty;
+
+    return InkWell(
+      onTap: () {
+        if (_verificarAutenticacion(context)) {
+          // Aquí puedes navegar al detalle del anuncio en el futuro
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: UColors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Imagen
+            Expanded(
+              flex: 5,
+              child: Stack(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
+                      child: tieneImagen
+                          ? Image.network(
+                              imagenUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                    color: const Color(0xFFF0F0F0),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.image_not_supported,
+                                        color: Colors.grey,
+                                        size: 40,
+                                      ),
+                                    ),
+                                  ),
+                            )
+                          : Container(
+                              color: const Color(0xFFF0F0F0),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.grey,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                  // Badge de condición
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: UColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getEstadoBadge(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Info
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      anuncio['titulo'] ?? '',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      _getPrecio(),
+                      style: const TextStyle(
+                        color: UColors.greenDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            anuncio['categoria'] ?? '',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------
 // 5. Banners Promocionales
 // ------------------------------------------
 class _BannersPromocionales extends StatelessWidget {
@@ -749,7 +908,6 @@ class _BannersPromocionales extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
-
     if (width < 800) {
       return Column(
         children: [
@@ -776,7 +934,6 @@ class _BannersPromocionales extends StatelessWidget {
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: UColors.orange,
-
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -806,7 +963,6 @@ class _BannersPromocionales extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: UColors.white,
               foregroundColor: UColors.orange,
-
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -827,7 +983,6 @@ class _BannersPromocionales extends StatelessWidget {
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
         color: UColors.greenIcon.withValues(alpha: 0.2),
-
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -838,7 +993,6 @@ class _BannersPromocionales extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             decoration: const BoxDecoration(
               color: UColors.greenDark,
-
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.security, size: 24, color: Colors.white),
@@ -848,7 +1002,6 @@ class _BannersPromocionales extends StatelessWidget {
             'Tratos Seguros',
             style: TextStyle(
               color: UColors.greenDark,
-
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
@@ -858,7 +1011,6 @@ class _BannersPromocionales extends StatelessWidget {
             'Encuentros exclusivos en puntos seguros dentro del campus universitario.',
             style: TextStyle(
               color: UColors.greenDark.withValues(alpha: 0.8),
-
               fontSize: 16,
               fontStyle: FontStyle.italic,
               height: 1.5,
@@ -875,31 +1027,28 @@ class _BannersPromocionales extends StatelessWidget {
 // ------------------------------------------
 class _PantallaDetalleProducto extends StatelessWidget {
   final _Producto producto;
-
   const _PantallaDetalleProducto({required this.producto});
 
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 900;
-
     return Scaffold(
       backgroundColor: UColors.white,
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: BarraNavegacionSuperior()),
+          const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: isMobile ? 20 : 40,
                 vertical: 32,
               ),
-              child:
-                  isMobile
-                      ? Column(children: _buildContent(context, true))
-                      : Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: _buildContent(context, false),
-                      ),
+              child: isMobile
+                  ? Column(children: _buildContent(context, true))
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _buildContent(context, false),
+                    ),
             ),
           ),
           const SliverToBoxAdapter(child: _PieDePagina()),
@@ -910,7 +1059,6 @@ class _PantallaDetalleProducto extends StatelessWidget {
 
   List<Widget> _buildContent(BuildContext context, bool isMobile) {
     return [
-      // Lado Izquierdo: Galería de Imágenes
       Expanded(
         flex: isMobile ? 0 : 6,
         child: Column(
@@ -933,63 +1081,56 @@ class _PantallaDetalleProducto extends StatelessWidget {
             if (producto.imagenesAdicionales.isNotEmpty)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children:
-                    producto.imagenesAdicionales.take(3).map((url) {
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              url,
-                              height: 100,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
+                children: producto.imagenesAdicionales.take(3).map((url) {
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          url,
+                          height: 100,
+                          fit: BoxFit.cover,
                         ),
-                      );
-                    }).toList(),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
           ],
         ),
       ),
-
       if (!isMobile) const SizedBox(width: 48),
       if (isMobile) const SizedBox(height: 32),
-
-      // Lado Derecho: Información del Producto
       Expanded(
         flex: isMobile ? 0 : 4,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Badges Categoría
             Wrap(
               spacing: 8,
-              children:
-                  producto.etiquetas.map((e) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: UColors.footerBg,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        e,
-                        style: TextStyle(
-                          color: UColors.textGray,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    );
-                  }).toList(),
+              children: producto.etiquetas.map((e) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: UColors.footerBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    e,
+                    style: TextStyle(
+                      color: UColors.textGray,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 16),
-            // Título
             Text(
               producto.titulo,
               style: TextStyle(
@@ -999,22 +1140,15 @@ class _PantallaDetalleProducto extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // Precio y Badge
-            Row(
-              children: [
-                Text(
-                  producto.precio,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: UColors.greenDark,
-                  ),
-                ),
-              ],
+            Text(
+              producto.precio,
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: UColors.greenDark,
+              ),
             ),
-
             const SizedBox(height: 32),
-            // Vendedor Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -1053,7 +1187,10 @@ class _PantallaDetalleProducto extends StatelessWidget {
                         ),
                         Text(
                           producto.vendedor.facultad,
-                          style: TextStyle(color: UColors.textGray, fontSize: 13),
+                          style: TextStyle(
+                            color: UColors.textGray,
+                            fontSize: 13,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Row(
@@ -1062,10 +1199,9 @@ class _PantallaDetalleProducto extends StatelessWidget {
                               return Icon(
                                 Icons.star,
                                 size: 14,
-                                color:
-                                    i < producto.vendedor.estrellas.floor()
-                                        ? UColors.orange
-                                        : UColors.cardBorder,
+                                color: i < producto.vendedor.estrellas.floor()
+                                    ? UColors.orange
+                                    : UColors.cardBorder,
                               );
                             }),
                             const SizedBox(width: 4),
@@ -1085,7 +1221,6 @@ class _PantallaDetalleProducto extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            // Descripción del Producto (Cajita del Vendedor)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -1110,10 +1245,13 @@ class _PantallaDetalleProducto extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Puntos clave (opcional, para que se vea más pro)
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 16, color: UColors.textGray),
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: UColors.textGray,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Entrega en: ${producto.ubicacion}',
@@ -1124,14 +1262,19 @@ class _PantallaDetalleProducto extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(height: 32),
-            // Botones de Acción
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                    );
+                  }
+                },
                 icon: const Icon(Icons.chat_bubble_outline),
                 label: const Text('Contactar Vendedor'),
                 style: ElevatedButton.styleFrom(

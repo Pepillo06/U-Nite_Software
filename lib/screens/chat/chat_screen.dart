@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatScreen extends StatefulWidget {
+  final String conversacionId;
   final String nombreOtro;
+  final String otroUserId;
+  final String? anuncioId;
   final bool showAppBar;
 
   const ChatScreen({
     super.key,
+    required this.conversacionId,
     required this.nombreOtro,
+    required this.otroUserId,
+    this.anuncioId,
     this.showAppBar = true,
   });
 
@@ -17,22 +23,78 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  final _supabase = Supabase.instance.client;
   final _controller = TextEditingController();
   final _scroll = ScrollController();
+  List<Map<String, dynamic>> _mensajes = [];
+  Map<String, dynamic>? _anuncio;
+  bool _loading = true;
 
-  final List<Map<String, dynamic>> _mensajes = [
-    {'texto': 'Hola! He visto que vendes la calculadora. ¿Sigue disponible para recoger hoy en el campus?', 'isMe': false, 'hora': '14:15'},
-    {'texto': '¡Hola! Sí, todavía la tengo. Estaré en la facultad de ingeniería hasta las 18:00 si te va bien.', 'isMe': true, 'hora': '14:18'},
-    {'texto': '¿Sigue disponible la calculadora? Podría pasarme sobre las 16:30 por allí.', 'isMe': false, 'hora': '14:20'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadMensajes();
+    _loadAnuncio();
+    _suscribirse();
+  }
 
-  void _enviar() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
+  Future<void> _loadMensajes() async {
+    final data = await _supabase
+        .from('mensajes')
+        .select()
+        .eq('conversacion_id', widget.conversacionId)
+        .order('creado_en', ascending: true);
     setState(() {
-      _mensajes.add({'texto': text, 'isMe': true, 'hora': 'ahora'});
+      _mensajes = List<Map<String, dynamic>>.from(data);
+      _loading = false;
     });
-    _controller.clear();
+    _scrollToBottom();
+    await _marcarComoLeidos();
+  }
+
+  Future<void> _marcarComoLeidos() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    await _supabase
+        .from('mensajes')
+        .update({'leido': true})
+        .eq('conversacion_id', widget.conversacionId)
+        .eq('leido', false)
+        .neq('remitente_id', userId);
+  }
+
+  Future<void> _loadAnuncio() async {
+    if (widget.anuncioId == null) return;
+    final data = await _supabase
+        .from('anuncios_marketplace')
+        .select('titulo, precio_monto, precio_moneda')
+        .eq('id', widget.anuncioId!)
+        .maybeSingle();
+    if (data != null) setState(() => _anuncio = data);
+  }
+
+  void _suscribirse() {
+    _supabase
+        .channel('mensajes:${widget.conversacionId}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'mensajes',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversacion_id',
+            value: widget.conversacionId,
+          ),
+          callback: (payload) {
+            setState(() => _mensajes.add(payload.newRecord));
+            _scrollToBottom();
+            _marcarComoLeidos();
+          },
+        )
+        .subscribe();
+  }
+
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(
@@ -44,23 +106,54 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-        Future<void> _adjuntarArchivo() async {
-        // En web mostramos un mensaje informativo
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Función de archivos disponible en la app móvil',
-              style: GoogleFonts.lexend(color: Colors.white, fontSize: 13),
-            ),
-            backgroundColor: const Color(0xFFF36900),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
+  Future<void> _enviar() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    _controller.clear();
+
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) {
+      setState(() {
+        _mensajes.add({
+          'contenido': text,
+          'remitente_id': 'yo',
+          'creado_en': DateTime.now().toIso8601String(),
+        });
+      });
+      _scrollToBottom();
+      return;
+    }
+
+    await _supabase.from('mensajes').insert({
+      'conversacion_id': widget.conversacionId,
+      'remitente_id': userId,
+      'contenido': text,
+    });
+  }
+
+  Future<void> _adjuntarArchivo() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Función de archivos disponible en la app móvil',
+          style: GoogleFonts.lexend(color: Colors.white, fontSize: 13),
+        ),
+        backgroundColor: const Color(0xFFF36900),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  String _formatHora(String timestamp) {
+    final dt = DateTime.parse(timestamp).toLocal();
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final myId = _supabase.auth.currentUser?.id;
     final inicial = widget.nombreOtro.isNotEmpty
         ? widget.nombreOtro[0].toUpperCase()
         : '?';
@@ -89,20 +182,29 @@ class _ChatScreenState extends State<ChatScreen> {
           if (!widget.showAppBar) _buildDesktopChatHeader(inicial),
           _buildDaySeparator(),
           Expanded(
-            child: ListView.builder(
-              controller: _scroll,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              itemCount: _mensajes.length,
-              itemBuilder: (context, i) {
-                final msg = _mensajes[i];
-                final isMe = msg['isMe'] as bool;
-                return _BurbujaMensaje(
-                  texto: msg['texto'],
-                  hora: msg['hora'],
-                  isMe: isMe,
-                );
-              },
-            ),
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFF36900)))
+                : _mensajes.isEmpty
+                    ? Center(
+                        child: Text('Sé el primero en escribir 👋',
+                            style: GoogleFonts.lexend(
+                                color: const Color(0xFF5B4137), fontSize: 14)))
+                    : ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 16),
+                        itemCount: _mensajes.length,
+                        itemBuilder: (context, i) {
+                          final msg = _mensajes[i];
+                          final isMe = msg['remitente_id'] == myId;
+                          return _BurbujaMensaje(
+                            texto: msg['contenido'],
+                            hora: _formatHora(msg['creado_en']),
+                            isMe: isMe,
+                          );
+                        },
+                      ),
           ),
           _buildInputBar(),
         ],
@@ -227,43 +329,46 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F3F3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE3BFB1)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE3BFB1),
-                    borderRadius: BorderRadius.circular(8),
+          if (_anuncio != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F3F3),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE3BFB1)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3BFB1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.shopping_bag_outlined,
+                        color: Color(0xFF5B4137), size: 22),
                   ),
-                  child: const Icon(Icons.calculate_outlined,
-                      color: Color(0xFF5B4137), size: 22),
-                ),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Calculadora Científica TI-84',
-                        style: GoogleFonts.lexend(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF1A1A1A))),
-                    Text('\$45.00',
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_anuncio!['titulo'] ?? '',
+                          style: GoogleFonts.lexend(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF1A1A1A))),
+                      Text(
+                        '\$${_anuncio!['precio_monto']} ${_anuncio!['precio_moneda'] ?? ''}',
                         style: GoogleFonts.lexend(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFFF36900))),
-                  ],
-                ),
-              ],
+                            color: const Color(0xFFF36900)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );

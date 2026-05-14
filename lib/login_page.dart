@@ -5,6 +5,7 @@ import 'register_page.dart';
 import 'market.dart';
 import 'theme.dart';
 //import 'test_landing_page.dart'; 
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -106,6 +107,21 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
 
+          Positioned(
+            top: 40,  // Ajusta según el notch o status bar
+            left: 20,
+            child: SafeArea(
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomePage()),
+                  );
+                },
+              ),
+            ),
+          ),
           // 3. Contenido Central
           Center(
             child: SingleChildScrollView(
@@ -275,7 +291,7 @@ class _LoginPageState extends State<LoginPage> {
                                 style: TextStyle(color: Colors.black54, fontSize: 14),
                                 children: <TextSpan>[
                                   TextSpan(
-                                    text: 'Registro',
+                                    text: 'Regístrate',
                                     style: TextStyle(
                                       color: UColors.orangeDark,
                                       fontWeight: FontWeight.bold,
