@@ -1165,17 +1165,16 @@ void _mostrarDetalleAnuncio(
                                         final nav = Navigator.of(context);
                                         nav.pop(); // cierra el dialog
 
-                                        nav.push(
-                                          MaterialPageRoute(
-                                            builder: (_) => ChatScreen(
-                                              conversacionId: conversacionId,
-                                              nombreOtro: nombreVendedor,
-                                              otroUserId: vendedorId,
-                                              anuncioId: anuncioId,
-                                              showAppBar: true,
-                                            ),
+                                       nav.push(
+                                        MaterialPageRoute(
+                                          builder: (_) => ChatListScreen(
+                                            conversacionInicial: conversacionId,
+                                            nombreInicial: nombreVendedor,
+                                            otroUserIdInicial: vendedorId,
+                                            anuncioIdInicial: anuncioId,
                                           ),
-                                        );
+                                        ),
+                                      );
                                       } catch (e) {
                                         if (context.mounted) {
                                           ScaffoldMessenger.of(context).showSnackBar(
