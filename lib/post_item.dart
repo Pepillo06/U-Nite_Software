@@ -8,7 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'market.dart';
 import 'package:flutter/services.dart';
 
-
 // Definición de tipos de transacción
 enum TransactionType { venta, alquiler, trueque }
 
@@ -37,6 +36,29 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
   String? _titleError;
   String? _descriptionError;
   String? _priceError;
+  bool _isHoveringPublicar = false;
+  bool _isPressingPublicar = false;
+  String? _pressingCondition;
+  String? _hoveringInput; // para rastrear cuál input tiene hover
+  final Map<String, FocusNode> _focusNodes = {}; // para rastrear foco por label
+  final FocusNode _costoPorDiaFocusNode = FocusNode();
+  TransactionType? _hoveringTab;
+  TransactionType? _pressingTab;
+
+  String _mapCondicion(String condicion) {
+    switch (condicion) {
+      case 'Nuevo':
+        return 'Nuevo';
+      case 'Como nuevo':
+        return 'Usado - Como nuevo';
+      case 'Bueno':
+        return 'Usado - Buen estado';
+      case 'Regular':
+        return 'Regular';
+      default:
+        return condicion;
+    }
+  }
 
   Future<void> _publicarArticulo() async {
     final supabase = Supabase.instance.client;
@@ -52,14 +74,18 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
     bool hasError = false;
 
     if (_titleController.text.trim().isEmpty) {
-      setState(() => _titleError = 'El nombre del artículo no puede estar vacío.');
+      setState(
+        () => _titleError = 'El nombre del artículo no puede estar vacío.',
+      );
       hasError = true;
     } else {
       setState(() => _titleError = null);
     }
 
     if (_descriptionController.text.trim().isEmpty) {
-      setState(() => _descriptionError = 'La descripción no puede estar vacía.');
+      setState(
+        () => _descriptionError = 'La descripción no puede estar vacía.',
+      );
       hasError = true;
     } else {
       setState(() => _descriptionError = null);
@@ -69,7 +95,9 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
       final priceText = _priceController.text.trim();
       final price = double.tryParse(priceText);
       if (priceText.isEmpty || price == null || price < 0) {
-        setState(() => _priceError = 'Ingresa un precio válido (número positivo).');
+        setState(
+          () => _priceError = 'Ingresa un precio válido (número positivo).',
+        );
         hasError = true;
       } else {
         setState(() => _priceError = null);
@@ -131,7 +159,9 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
         'titulo': _titleController.text.trim(),
         'descripcion': _descriptionController.text.trim(),
         'categoria': _selectedCategory,
-        'estado_producto': _selectedCondition?.toLowerCase(),
+        'estado_producto': _selectedCondition != null
+            ? _mapCondicion(_selectedCondition!)
+            : null,
         'disponible': true,
         'fecha_publicacion': DateTime.now().toIso8601String(),
         'detalles_modalidades': modalidades,
@@ -152,6 +182,15 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _costoPorDiaFocusNode.dispose();
+    for (final node in _focusNodes.values) {
+      node.dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -316,7 +355,11 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                   },
                   child: const Padding(
                     padding: EdgeInsets.all(10),
-                    child: Icon(Icons.arrow_back, color: Color(0xFF2E3137), size: 24),
+                    child: Icon(
+                      Icons.arrow_back,
+                      color: Color(0xFF2E3137),
+                      size: 24,
+                    ),
                   ),
                 ),
               ),
@@ -433,6 +476,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                               _selectedCategory = val;
                             });
                           },
+                          hoverKey: 'Categoría',
                         ),
                       ],
                     ),
@@ -458,10 +502,16 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                               'Precio fijo para venta',
                               controller: _priceController,
                               hintText: '\$ 0.00',
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              errorText: _priceError,  // ← AGREGA ESTO
-                              inputFormatters: [           // ← AGREGA ESTO
-                                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              errorText: _priceError, // ← AGREGA ESTO
+                              inputFormatters: [
+                                // ← AGREGA ESTO
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d*'),
+                                ),
                               ],
                             ),
                             if (_selectedTypes.contains(
@@ -492,51 +542,98 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                                             ),
                                             const SizedBox(height: 5),
                                           ],
-                                          Container(
-                                            height: 48,
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              border: Border.all(
-                                                color: borderInput,
+                                          MouseRegion(
+                                            onEnter: (_) => setState(
+                                              () => _hoveringInput =
+                                                  'costo_$index',
+                                            ),
+                                            onExit: (_) => setState(() {
+                                              if (_hoveringInput ==
+                                                  'costo_$index')
+                                                _hoveringInput = null;
+                                            }),
+                                            child: AnimatedContainer(
+                                              duration: const Duration(
+                                                milliseconds: 130,
                                               ),
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 15,
-                                            ),
-                                            alignment: Alignment.centerLeft,
-                                            child: Row(
-                                              children: [
-                                                Text(
-                                                  '\$ ',
-                                                  style: inputStyle.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
+                                              curve: Curves.easeOut,
+                                              height: 48,
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                border: Border.all(
+                                                  color:
+                                                      _costoPorDiaFocusNode
+                                                          .hasFocus
+                                                      ? const Color(0xFFF25A22)
+                                                      : _hoveringInput ==
+                                                            'costo_$index'
+                                                      ? const Color(
+                                                          0xFFE3BFB1,
+                                                        ).withValues(alpha: 0.8)
+                                                      : borderInput,
+                                                  width:
+                                                      _costoPorDiaFocusNode
+                                                          .hasFocus
+                                                      ? 1.8
+                                                      : 1.0,
                                                 ),
-                                                Expanded(
-                                                  child: TextField(
-                                                    controller:
-                                                        _rentalOptions[index]['controller'],
-                                                    style: inputStyle,
-                                                    keyboardType:
-                                                        TextInputType.number,
-                                                    decoration: InputDecoration(
-                                                      border: InputBorder.none,
-                                                      hintText: '0.00',
-                                                      hintStyle: inputStyle
-                                                          .copyWith(
-                                                            color: const Color(
-                                                              0xFF8C95A3,
-                                                            ),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                boxShadow:
+                                                    _costoPorDiaFocusNode
+                                                        .hasFocus
+                                                    ? [
+                                                        BoxShadow(
+                                                          color:
+                                                              const Color(
+                                                                0xFFF25A22,
+                                                              ).withValues(
+                                                                alpha: 0.15,
+                                                              ),
+                                                          blurRadius: 8,
+                                                          offset: const Offset(
+                                                            0,
+                                                            2,
                                                           ),
-                                                      isDense: true,
-                                                      contentPadding:
-                                                          EdgeInsets.zero,
+                                                        ),
+                                                      ]
+                                                    : [],
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 15,
+                                                  ),
+                                              alignment: Alignment.centerLeft,
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: TextField(
+                                                      controller:
+                                                          _rentalOptions[index]['controller'],
+                                                      focusNode:
+                                                          _costoPorDiaFocusNode,
+                                                      style: inputStyle,
+                                                      keyboardType:
+                                                          TextInputType.number,
+                                                      decoration: InputDecoration(
+                                                        border:
+                                                            InputBorder.none,
+                                                        hintText: '\$ 0.00',
+                                                        hintStyle: inputStyle
+                                                            .copyWith(
+                                                              color:
+                                                                  const Color(
+                                                                    0xFF8C95A3,
+                                                                  ),
+                                                            ),
+                                                        isDense: true,
+                                                        contentPadding:
+                                                            EdgeInsets.zero,
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -574,6 +671,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                                                       val;
                                                 });
                                               },
+                                              hoverKey: 'Unidad_$index',
                                             ),
                                           ),
                                         ],
@@ -962,17 +1060,45 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
         const SizedBox(height: 30),
 
         // Botón Publicar
-        GestureDetector(
-          onTap: _isLoading ? null : _publicarArticulo,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: Container(
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _isHoveringPublicar = true),
+          onExit: (_) => setState(() {
+            _isHoveringPublicar = false;
+            _isPressingPublicar = false;
+          }),
+          child: GestureDetector(
+            onTap: _isLoading ? null : _publicarArticulo,
+            onTapDown: (_) => setState(() => _isPressingPublicar = true),
+            onTapUp: (_) => setState(() => _isPressingPublicar = false),
+            onTapCancel: () => setState(() => _isPressingPublicar = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOut,
               width: double.infinity,
               height: 60,
               decoration: BoxDecoration(
-                color: const Color(0xFFF25A22),
+                color: _isPressingPublicar
+                    ? const Color(0xFFBF4518)
+                    : _isHoveringPublicar
+                    ? const Color(0xFFFF7043)
+                    : const Color(0xFFF25A22),
                 borderRadius: BorderRadius.circular(10),
+                boxShadow: _isHoveringPublicar
+                    ? [
+                        BoxShadow(
+                          color: const Color(
+                            0xFFF25A22,
+                          ).withValues(alpha: 0.45),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ]
+                    : [],
               ),
+              transform: Matrix4.identity()
+                ..scale(_isPressingPublicar ? 0.97 : 1.0),
+              transformAlignment: Alignment.center,
               child: _isLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: Colors.white),
@@ -1009,9 +1135,17 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
     Color background,
   ) {
     bool isSelected = _selectedTypes.contains(type);
+    bool isHovering = _hoveringTab == type;
+    bool isPressing = _pressingTab == type;
+
     return Expanded(
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hoveringTab = type),
+        onExit: (_) => setState(() {
+          if (_hoveringTab == type) _hoveringTab = null;
+          if (_pressingTab == type) _pressingTab = null;
+        }),
         child: GestureDetector(
           onTap: () {
             setState(() {
@@ -1022,25 +1156,44 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
               }
             });
           },
-          child: Container(
-            // 1. Cambia el alineamiento a center para que el texto quede en medio
+          onTapDown: (_) => setState(() => _pressingTab = type),
+          onTapUp: (_) => setState(() => _pressingTab = null),
+          onTapCancel: () => setState(() => _pressingTab = null),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
             alignment: Alignment.center,
+            margin: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isSelected
-                  ? const Color(0xFF2D4B03)
+                  ? isPressing
+                        ? const Color(0xFF1E3202)
+                        : isHovering
+                        ? const Color(0xFF3A5F05)
+                        : const Color(0xFF2D4B03)
+                  : isPressing
+                  ? const Color(0xFFE0E0E0)
+                  : isHovering
+                  ? const Color(0xFFEAE8E8)
                   : const Color(0xFFF5F3F3),
               borderRadius: BorderRadius.circular(9),
+              boxShadow: isSelected && isHovering
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF2D4B03).withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : [],
             ),
-            margin: const EdgeInsets.all(10),
-            //alignment: MainAxisAlignment.center,
+            transform: Matrix4.identity()..scale(isPressing ? 0.95 : 1.0),
+            transformAlignment: Alignment.center,
             child: Text(
               title,
               style: TextStyle(
                 fontSize: 14,
-                //fontFamily: 'Outfit',
-                color: isSelected
-                    ? const Color.fromARGB(255, 255, 255, 255)
-                    : darkText,
+                color: isSelected ? Colors.white : darkText,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -1063,28 +1216,59 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
     List<TextInputFormatter>? inputFormatters,
   }) {
     final bool hasError = errorText != null && errorText.isNotEmpty;
+    final focusNode = _getFocusNode(label);
+    final bool isFocused = focusNode.hasFocus;
+    final bool isHovering = _hoveringInput == label;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: labelStyle),
         const SizedBox(height: 5),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: hasError ? Colors.red.shade400 : borderInput),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-          child: TextField(
-            controller: controller,
-            style: inputStyle,
-            keyboardType: keyboardType,
-            maxLines: maxLines,
-            inputFormatters: inputFormatters,
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              hintText: hintText,
-              hintStyle: inputStyle.copyWith(color: const Color(0xFF8C95A3)),
+        MouseRegion(
+          onEnter: (_) => setState(() => _hoveringInput = label),
+          onExit: (_) => setState(() {
+            if (_hoveringInput == label) _hoveringInput = null;
+          }),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(
+                color: hasError
+                    ? Colors.red.shade400
+                    : isFocused
+                    ? const Color(0xFFF25A22)
+                    : isHovering
+                    ? const Color(0xFFE3BFB1).withValues(alpha: 0.8)
+                    : borderInput,
+                width: isFocused ? 1.8 : 1.0,
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: isFocused
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFFF25A22).withValues(alpha: 0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : [],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              style: inputStyle,
+              keyboardType: keyboardType,
+              maxLines: maxLines,
+              inputFormatters: inputFormatters,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                hintText: hintText,
+                hintStyle: inputStyle.copyWith(color: const Color(0xFF8C95A3)),
+              ),
             ),
           ),
         ),
@@ -1135,30 +1319,64 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
     String? value,
     required List<String> items,
     required Function onChanged,
+    String? hoverKey,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: borderInput),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isExpanded: true,
-          hint: Text(hintText, style: inputStyle),
-          icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFFA5B2BC)),
-          items: items.map<DropdownMenuItem<String>>((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value, style: inputStyle),
-            );
-          }).toList(),
-          onChanged: (newValue) => onChanged(newValue),
+    final bool isHovering = _hoveringInput == (hoverKey ?? hintText);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hoveringInput = hoverKey ?? hintText),
+      onExit: (_) => setState(() {
+        if (_hoveringInput == (hoverKey ?? hintText)) _hoveringInput = null;
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(
+            color: isHovering ? const Color(0xFFF25A22) : borderInput,
+            width: isHovering ? 1.8 : 1.0,
+          ),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isHovering
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFF25A22).withValues(alpha: 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : [],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: value,
+            isExpanded: true,
+            hint: Text(hintText, style: inputStyle),
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              color: Color(0xFFA5B2BC),
+            ),
+            items: items.map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value, style: inputStyle),
+              );
+            }).toList(),
+            onChanged: (newValue) => onChanged(newValue),
+          ),
         ),
       ),
     );
+  }
+
+  FocusNode _getFocusNode(String key) {
+    return _focusNodes.putIfAbsent(key, () {
+      final node = FocusNode();
+      node.addListener(() => setState(() {}));
+      return node;
+    });
   }
 
   Widget buildConditionButton(
@@ -1169,25 +1387,46 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
     Color unselectedBg,
   ) {
     bool isSelected = _selectedCondition == title;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedCondition = title;
-        });
-      },
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
+    bool isPressing = _pressingCondition == title;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedCondition = title;
+          });
+        },
+        onTapDown: (_) => setState(() => _pressingCondition = title),
+        onTapUp: (_) => setState(() => _pressingCondition = null),
+        onTapCancel: () => setState(() => _pressingCondition = null),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 130),
+          curve: Curves.easeOut,
           margin: const EdgeInsets.only(right: 10),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFFFF6100) : unselectedBg,
+            color: isSelected
+                ? const Color(0xFFFF6100)
+                : isPressing
+                ? const Color(0xFFE0E0E0)
+                : unselectedBg,
             borderRadius: BorderRadius.circular(20),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFFF6100).withValues(alpha: 0.35),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : [],
           ),
+          transform: Matrix4.identity()..scale(isPressing ? 0.93 : 1.0),
+          transformAlignment: Alignment.center,
           child: Text(
             title,
             style: TextStyle(
-              //fontFamily: 'Outfit',
               fontSize: 14,
               color: darkText,
               fontWeight: FontWeight.w500,
