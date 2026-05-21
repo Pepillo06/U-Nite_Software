@@ -298,67 +298,84 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 700;
+    const double alturaComponentes = 44.0; // Definimos el alto idéntico para ambos
+
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 16 : 40,
         vertical: 12,
       ),
-      child: Row(
+      // Usamos un Stack para que el botón no altere el centro geométrico de la barra
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          // Barra de búsqueda
-          Expanded(
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F3F3),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE3BFB1)),
+          
+          // 1. CAPA CENTRAL: Barra de búsqueda totalmente centrada
+          Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? 240 : 700, 
               ),
-              child: TextField(
-                controller: _searchController,
-                style: GoogleFonts.lexend(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Buscar libros, muebles, electrónica...',
-                  hintStyle: GoogleFonts.lexend(
-                    color: const Color(0xFF8F7065),
-                    fontSize: 14,
+              child: Container(
+                height: alturaComponentes, // Alto de 44px
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F3F3),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: const Color(0xFFE3BFB1)),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  style: GoogleFonts.lexend(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar libros, muebles...',
+                    hintStyle: GoogleFonts.lexend(
+                      color: const Color(0xFF8F7065),
+                      fontSize: 14,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: Color(0xFF8F7065),
+                      size: 20,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 11), // Ajustado para centrar el texto internamente
                   ),
-                  prefixIcon: const Icon(
-                    Icons.search,
-                    color: Color(0xFF8F7065),
-                    size: 20,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 16),
-          // Botón Vender Artículo
-          ElevatedButton(
-            onPressed: widget.onVender,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: UColors.orange,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 12 : 20,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              isMobile ? 'Vender' : 'Vender Artículo',
-              style: GoogleFonts.lexend(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+
+          // 2. CAPA LATERAL: Botón "Vender" pegado estrictamente a la derecha
+          Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              height: alturaComponentes, // Forzamos el mismo alto de 44px
+              child: ElevatedButton.icon(
+                onPressed: widget.onVender,
+                icon: const Icon(Icons.add, size: 18), // Icono de "+" al inicio
+                label: Text(
+                  isMobile ? 'Vender' : 'Vender Artículo',
+                  style: GoogleFonts.lexend(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: UColors.orange,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 12 : 20,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
               ),
             ),
           ),
+          
         ],
       ),
     );
@@ -383,8 +400,8 @@ class _FiltrosCategorias extends StatelessWidget {
       {'nombre': 'Todos', 'icono': Icons.grid_view},
       {'nombre': 'Libros', 'icono': Icons.menu_book},
       {'nombre': 'Electrónica', 'icono': Icons.computer},
-      {'nombre': 'Muebles', 'icono': Icons.chair_alt},
-      {'nombre': 'Alojamientos', 'icono': Icons.home_outlined},
+      {'nombre': 'Herramientas', 'icono': Icons.architecture},
+      {'nombre': 'Accesorios', 'icono': Icons.checkroom},
     ];
 
     return Container(
@@ -397,6 +414,10 @@ class _FiltrosCategorias extends StatelessWidget {
           children: List.generate(categorias.length, (index) {
             final nombre = categorias[index]['nombre'] as String;
             final esSeleccionado = categoriaActual == nombre;
+            
+            // 1. Condición mágica: ¿Es el botón de "Todos"?
+            final esBotonTodos = index == 0; 
+
             return Padding(
               padding: const EdgeInsets.only(right: 12.0),
               child: InkWell(
@@ -408,24 +429,35 @@ class _FiltrosCategorias extends StatelessWidget {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: esSeleccionado ? UColors.orange : UColors.footerBg,
+                    // 2. Color físico diferente si es "Todos" y no está seleccionado
+                    color: esSeleccionado 
+                        ? UColors.orange 
+                        : (esBotonTodos ? const Color.fromARGB(255, 221, 220, 220) : UColors.footerBg),
                     borderRadius: BorderRadius.circular(24),
+                    // 3. Le añadimos un borde físico solo si es el botón "Todos" no seleccionado
+                    // border: esBotonTodos && !esSeleccionado
+                    //     ? Border.all(color: UColors.orange.withOpacity(0.5), width: 1.5)
+                    //     : null,
                   ),
                   child: Row(
                     children: [
+                      // 4. Si quieres ocultar el icono en "Todos" para que sea diferente,
+                      // puedes condicionar su aparición aquí:
+                      
                       Icon(
                         categorias[index]['icono'] as IconData,
                         size: 20,
                         color: esSeleccionado ? Colors.white : UColors.textGray,
                       ),
                       const SizedBox(width: 8),
+                      
                       Text(
                         nombre,
                         style: TextStyle(
                           color: esSeleccionado
                               ? Colors.white
-                              : UColors.textDark,
-                          fontWeight: esSeleccionado
+                              : (esBotonTodos ? UColors.textDark : UColors.textDark), // Texto naranja si es "Todos"
+                          fontWeight: esSeleccionado || esBotonTodos
                               ? FontWeight.bold
                               : FontWeight.w500,
                           fontSize: 15,

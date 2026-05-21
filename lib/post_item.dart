@@ -468,7 +468,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                           items: [
                             'Libros',
                             'Herramientas',
-                            'Ropa',
+                            'Accesorios',
                             'Electrónica',
                           ],
                           onChanged: (val) {

@@ -345,6 +345,8 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                 'cedula': widget.model.cedula,
                 'universidad': _selectedUniversidad, 
                 'carrera': _selectedCarrera, 
+                'es_vendedor': widget.model.perfilSeleccionado == 1,
+                'es_estudiante': widget.model.perfilSeleccionado == 2,
               },
             );
 
