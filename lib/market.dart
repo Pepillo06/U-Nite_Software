@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'post_item.dart';
 import 'profile_page.dart';
+import 'post_item.dart';
 import 'login_page.dart';
 import 'screens/chat/chat_list_screen.dart';
 import 'widgets/unite_header.dart';
+import 'screens/chat/chat_screen.dart';
 
 // ==========================================
-// PANTALLA PRINCIPAL DEL MARKETPLACE REDISEÑADA
+// PANTALLA PRINCIPAL DEL MARKETPLACE
 // ==========================================
 class MarketPage extends StatefulWidget {
   const MarketPage({super.key});
-
   @override
   State<MarketPage> createState() => _MarketPageState();
 }
@@ -29,84 +29,36 @@ class _MarketPageState extends State<MarketPage> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 900;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFFCFCFC), // Fondo claro y limpio como la foto
+      backgroundColor: UColors.footerBg,
       body: CustomScrollView(
         slivers: [
-          // Mantenemos tu Header intacto
           const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
-          
-          // SECCIÓN HERO: Título llamativo y Buscador Centralizado
-          const SliverToBoxAdapter(child: _SeccionHero()),
-
-          // SECCIÓN DE CONTENIDO: Layout dividido (Categorías + Productos)
+          SliverToBoxAdapter(
+            child: _BarraSuperior(
+              onVender: () {
+                if (_verificarAutenticacion(context)) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PublicarArticuloPage(),
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: _FiltrosCategorias(
+              categoriaActual: _categoriaSeleccionada,
+              onChanged: _onCategoriaChanged,
+            ),
+          ),
+          _CuadriculaProductos(categoria: _categoriaSeleccionada),
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16.0 : 40.0,
-                vertical: 32.0,
-              ),
-              child: isMobile
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _BotonVenderElegante(isMobile: true),
-                        const SizedBox(height: 16),
-                        _CategoriasLaterales(
-                          categoriaActual: _categoriaSeleccionada,
-                          onChanged: _onCategoriaChanged,
-                          isMobile: true,
-                        ),
-                        const SizedBox(height: 24),
-                        _EncabezadoResultados(),
-                        const SizedBox(height: 16),
-                        _CuadriculaProductosContenedor(categoria: _categoriaSeleccionada),
-                      ],
-                    )
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Barra Lateral Izquierda
-                        SizedBox(
-                          width: 240,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _BotonVenderElegante(isMobile: false),
-                              const SizedBox(height: 24),
-                              Text(
-                                'Categorías',
-                                style: GoogleFonts.lexend(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1A1A1A),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _CategoriasLaterales(
-                                categoriaActual: _categoriaSeleccionada,
-                                onChanged: _onCategoriaChanged,
-                                isMobile: false,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 40),
-                        // Panel de Productos a la Derecha
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _EncabezadoResultados(),
-                              const SizedBox(height: 20),
-                              _CuadriculaProductosContenedor(categoria: _categoriaSeleccionada),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+              padding: const EdgeInsets.symmetric(horizontal: 40.0),
+              child: const _BannersPromocionales(),
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 40)),
@@ -118,182 +70,328 @@ class _MarketPageState extends State<MarketPage> {
 }
 
 // ==========================================
-// SECCIÓN HERO (Buscador Gigante + Títulos)
+// FUNCIÓN AUXILIAR DE AUTENTICACIÓN
 // ==========================================
-class _SeccionHero extends StatelessWidget {
-  const _SeccionHero();
+bool _verificarAutenticacion(BuildContext context) {
+  if (Supabase.instance.client.auth.currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Debes iniciar sesión para realizar esta acción'),
+        backgroundColor: UColors.orange,
+      ),
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+    return false;
+  }
+  return true;
+}
+
+// ==========================================
+// MODELOS Y DATOS DE PRUEBA
+// ==========================================
+class _Producto {
+  final String titulo;
+  final String precio;
+  final String ubicacion;
+  final bool esNuevo;
+  final String imagenUrl;
+  final String categoria;
+  final String descripcion;
+  final List<String> etiquetas;
+  final _Vendedor vendedor;
+  final List<String> zonasEntrega;
+  final List<String> imagenesAdicionales;
+
+  _Producto({
+    required this.titulo,
+    required this.precio,
+    required this.ubicacion,
+    required this.esNuevo,
+    required this.imagenUrl,
+    required this.categoria,
+    required this.descripcion,
+    required this.etiquetas,
+    required this.vendedor,
+    required this.zonasEntrega,
+    required this.imagenesAdicionales,
+  });
+}
+
+class _Vendedor {
+  final String nombre;
+  final String facultad;
+  final double estrellas;
+  final int ventas;
+  final String avatarUrl;
+  final bool esVerificado;
+
+  _Vendedor({
+    required this.nombre,
+    required this.facultad,
+    required this.estrellas,
+    required this.ventas,
+    required this.avatarUrl,
+    this.esVerificado = false,
+  });
+}
+
+final List<_Producto> _productosPrueba = [
+  _Producto(
+    titulo: 'Cálculo de Stewart - 8va Edición (Como nuevo)',
+    precio: '\$45.00',
+    ubicacion: 'Biblioteca Pedro Grases',
+    esNuevo: true,
+    categoria: 'Libros',
+    descripcion:
+        'Libro esencial para los primeros semestres de ingeniería. Está en excelente estado, sin rayones ni hojas dobladas. Incluye el código de acceso a la plataforma digital (sin usar).',
+    etiquetas: ['Ingeniería', 'Libros'],
+    vendedor: _Vendedor(
+      nombre: 'Carlos Ruiz',
+      facultad: 'Facultad de Ingeniería',
+      estrellas: 4.8,
+      ventas: 48,
+      avatarUrl: 'https://i.pravatar.cc/150?img=11',
+      esVerificado: true,
+    ),
+    zonasEntrega: ['Entrada de la Biblioteca', 'Bancos del Samán'],
+    imagenesAdicionales: [
+      'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1589998059171-988d887df646?q=80&w=600&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=600&auto=format&fit=crop',
+    ],
+    imagenUrl:
+        'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop',
+  ),
+  _Producto(
+    titulo: 'MacBook Air M1 2020 - 8GB RAM / 256GB SSD',
+    precio: '\$750.00',
+    ubicacion: 'Módulo de Ingeniería',
+    esNuevo: false,
+    categoria: 'Electrónica',
+    descripcion:
+        'Batería al 92% de salud. Estéticamente 10/10. Se entrega con cargador original y caja.',
+    etiquetas: ['Apple', 'Computación'],
+    vendedor: _Vendedor(
+      nombre: 'Ana Martínez',
+      facultad: 'Ciencias Económicas',
+      estrellas: 5.0,
+      ventas: 12,
+      avatarUrl: 'https://i.pravatar.cc/150?img=5',
+    ),
+    zonasEntrega: ['Piso 2, Módulo de Ingeniería', 'Cafetería El Samán'],
+    imagenesAdicionales: [],
+    imagenUrl:
+        'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=600&auto=format&fit=crop',
+  ),
+  _Producto(
+    titulo: 'Silla Ergonómica Pro para Escritorio',
+    precio: '\$120.00',
+    ubicacion: 'Residencias (Cerca UNIMET)',
+    esNuevo: false,
+    categoria: 'Muebles',
+    descripcion:
+        'Silla con soporte lumbar ajustable. Perfecta para largas jornadas de estudio.',
+    etiquetas: ['Hogar', 'Estudio'],
+    vendedor: _Vendedor(
+      nombre: 'Luis Gómez',
+      facultad: 'Arquitectura',
+      estrellas: 4.5,
+      ventas: 5,
+      avatarUrl: 'https://i.pravatar.cc/150?img=8',
+    ),
+    zonasEntrega: ['Plaza del Rectorado', 'Parada de Autobuses'],
+    imagenesAdicionales: [],
+    imagenUrl:
+        'https://images.unsplash.com/photo-1505843490538-5133c6c7d0e1?q=80&w=600&auto=format&fit=crop',
+  ),
+  _Producto(
+    titulo: 'Habitación Amueblada Cerca del Campus',
+    precio: '\$450.00/mes',
+    ubicacion: 'Terrazas del Ávila',
+    esNuevo: true,
+    categoria: 'Alojamientos',
+    descripcion:
+        'Incluye servicios de agua, luz e internet. Ambiente tranquilo solo para estudiantes.',
+    etiquetas: ['Renta', 'Vivienda'],
+    vendedor: _Vendedor(
+      nombre: 'Sra. Marta',
+      facultad: 'Vecina del Sector',
+      estrellas: 4.9,
+      ventas: 2,
+      avatarUrl: 'https://i.pravatar.cc/150?img=22',
+    ),
+    zonasEntrega: ['Visita previa cita en Vigilancia'],
+    imagenesAdicionales: [],
+    imagenUrl:
+        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?q=80&w=600&auto=format&fit=crop',
+  ),
+  _Producto(
+    titulo: 'Audífonos Noise Cancelling Sony WH-1000XM4',
+    precio: '\$180.00',
+    ubicacion: 'Módulo de Derecho',
+    esNuevo: true,
+    categoria: 'Electrónica',
+    descripcion:
+        'Nuevos en caja sellada. La mejor cancelación de ruido del mercado.',
+    etiquetas: ['Audio', 'Música'],
+    vendedor: _Vendedor(
+      nombre: 'Pedro Peña',
+      facultad: 'Estudios Jurídicos',
+      estrellas: 4.7,
+      ventas: 31,
+      avatarUrl: 'https://i.pravatar.cc/150?img=15',
+    ),
+    zonasEntrega: ['Pasillos de Derecho', 'Modulo Central'],
+    imagenesAdicionales: [],
+    imagenUrl:
+        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=600&auto=format&fit=crop',
+  ),
+  _Producto(
+    titulo: 'Introducción a la Psicología - Morris & Maisto',
+    precio: '\$30.00',
+    ubicacion: 'Edificio Eugenio Mendoza',
+    esNuevo: false,
+    categoria: 'Libros',
+    descripcion: 'Poco uso, ideal para psicología general.',
+    etiquetas: ['Psicología', 'Texto'],
+    vendedor: _Vendedor(
+      nombre: 'Elena Ruiz',
+      facultad: 'Psicología',
+      estrellas: 5.0,
+      ventas: 8,
+      avatarUrl: 'https://i.pravatar.cc/150?img=26',
+    ),
+    zonasEntrega: ['Auditorio Eugenio Mendoza', 'Bancos del Samán'],
+    imagenesAdicionales: [],
+    imagenUrl:
+        'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?q=80&w=600&auto=format&fit=crop',
+  ),
+];
+
+// ==========================================
+// WIDGETS
+// ==========================================
+
+// ------------------------------------------
+// BARRA SUPERIOR (búsqueda + vender)
+// ------------------------------------------
+class _BarraSuperior extends StatefulWidget {
+  final VoidCallback onVender;
+  const _BarraSuperior({required this.onVender});
+
+  @override
+  State<_BarraSuperior> createState() => _BarraSuperiorState();
+}
+
+class _BarraSuperiorState extends State<_BarraSuperior> {
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
-    final bool isSmall = width < 600;
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
+    const double alturaComponentes = 44.0; // Definimos el alto idéntico para ambos
 
     return Container(
-      width: double.infinity,
-      //color: Colors.white,
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment.center, // El degradado empieza exactamente en el medio
-          radius: 1,             // Define qué tan expandido estará el efecto
-          colors: [
-            UColors.orange.withOpacity(0.3), // Naranja muy sutil y elegante en el centro
-            Colors.white,                    // Se desvanece por completo a blanco puro
-          ],
-          stops: const [0.0, 0.70], // El naranja se mantiene suave y a partir del 85% se vuelve blanco
-        ),
-      ),
+      color: Colors.white,
       padding: EdgeInsets.symmetric(
-        horizontal: isSmall ? 20.0 : 40.0,
-        vertical: isSmall ? 40.0 : 60.0,
+        horizontal: isMobile ? 16 : 40,
+        vertical: 12,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      // Usamos un Stack para que el botón no altere el centro geométrico de la barra
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: GoogleFonts.lexend(
-                fontSize: isSmall ? 32 : 48,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF1A1A1A),
-                height: 1.2,
+          
+          // 1. CAPA CENTRAL: Barra de búsqueda totalmente centrada
+          Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? 240 : 700, 
               ),
-              children: [
-                const TextSpan(text: '¿Qué buscas para tu\n'),
-                TextSpan(
-                  text: 'carrera',
-                  style: TextStyle(color: UColors.orange),
+              child: Container(
+                height: alturaComponentes, // Alto de 44px
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F3F3),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: const Color(0xFFE3BFB1)),
                 ),
-                const TextSpan(text: ' hoy?'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Explora libros, tecnología y servicios compartidos por tu comunidad universitaria.',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.lexend(
-              fontSize: isSmall ? 14 : 16,
-              color: const Color(0xFF666666),
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 32),
-          // Buscador estilo de la foto
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 650),
-            child: Container(
-              height: 54,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.06),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-                border: Border.all(color: const Color(0xFFEBEAEA)),
-              ),
-              padding: const EdgeInsets.only(left: 20, right: 6),
-              child: Row(
-                children: [
-                  const Icon(Icons.search, color: Color(0xFF999999), size: 22),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      style: GoogleFonts.lexend(fontSize: 15),
-                      decoration: InputDecoration(
-                        hintText: 'Buscar artículo...',
-                        hintStyle: GoogleFonts.lexend(
-                          color: const Color(0xFF999999),
-                          fontSize: 15,
-                        ),
-                        border: InputBorder.none,
-                      ),
+                child: TextField(
+                  controller: _searchController,
+                  style: GoogleFonts.lexend(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar libros, muebles...',
+                    hintStyle: GoogleFonts.lexend(
+                      color: const Color(0xFF8F7065),
+                      fontSize: 14,
                     ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: UColors.orange,
-                      foregroundColor: Colors.white,
-                      //height: 42,
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      elevation: 0,
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: Color(0xFF8F7065),
+                      size: 20,
                     ),
-                    child: Text(
-                      'BUSCAR',
-                      style: GoogleFonts.lexend(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 11), // Ajustado para centrar el texto internamente
                   ),
-                ],
+                ),
               ),
             ),
           ),
+
+          // 2. CAPA LATERAL: Botón "Vender" pegado estrictamente a la derecha
+          Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              height: alturaComponentes, // Forzamos el mismo alto de 44px
+              child: ElevatedButton.icon(
+                onPressed: widget.onVender,
+                icon: const Icon(Icons.add, size: 18), // Icono de "+" al inicio
+                label: Text(
+                  isMobile ? 'Vender' : 'Vender Artículo',
+                  style: GoogleFonts.lexend(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: UColors.orange,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 12 : 20,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
         ],
       ),
     );
   }
 }
 
-// ==========================================
-// COMPONENTE: BOTÓN VENDER REDISEÑADO
-// ==========================================
-class _BotonVenderElegante extends StatelessWidget {
-  final bool isMobile;
-  const _BotonVenderElegante({required this.isMobile});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: isMobile ? double.infinity : 240,
-      height: 48,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          if (_verificarAutenticacion(context)) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PublicarArticuloPage()),
-            );
-          }
-        },
-        icon: const Icon(Icons.add, size: 20),
-        label: Text(
-          'Vender Artículo',
-          style: GoogleFonts.lexend(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: UColors.greenDark,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      ),
-    );
-  }
-}
-
-// ==========================================
-// FILTROS LATERALES EN ESPAÑOL
-// ==========================================
-class _CategoriasLaterales extends StatelessWidget {
+// ------------------------------------------
+// 2. Filtros de Categorías
+// ------------------------------------------
+class _FiltrosCategorias extends StatelessWidget {
   final String categoriaActual;
   final Function(String) onChanged;
-  final bool isMobile;
 
-  const _CategoriasLaterales({
+  const _FiltrosCategorias({
     required this.categoriaActual,
     required this.onChanged,
-    required this.isMobile,
   });
 
   @override
@@ -306,149 +404,89 @@ class _CategoriasLaterales extends StatelessWidget {
       {'nombre': 'Accesorios', 'icono': Icons.checkroom},
     ];
 
-    if (isMobile) {
-      return SingleChildScrollView(
+    return Container(
+      color: UColors.white,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 16.0),
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: categorias.map((cat) {
-            final String nombre = cat['nombre'] as String;
-            final bool esSeleccionado = categoriaActual == nombre;
+          children: List.generate(categorias.length, (index) {
+            final nombre = categorias[index]['nombre'] as String;
+            final esSeleccionado = categoriaActual == nombre;
+            
+            // 1. Condición mágica: ¿Es el botón de "Todos"?
+            final esBotonTodos = index == 0; 
+
             return Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: ChoiceChip(
-                label: Text(nombre, style: GoogleFonts.lexend(fontSize: 13)),
-                selected: esSeleccionado,
-                selectedColor: const Color(0xFFFBF1EE),
-                checkmarkColor: UColors.orange,
-                labelStyle: TextStyle(
-                  color: esSeleccionado ? UColors.orange : const Color(0xFF555555),
-                  fontWeight: esSeleccionado ? FontWeight.w600 : FontWeight.w500,
-                ),
-                backgroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(
-                    color: esSeleccionado ? UColors.orange : const Color(0xFFEBEAEA),
+              padding: const EdgeInsets.only(right: 12.0),
+              child: InkWell(
+                onTap: () => onChanged(nombre),
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    // 2. Color físico diferente si es "Todos" y no está seleccionado
+                    color: esSeleccionado 
+                        ? UColors.orange 
+                        : (esBotonTodos ? const Color.fromARGB(255, 221, 220, 220) : UColors.footerBg),
+                    borderRadius: BorderRadius.circular(24),
+                    // 3. Le añadimos un borde físico solo si es el botón "Todos" no seleccionado
+                    // border: esBotonTodos && !esSeleccionado
+                    //     ? Border.all(color: UColors.orange.withOpacity(0.5), width: 1.5)
+                    //     : null,
+                  ),
+                  child: Row(
+                    children: [
+                      // 4. Si quieres ocultar el icono en "Todos" para que sea diferente,
+                      // puedes condicionar su aparición aquí:
+                      
+                      Icon(
+                        categorias[index]['icono'] as IconData,
+                        size: 20,
+                        color: esSeleccionado ? Colors.white : UColors.textGray,
+                      ),
+                      const SizedBox(width: 8),
+                      
+                      Text(
+                        nombre,
+                        style: TextStyle(
+                          color: esSeleccionado
+                              ? Colors.white
+                              : (esBotonTodos ? UColors.textDark : UColors.textDark), // Texto naranja si es "Todos"
+                          fontWeight: esSeleccionado || esBotonTodos
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                onSelected: (_) => onChanged(nombre),
               ),
             );
-          }).toList(),
+          }),
         ),
-      );
-    }
-
-    return Column(
-      children: categorias.map((cat) {
-        final String nombre = cat['nombre'] as String;
-        final IconData icono = cat['icono'] as IconData;
-        final bool esSeleccionado = categoriaActual == nombre;
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6.0),
-          child: InkWell(
-            onTap: () => onChanged(nombre),
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: esSeleccionado ? const Color(0xFFFBF1EE) : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    icono,
-                    size: 18,
-                    color: esSeleccionado ? UColors.orange : const Color(0xFF666666),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    nombre,
-                    style: GoogleFonts.lexend(
-                      fontSize: 14,
-                      fontWeight: esSeleccionado ? FontWeight.w600 : FontWeight.w500,
-                      color: esSeleccionado ? UColors.orange : const Color(0xFF444444),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      }).toList(),
+      ),
     );
   }
 }
 
-// ==========================================
-// ENCABEZADO DE RESULTADOS (Explore Marketplace)
-// ==========================================
-class _EncabezadoResultados extends StatelessWidget {
-  const _EncabezadoResultados();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Explore el Marketplace',
-              style: GoogleFonts.lexend(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1A1A1A),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Descubre artículos de tu comunidad universitaria',
-              style: GoogleFonts.lexend(
-                fontSize: 13,
-                color: const Color(0xFF777777),
-              ),
-            ),
-          ],
-        ),
-        // Dropdown estético imitando el 'Sort by'
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFEBEAEA)),
-            color: Colors.white,
-          ),
-          child: Row(
-            children: [
-              Text(
-                'Sort by: Recientes',
-                style: GoogleFonts.lexend(fontSize: 12, fontWeight: FontWeight.w500),
-              ),
-              const Icon(Icons.arrow_drop_down, size: 18),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ==========================================
-// MANEJADOR Y CONTENEDOR DE LA GRID (SUPABASE)
-// ==========================================
-class _CuadriculaProductosContenedor extends StatefulWidget {
+// ------------------------------------------
+// 3. Cuadrícula de Productos (desde Supabase)
+// ------------------------------------------
+class _CuadriculaProductos extends StatefulWidget {
   final String categoria;
-  const _CuadriculaProductosContenedor({required this.categoria});
+  const _CuadriculaProductos({required this.categoria});
 
   @override
-  State<_CuadriculaProductosContenedor> createState() => _CuadriculaProductosContenedorState();
+  State<_CuadriculaProductos> createState() => _CuadriculaProductosState();
 }
 
-class _CuadriculaProductosContenedorState extends State<_CuadriculaProductosContenedor> {
+class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _anuncios = [];
   bool _cargando = true;
@@ -460,7 +498,7 @@ class _CuadriculaProductosContenedorState extends State<_CuadriculaProductosCont
   }
 
   @override
-  void didUpdateWidget(_CuadriculaProductosContenedor oldWidget) {
+  void didUpdateWidget(_CuadriculaProductos oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.categoria != widget.categoria) {
       _cargarAnuncios();
@@ -470,16 +508,22 @@ class _CuadriculaProductosContenedorState extends State<_CuadriculaProductosCont
   Future<void> _cargarAnuncios() async {
     setState(() => _cargando = true);
     try {
-      final data = await _supabase
+      var query = _supabase
           .from('anuncios_marketplace')
           .select()
           .eq('disponible', true)
           .order('fecha_publicacion', ascending: false);
 
-      List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(data);
+      final data = await query;
+      List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(
+        data,
+      );
 
+      // Filtrar por categoría en cliente (más simple que en query)
       if (widget.categoria != 'Todos') {
-        resultado = resultado.where((a) => a['categoria'] == widget.categoria).toList();
+        resultado = resultado
+            .where((a) => a['categoria'] == widget.categoria)
+            .toList();
       }
 
       setState(() {
@@ -494,135 +538,142 @@ class _CuadriculaProductosContenedorState extends State<_CuadriculaProductosCont
   @override
   Widget build(BuildContext context) {
     if (_cargando) {
-      return const SizedBox(
-        height: 200,
-        child: Center(child: CircularProgressIndicator(color: UColors.orange)),
-      );
-    }
-
-    if (_anuncios.isEmpty) {
-      return Container(
-        height: 250,
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.search_off, size: 48, color: Color(0xFF999999)),
-            const SizedBox(height: 12),
-            Text(
-              'No hay productos en esta categoría',
-              style: GoogleFonts.lexend(color: const Color(0xFF777777), fontSize: 15),
-            ),
-          ],
+      return const SliverToBoxAdapter(
+        child: SizedBox(
+          height: 300,
+          child: Center(
+            child: CircularProgressIndicator(color: UColors.orange),
+          ),
         ),
       );
     }
 
     double width = MediaQuery.of(context).size.width;
-    int columnas = 3; // Estabilizado en 3 columnas para layouts de escritorio medianos/grandes a la derecha
-    if (width < 600) columnas = 1;
-    else if (width < 1100) columnas = 2;
+    int columnas = 4;
+    if (width < 600)
+      columnas = 1;
+    else if (width < 900)
+      columnas = 2;
+    else if (width < 1200)
+      columnas = 3;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(), // Deja que el CustomScrollView maneje el scroll
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columnas,
-        crossAxisSpacing: 20,
-        mainAxisSpacing: 20,
-        childAspectRatio: 0.82, // Proporción perfecta para el diseño de la tarjeta
-      ),
-      itemCount: _anuncios.length,
-      itemBuilder: (context, index) => _TarjetaAnuncioRedisenada(anuncio: _anuncios[index]),
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
+      sliver: _anuncios.isEmpty
+          ? SliverToBoxAdapter(
+              child: Container(
+                height: 300,
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off, size: 64, color: UColors.textGray),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No hay productos en esta categoría',
+                      style: TextStyle(color: UColors.textGray, fontSize: 18),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columnas,
+                crossAxisSpacing: 24,
+                mainAxisSpacing: 24,
+                childAspectRatio: 0.9,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _TarjetaAnuncio(anuncio: _anuncios[index]),
+                childCount: _anuncios.length,
+              ),
+            ),
     );
   }
 }
 
-// ==========================================
-// TARJETA DE PRODUCTO FIEL AL NUEVO DISEÑO
-// ==========================================
-class _TarjetaAnuncioRedisenada extends StatelessWidget {
-  final Map<String, dynamic> anuncio;
-  const _TarjetaAnuncioRedisenada({required this.anuncio});
-
-  String _getPrecio() {
-    final modalidades = anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
-    if (modalidades.containsKey('venta')) {
-      final precio = modalidades['venta']['precio'];
-      return '\$${precio?.toStringAsFixed(2) ?? '0.00'}';
-    }
-    if (modalidades.containsKey('alquiler')) {
-      final alquiler = modalidades['alquiler'];
-      if (alquiler is List && alquiler.isNotEmpty) {
-        final costo = alquiler[0]['costo'];
-        final unidad = alquiler[0]['unidad_tiempo'] ?? '';
-        return '\$${costo?.toStringAsFixed(2) ?? '0.00'}/$unidad';
-      }
-    }
-    return 'Consultar';
-  }
-
-  String _getImagenUrl() {
-    final modalidades = anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
-    final imagenes = modalidades['imagenes'] as List<dynamic>? ?? [];
-    return imagenes.isNotEmpty ? imagenes[0].toString() : '';
-  }
-
-  String _getCategoriaTag() {
-    return (anuncio['categoria'] ?? 'General').toString().toUpperCase();
-  }
+// ------------------------------------------
+// 4. Tarjeta Individual de Producto
+// ------------------------------------------
+class _TarjetaProducto extends StatelessWidget {
+  final _Producto producto;
+  const _TarjetaProducto({required this.producto});
 
   @override
   Widget build(BuildContext context) {
-    final imagenUrl = _getImagenUrl();
-
     return InkWell(
-      onTap: () => _mostrarDetalleAnuncio(context, anuncio),
+      onTap: () {
+        if (_verificarAutenticacion(context)) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  _PantallaDetalleProducto(producto: producto),
+            ),
+          );
+        }
+      },
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: UColors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEBEAEA)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Contenedor de Imagen + Tag de Categoría flotante
             Expanded(
-              flex: 11,
+              flex: 5,
               child: Stack(
                 children: [
                   SizedBox(
                     width: double.infinity,
                     height: double.infinity,
                     child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                      child: imagenUrl.isNotEmpty
-                          ? Image.network(imagenUrl, fit: BoxFit.cover)
-                          : Container(
-                              color: const Color(0xFFF5F5F5),
-                              child: const Icon(Icons.image_not_supported, color: Color(0xFFBBBBBB)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
+                      child: Image.network(
+                        producto.imagenUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: UColors.textGray,
+                          child: const Center(
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                              size: 40,
                             ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  // Tag superior derecho (Ej: TECH, BOOKS, HOUSING)
                   Positioned(
-                    top: 10,
-                    right: 10,
+                    top: 12,
+                    right: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.55),
-                        borderRadius: BorderRadius.circular(4),
+                        color: UColors.white,
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        _getCategoriaTag(),
-                        style: GoogleFonts.lexend(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
+                        producto.esNuevo ? 'Nuevo' : 'Usado',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
@@ -630,57 +681,48 @@ class _TarjetaAnuncioRedisenada extends StatelessWidget {
                 ],
               ),
             ),
-            // Contenedor de Detalles del Producto
             Expanded(
-              flex: 6,
+              flex: 3,
               child: Padding(
-                padding: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      anuncio['titulo'] ?? '',
-                      style: GoogleFonts.lexend(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: const Color(0xFF1A1A1A),
+                      producto.titulo,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      _getPrecio(),
-                      style: GoogleFonts.lexend(
-                        color: UColors.orange, // El precio destaca en naranja/marca
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
+                      producto.precio,
+                      style: const TextStyle(
+                        color: UColors.greenDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
-                    const Divider(height: 1, color: Color(0xFFF0F0F0)),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Simulación de estrellas/calificación del diseño
-                        Row(
-                          children: [
-                            const Icon(Icons.star, size: 14, color: Colors.amber),
-                            const SizedBox(width: 4),
-                            Text(
-                              '4.9',
-                              style: GoogleFonts.lexend(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF555555),
-                              ),
-                            ),
-                          ],
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: Colors.grey.shade600,
                         ),
-                        Text(
-                          'por Estudiante',
-                          style: GoogleFonts.lexend(
-                            fontSize: 11,
-                            color: const Color(0xFF888888),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            producto.ubicacion,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -696,24 +738,203 @@ class _TarjetaAnuncioRedisenada extends StatelessWidget {
   }
 }
 
-// ==========================================
-// COMPLETAR WIDGETS AUXILIARES E INTACTOS
-// ==========================================
+// ------------------------------------------
+// Tarjeta de Anuncio (datos desde Supabase)
+// ------------------------------------------
+class _TarjetaAnuncio extends StatelessWidget {
+  final Map<String, dynamic> anuncio;
+  const _TarjetaAnuncio({required this.anuncio});
 
-bool _verificarAutenticacion(BuildContext context) {
-  if (Supabase.instance.client.auth.currentUser == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Debes iniciar sesión para realizar esta acción'),
-        backgroundColor: UColors.orange,
+  String _getPrecio() {
+    final modalidades =
+        anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    if (modalidades.containsKey('venta')) {
+      final precio = modalidades['venta']['precio'];
+      return '\$${precio?.toStringAsFixed(2) ?? '0.00'}';
+    }
+    if (modalidades.containsKey('alquiler')) {
+      final alquiler = modalidades['alquiler'];
+      if (alquiler is List && alquiler.isNotEmpty) {
+        final costo = alquiler[0]['costo'];
+        final unidad = alquiler[0]['unidad_tiempo'] ?? '';
+        return '\$${costo?.toStringAsFixed(2) ?? '0.00'}/$unidad';
+      }
+    }
+    if (modalidades.containsKey('trueque')) return 'Trueque';
+    return 'Consultar';
+  }
+
+  String _getImagenUrl() {
+    final modalidades =
+        anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    final imagenes = modalidades['imagenes'] as List<dynamic>? ?? [];
+    return imagenes.isNotEmpty ? imagenes[0].toString() : '';
+  }
+
+  bool _esNuevo() {
+    final estado = (anuncio['estado_producto'] ?? '').toString().toLowerCase();
+    return estado == 'nuevo';
+  }
+
+  String _getEstadoBadge() {
+    final estado = (anuncio['estado_producto'] ?? '').toString();
+    if (estado.isEmpty) return 'Usado';
+    return estado[0].toUpperCase() + estado.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imagenUrl = _getImagenUrl();
+    final tieneImagen = imagenUrl.isNotEmpty;
+
+    return InkWell(
+      onTap: () {
+        if (_verificarAutenticacion(context)) {
+          _mostrarDetalleAnuncio(context, anuncio);
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: UColors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Imagen
+            Expanded(
+              flex: 5,
+              child: Stack(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
+                      child: tieneImagen
+                          ? Image.network(
+                              imagenUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                    color: const Color(0xFFF0F0F0),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.image_not_supported,
+                                        color: Colors.grey,
+                                        size: 40,
+                                      ),
+                                    ),
+                                  ),
+                            )
+                          : Container(
+                              color: const Color(0xFFF0F0F0),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.grey,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                  // Badge de condición
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: UColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getEstadoBadge(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Info
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      anuncio['titulo'] ?? '',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      _getPrecio(),
+                      style: const TextStyle(
+                        color: UColors.greenDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            anuncio['categoria'] ?? '',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
-    Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginPage()));
-    return false;
   }
-  return true;
 }
 
+// ------------------------------------------
+// Popup de Detalle de Anuncio
+// ------------------------------------------
 void _mostrarDetalleAnuncio(
   BuildContext context,
   Map<String, dynamic> anuncio,
@@ -1187,6 +1408,301 @@ class _BannersPromocionales extends StatelessWidget {
   }
 }
 
+// ------------------------------------------
+// 7. Pantalla de Detalle de Producto
+// ------------------------------------------
+class _PantallaDetalleProducto extends StatelessWidget {
+  final _Producto producto;
+  const _PantallaDetalleProducto({required this.producto});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < 900;
+    return Scaffold(
+      backgroundColor: UColors.white,
+      body: CustomScrollView(
+        slivers: [
+          const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 20 : 40,
+                vertical: 32,
+              ),
+              child: isMobile
+                  ? Column(children: _buildContent(context, true))
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _buildContent(context, false),
+                    ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: _PieDePagina()),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildContent(BuildContext context, bool isMobile) {
+    return [
+      Expanded(
+        flex: isMobile ? 0 : 6,
+        child: Column(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: UColors.cardBorder),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  producto.imagenUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (producto.imagenesAdicionales.isNotEmpty)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: producto.imagenesAdicionales.take(3).map((url) {
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(
+                          url,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
+      if (!isMobile) const SizedBox(width: 48),
+      if (isMobile) const SizedBox(height: 32),
+      Expanded(
+        flex: isMobile ? 0 : 4,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              children: producto.etiquetas.map((e) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: UColors.footerBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    e,
+                    style: TextStyle(
+                      color: UColors.textGray,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              producto.titulo,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: UColors.textDark,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              producto.precio,
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: UColors.greenDark,
+              ),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: UColors.cardBorder),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundImage: NetworkImage(producto.vendedor.avatarUrl),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              producto.vendedor.nombre,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            if (producto.vendedor.esVerificado) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.verified,
+                                size: 16,
+                                color: UColors.blueIcon,
+                              ),
+                            ],
+                          ],
+                        ),
+                        Text(
+                          producto.vendedor.facultad,
+                          style: TextStyle(
+                            color: UColors.textGray,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            ...List.generate(5, (i) {
+                              return Icon(
+                                Icons.star,
+                                size: 14,
+                                color: i < producto.vendedor.estrellas.floor()
+                                    ? UColors.orange
+                                    : UColors.cardBorder,
+                              );
+                            }),
+                            const SizedBox(width: 4),
+                            Text(
+                              '(${producto.vendedor.ventas} ventas)',
+                              style: TextStyle(
+                                color: UColors.textGray,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: UColors.cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Descripción del Producto',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    producto.descripcion,
+                    style: TextStyle(
+                      color: UColors.textDark,
+                      fontSize: 15,
+                      height: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: UColors.textGray,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Entrega en: ${producto.ubicacion}',
+                        style: TextStyle(color: UColors.textGray, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: const Text('Contactar Vendedor'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: UColors.orange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.bookmark_border),
+                label: const Text('Apartar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: UColors.greenDark,
+                  side: const BorderSide(color: UColors.greenDark, width: 2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+}
 
 // ------------------------------------------
 // 8. Pie de Página (Footer)

@@ -300,15 +300,6 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             } else {
               _passwordError = null;
             }
-          
-            
-            // if (_passwordController.text.isEmpty) {
-            //   _passwordError = "La contraseña es obligatoria";
-            // } else if (_passwordController.text.length < 6) {
-            //   _passwordError = "La contraseña debe contener mínimo 6 caracteres";
-            // } else {
-            //   _passwordError = null;
-            // }
           });
 
           // Si hay algún error, detenemos la ejecución
@@ -336,35 +327,33 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             // 1. Crear el usuario en Supabase Auth
             // widget.model tiene los datos de los pasos anteriores
             // correoController tiene el del paso actual
+            
             final AuthResponse res = await supabase.auth.signUp(
               email: _correoController.text.trim(),
-              password: _passwordController.text.trim(), // Asegúrate de tener este controller
+              password: _passwordController.text.trim(),
               data: {
                 'primer_nombre': widget.model.nombre,
                 'primer_apellido': widget.model.apellido,
                 'cedula': widget.model.cedula,
                 'universidad': _selectedUniversidad, 
                 'carrera': _selectedCarrera, 
-                'es_vendedor': widget.model.perfilSeleccionado == 1,
-                'es_estudiante': widget.model.perfilSeleccionado == 2,
               },
             );
 
             final String? userId = res.user?.id;
 
             if (userId != null) {
-              // 2. Insertar en la tabla de PostgreSQL de tu compañero
-              // Usamos widget.model para acceder a lo que guardamos en Paso 1 y 2
-              // await supabase.from('usuarios').insert({
-              //   'id': userId, 
-              //   'primer_nombre': widget.model.nombre,
-              //   'primer_apellido': widget.model.apellido,
-              //   'cedula': int.tryParse(widget.model.cedula ?? '0'),
-              //   'correo': _correoController.text.trim(),
-              //   //'universidad': _selectedUniversidad, // Variable del Paso 3
-              //   //'carrera': _selectedCarrera,        // Variable del Paso 3
-              //   // Si tienes más campos en la tabla, agrégalos aquí
-              // });
+              final bool esVendedor = widget.model.perfilSeleccionado == 1;
+              final bool esEstudiante = widget.model.perfilSeleccionado == 2;
+
+              // 3. Hacemos un UPDATE en vez de un INSERT
+              await supabase
+                  .from('usuarios')
+                  .update({     
+                    'es_estudiante': esEstudiante, // Cambiará a TRUE si aplica
+                    'es_vendedor': esVendedor,     // Cambiará a TRUE si aplica
+                  })
+                  .eq('id', userId);
 
               // Cerramos el indicador de carga
               if (!mounted) return;
