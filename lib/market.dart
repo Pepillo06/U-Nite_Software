@@ -18,10 +18,18 @@ class MarketPage extends StatefulWidget {
 
 class _MarketPageState extends State<MarketPage> {
   String _categoriaSeleccionada = 'Todos';
+  String _busquedaActual = ''; // <-- Nueva variable para la búsqueda
 
   void _onCategoriaChanged(String categoria) {
     setState(() {
       _categoriaSeleccionada = categoria;
+    });
+  }
+
+  // <-- Nueva función para manejar el cambio de texto
+  void _onBusquedaChanged(String texto) {
+    setState(() {
+      _busquedaActual = texto;
     });
   }
 
@@ -34,6 +42,7 @@ class _MarketPageState extends State<MarketPage> {
           const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
           SliverToBoxAdapter(
             child: _BarraSuperior(
+              onBusquedaChanged: _onBusquedaChanged, // <-- Pasamos la función
               onVender: () {
                 if (_verificarAutenticacion(context)) {
                   Navigator.push(
@@ -52,7 +61,11 @@ class _MarketPageState extends State<MarketPage> {
               onChanged: _onCategoriaChanged,
             ),
           ),
-          _CuadriculaProductos(categoria: _categoriaSeleccionada),
+          // <-- Pasamos el texto de búsqueda a la cuadrícula
+          _CuadriculaProductos(
+            categoria: _categoriaSeleccionada,
+            busqueda: _busquedaActual, 
+          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40.0),
@@ -278,7 +291,12 @@ final List<_Producto> _productosPrueba = [
 // ------------------------------------------
 class _BarraSuperior extends StatefulWidget {
   final VoidCallback onVender;
-  const _BarraSuperior({required this.onVender});
+  final ValueChanged<String> onBusquedaChanged; // <-- Nuevo parámetro
+
+  const _BarraSuperior({
+    required this.onVender,
+    required this.onBusquedaChanged, // <-- Requerido
+  });
 
   @override
   State<_BarraSuperior> createState() => _BarraSuperiorState();
@@ -296,7 +314,7 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 700;
-    const double alturaComponentes = 44.0; // Definimos el alto idéntico para ambos
+    const double alturaComponentes = 44.0;
 
     return Container(
       color: Colors.white,
@@ -304,19 +322,16 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
         horizontal: isMobile ? 16 : 40,
         vertical: 12,
       ),
-      // Usamos un Stack para que el botón no altere el centro geométrico de la barra
       child: Stack(
         alignment: Alignment.center,
         children: [
-          
-          // 1. CAPA CENTRAL: Barra de búsqueda totalmente centrada
           Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: isMobile ? 240 : 700, 
               ),
               child: Container(
-                height: alturaComponentes, // Alto de 44px
+                height: alturaComponentes,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F3F3),
                   borderRadius: BorderRadius.circular(30),
@@ -325,6 +340,7 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
                 child: TextField(
                   controller: _searchController,
                   style: GoogleFonts.lexend(fontSize: 14),
+                  onSubmitted: widget.onBusquedaChanged, 
                   decoration: InputDecoration(
                     hintText: 'Buscar libros, muebles...',
                     hintStyle: GoogleFonts.lexend(
@@ -336,22 +352,47 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
                       color: Color(0xFF8F7065),
                       size: 20,
                     ),
+                    // MODIFICACIÓN AQUÍ: Agrupamos el botón de limpiar y el nuevo botón Buscar
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_searchController.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 18, color: Color(0xFF8F7065)),
+                            onPressed: () {
+                              _searchController.clear();
+                              widget.onBusquedaChanged('');
+                              setState(() {}); // Actualiza el estado para ocultar la equis
+                            },
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_forward_rounded, color: UColors.orange),
+                          tooltip: 'Buscar',
+                          onPressed: () {
+                            widget.onBusquedaChanged(_searchController.text);
+                          },
+                        ),
+                        const SizedBox(width: 6), // Separación del borde redondeado
+                      ],
+                    ),
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 11), // Ajustado para centrar el texto internamente
+                    contentPadding: const EdgeInsets.symmetric(vertical: 11),
                   ),
+                  // Escuchamos los cambios para ocultar o mostrar la 'X' dinámicamente si se borra texto
+                  onChanged: (text) {
+                    setState(() {});
+                  },
                 ),
               ),
             ),
           ),
-
-          // 2. CAPA LATERAL: Botón "Vender" pegado estrictamente a la derecha
           Align(
             alignment: Alignment.centerRight,
             child: SizedBox(
-              height: alturaComponentes, // Forzamos el mismo alto de 44px
+              height: alturaComponentes,
               child: ElevatedButton.icon(
                 onPressed: widget.onVender,
-                icon: const Icon(Icons.add, size: 18), // Icono de "+" al inicio
+                icon: const Icon(Icons.add, size: 18),
                 label: Text(
                   isMobile ? 'Vender' : 'Vender Artículo',
                   style: GoogleFonts.lexend(
@@ -373,7 +414,6 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
               ),
             ),
           ),
-          
         ],
       ),
     );
@@ -478,7 +518,12 @@ class _FiltrosCategorias extends StatelessWidget {
 // ------------------------------------------
 class _CuadriculaProductos extends StatefulWidget {
   final String categoria;
-  const _CuadriculaProductos({required this.categoria});
+  final String busqueda; // <-- Nuevo parámetro de búsqueda
+
+  const _CuadriculaProductos({
+    required this.categoria,
+    required this.busqueda, // <-- Requerido
+  });
 
   @override
   State<_CuadriculaProductos> createState() => _CuadriculaProductosState();
@@ -498,7 +543,8 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   @override
   void didUpdateWidget(_CuadriculaProductos oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.categoria != widget.categoria) {
+    // <-- Si cambia la categoría O cambia el texto de búsqueda, recargamos de la DB
+    if (oldWidget.categoria != widget.categoria || oldWidget.busqueda != widget.busqueda) {
       _cargarAnuncios();
     }
   }
@@ -506,18 +552,23 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   Future<void> _cargarAnuncios() async {
     setState(() => _cargando = true);
     try {
-      var query = _supabase
+      // 1. Inicializamos la petición base
+      var baseQuery = _supabase
           .from('anuncios_marketplace')
           .select()
-          .eq('disponible', true)
-          .order('fecha_publicacion', ascending: false);
+          .eq('disponible', true);
 
-      final data = await query;
-      List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(
-        data,
-      );
+      // 2. Aplicamos condicionalmente el filtro de búsqueda si el usuario escribió algo
+      if (widget.busqueda.trim().isNotEmpty) {
+        baseQuery = baseQuery.ilike('titulo', '%${widget.busqueda.trim()}%');
+      }
 
-      // Filtrar por categoría en cliente (más simple que en query)
+      // 3. Agregamos el ordenamiento justo al final del encadenamiento antes del await
+      final data = await baseQuery.order('fecha_publicacion', ascending: false);
+      
+      List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(data);
+
+      // 4. Filtrar por categoría en el cliente
       if (widget.categoria != 'Todos') {
         resultado = resultado
             .where((a) => a['categoria'] == widget.categoria)
@@ -568,7 +619,7 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
                     Icon(Icons.search_off, size: 64, color: UColors.textGray),
                     const SizedBox(height: 16),
                     Text(
-                      'No hay productos en esta categoría',
+                      'No hay productos que coincidan con la búsqueda',
                       style: TextStyle(color: UColors.textGray, fontSize: 18),
                     ),
                   ],
@@ -775,7 +826,8 @@ class _TarjetaAnuncio extends StatelessWidget {
   }
 
   String _getEstadoBadge() {
-    final estado = (anuncio['estado_producto'] ?? '').toString();
+    // Nos aseguramos de que si viene null, se convierta de forma segura en un String vacío
+    final String estado = (anuncio['estado_producto']?.toString() ?? '').trim();
     if (estado.isEmpty) return 'Usado';
     return estado[0].toUpperCase() + estado.substring(1);
   }
@@ -784,6 +836,9 @@ class _TarjetaAnuncio extends StatelessWidget {
   Widget build(BuildContext context) {
     final imagenUrl = _getImagenUrl();
     final tieneImagen = imagenUrl.isNotEmpty;
+
+    final String tituloSeguro = anuncio['titulo']?.toString() ?? 'Sin título';
+    final String categoriaSegura = anuncio['categoria']?.toString() ?? 'General';
 
     return InkWell(
       onTap: () {

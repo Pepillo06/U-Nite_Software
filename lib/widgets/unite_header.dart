@@ -24,6 +24,7 @@ class UniteHeader extends StatefulWidget implements PreferredSizeWidget {
 class _UniteHeaderState extends State<UniteHeader> {
   final _supabase = Supabase.instance.client;
   String? _nombreCompleto;
+  String? _fotoPerfilUrl;
   int _mensajesPendientes = 0;
 
   @override
@@ -40,14 +41,22 @@ class _UniteHeaderState extends State<UniteHeader> {
     try {
       final data = await _supabase
           .from('usuarios')
-          .select('primer_nombre, primer_apellido')
+          // --- MODIFICAR ESTA LÍNEA PARA AGREGAR 'foto_perfil_url' ---
+          .select('primer_nombre, primer_apellido, foto_perfil_url')
           .eq('id', user.id)
-          .single();
-      setState(() {
-        _nombreCompleto =
-            '${data['primer_nombre']} ${data['primer_apellido']}'.trim();
-      });
-    } catch (_) {}
+          .maybeSingle();
+
+      if (data != null && mounted) {
+        setState(() {
+          _nombreCompleto =
+              "${data['primer_nombre'] ?? ''} ${data['primer_apellido'] ?? ''}";
+          // --- AGREGAR ESTA LÍNEA ---
+          _fotoPerfilUrl = data['foto_perfil_url']; 
+        });
+      }
+    } catch (e) {
+      debugPrint('Error al cargar datos del usuario en header: $e');
+    }
   }
 
   Future<void> _cargarMensajesPendientes() async {
@@ -256,22 +265,40 @@ class _UniteHeaderState extends State<UniteHeader> {
                 },
                 child: Row(
                   children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: const Color(0xFFE3BFB1),
-                      child: const Icon(Icons.person,
-                          color: Color(0xFF5B4137), size: 20),
-                    ),
+                    // CircleAvatar(
+                    //   radius: 18,
+                    //   backgroundColor: const Color(0xFFE3BFB1),
+                    //   child: const Icon(Icons.person,
+                    //       color: Color(0xFF5B4137), size: 20),
+                    // ),
                     if (!isMobile && _nombreCompleto != null) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        _nombreCompleto!,
-                        style: GoogleFonts.lexend(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1A1A1A),
-                        ),
+                      // Usamos un Row para que la foto y el texto del saludo estén pegados
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Pequeño círculo para la foto de perfil
+                          CircleAvatar(
+                            radius: 21, // Tamaño discreto para el header
+                            backgroundColor: Colors.grey[200],
+                            backgroundImage: _fotoPerfilUrl != null && _fotoPerfilUrl!.isNotEmpty
+                                ? NetworkImage(_fotoPerfilUrl!)
+                                : null,
+                            child: _fotoPerfilUrl == null || _fotoPerfilUrl!.isEmpty
+                                ? const Icon(Icons.person, size: 18, color: Colors.grey)
+                                : null,
+                          ),
+                          const SizedBox(width: 8), // Separación entre la foto y el texto
+                          Text(
+                            "$_nombreCompleto",
+                            style: GoogleFonts.lexend(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF333333),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(width: 16),
                     ],
                   ],
                 ),
