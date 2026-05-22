@@ -164,7 +164,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         image: DecorationImage(
                           image: fotoBannerUrl.isNotEmpty 
                               ? NetworkImage(fotoBannerUrl) 
-                              : const NetworkImage("https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=1000"),
+                              : const NetworkImage("https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1000"),
                           fit: BoxFit.cover,
                         ),
                       ),
