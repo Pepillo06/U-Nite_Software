@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'profile_page.dart';
 import 'dart:typed_data';
 
 class EditProfilePage extends StatefulWidget {
@@ -30,6 +28,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   bool _isSaving = false;
   String? _currentProfileUrl;
   Uint8List? _newProfileImageBytes;
+  String? _currentBannerUrl;
+  Uint8List? _newBannerImageBytes;
   String? _userId;
   List<Map<String, dynamic>> _misAnuncios = [];
   bool _isLoadingAnuncios = true;
@@ -91,6 +91,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       setState(() {
         _currentProfileUrl = data['foto_perfil_url'];
+        _currentBannerUrl = data['foto_banner_url'];
         _nombreController.text = data['primer_nombre'] ?? '';
         _apellidoController.text = data['primer_apellido'] ?? '';
         _cedulaController.text = data['cedula']?.toString() ?? '';
@@ -182,6 +183,60 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error al subir la foto: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadBanner() async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200, // Un poco más ancho para banners
+        maxHeight: 600,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      setState(() => _newBannerImageBytes = bytes);
+
+      // Subir al bucket 'avatars' (usando subcarpeta banners o un bucket llamado banners)
+      // Nota: Si usas el mismo bucket 'avatars', la ruta 'userId/banner.jpg' funcionará genial.
+      final path = '$_userId/banner.jpg';
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      final baseUrl = _supabase.storage.from('avatars').getPublicUrl(path);
+      final publicUrl = '$baseUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      await _supabase
+          .from('usuarios')
+          .update({'foto_banner_url': publicUrl})
+          .eq('id', _userId!);
+
+      setState(() => _currentBannerUrl = publicUrl);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Banner de perfil actualizado.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al subir el banner: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -884,76 +939,122 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildBannerAvatarEditor() {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          height: 140,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            image: const DecorationImage(
-              image: NetworkImage(
-                "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1000",
-              ),
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: -30,
-          left: 20,
-          child: GestureDetector(
-            onTap: _pickAndUploadAvatar,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 60),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            onTap: _pickAndUploadBanner,
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
-              child: Stack(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: CircleAvatar(
-                      radius: 45,
-                      backgroundImage: _newProfileImageBytes != null
-                          ? MemoryImage(_newProfileImageBytes!)
-                          : (_currentProfileUrl != null
-                                ? NetworkImage(_currentProfileUrl!)
-                                      as ImageProvider
-                                : null),
-                      backgroundColor: Colors.grey[200],
-                      child:
-                          (_newProfileImageBytes == null &&
-                              _currentProfileUrl == null)
-                          ? const Icon(Icons.person, size: 40)
-                          : null,
-                    ),
-                  ),
-                  // Badge de cámara
-                  Positioned(
-                    bottom: 4,
-                    right: 4,
+              child: Container(
+                height: 180,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey[300], // Fondo gris por si no hay imagen
+                  image: _newBannerImageBytes != null
+                      ? DecorationImage(
+                          image: MemoryImage(_newBannerImageBytes!),
+                          fit: BoxFit.cover,
+                        )
+                      : (_currentBannerUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(_currentBannerUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : const DecorationImage(
+                              image: NetworkImage(
+                                "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1000",
+                              ),
+                              fit: BoxFit.cover,
+                            )),
+                ),
+                // Un pequeño indicador visual arriba a la derecha para saber que es editable
+                child: Align(
+                  alignment: Alignment.bottomRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12), // Espaciado interno desde la esquina
                     child: Container(
-                      padding: const EdgeInsets.all(5),
+                      padding: const EdgeInsets.all(6),
                       decoration: const BoxDecoration(
-                        color: Color(0xFFF05600),
+                        color: Color(0xFFF05600), // <-- CAMBIADO: Color naranja de tu paleta
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.camera_alt,
                         color: Colors.white,
-                        size: 14,
+                        size: 16,
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      ],
+          Positioned(
+            bottom: -70,
+            left: 30,
+            child: GestureDetector(
+              onTap: _pickAndUploadAvatar,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Stack(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [ // Opcional: Añadir una sombra para que el círculo grande resalte más
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 80,
+                        backgroundImage: _newProfileImageBytes != null
+                            ? MemoryImage(_newProfileImageBytes!)
+                            : (_currentProfileUrl != null
+                                  ? NetworkImage(_currentProfileUrl!)
+                                        as ImageProvider
+                                  : null),
+                        backgroundColor: Colors.grey[200],
+                        child:
+                            (_newProfileImageBytes == null &&
+                                _currentProfileUrl == null)
+                            ? const Icon(Icons.person, size: 70)
+                            : null,
+                      ),
+                    ),
+                    // Badge de cámara
+                    Positioned(
+                      bottom: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF05600),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

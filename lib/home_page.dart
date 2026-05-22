@@ -1574,25 +1574,25 @@ class _FooterIcon extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════
 //  HELPER — placeholder cuando no está la imagen
 // ═══════════════════════════════════════════════════════════════
-Widget _imagePlaceholder(String name, Color bg) {
-  return Container(
-    color: bg,
-    child: Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.image_outlined, color: Colors.white54, size: 36),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    ),
-  );
-}
+// Widget _imagePlaceholder(String name, Color bg) {
+//   return Container(
+//     color: bg,
+//     child: Center(
+//       child: Column(
+//         mainAxisAlignment: MainAxisAlignment.center,
+//         children: [
+//           const Icon(Icons.image_outlined, color: Colors.white54, size: 36),
+//           const SizedBox(height: 8),
+//           Text(
+//             name,
+//             style: const TextStyle(color: Colors.white70, fontSize: 11),
+//             textAlign: TextAlign.center,
+//           ),
+//         ],
+//       ),
+//     ),
+//   );
+// }
 
 // ═══════════════════════════════════════════════════════════════
 //  WIDGETS DE BOTONES MULTICOLOR (Naranja y Verde)

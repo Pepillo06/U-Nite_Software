@@ -90,7 +90,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final String carrera = _perfilData!['carrera'] ?? '';
     final String semestre = _perfilData!['semestre']?.toString() ?? '';
     final String fotoUrl = _perfilData!['foto_perfil_url'] ?? '';
-    
+    final String fotoBannerUrl = _perfilData!['foto_banner_url'] ?? '';
     final String bioVendedor = _perfilData!['biografia_vendedor'] ?? '';
     final String bioAcademica = _perfilData!['biografia_academica'] ?? '';
     final String biografia = bioVendedor.isNotEmpty ? bioVendedor : bioAcademica;
@@ -158,11 +158,13 @@ class _ProfilePageState extends State<ProfilePage> {
                   children: [
                     // 1. EL BANNER: Ahora sí se va de largo ocupando el 100% horizontal de la pantalla
                     Container(
-                      height: isMobile ? 160 : 240,
+                      height: isMobile ? 160 : 200,
                       width: double.infinity,
-                      decoration: const BoxDecoration(
+                      decoration: BoxDecoration(
                         image: DecorationImage(
-                          image: NetworkImage("https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=1000"),
+                          image: fotoBannerUrl.isNotEmpty 
+                              ? NetworkImage(fotoBannerUrl) 
+                              : const NetworkImage("https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=1000"),
                           fit: BoxFit.cover,
                         ),
                       ),
@@ -171,7 +173,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     // 2. EL CONTENIDO COMPRIMIDO Y CENTRADO
                     Padding(
                       // El padding empuja el bloque exactamente donde termina el banner
-                      padding: EdgeInsets.only(top: isMobile ? 160 : 240),
+                      padding: EdgeInsets.only(top: isMobile ? 160 : 200),
                       child: Center(
                         child: ConstrainedBox(
                           // Aquí limitamos el ancho del perfil a 1000px en Web/PC
