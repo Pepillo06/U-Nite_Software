@@ -1193,6 +1193,44 @@ void _mostrarDetalleAnuncio(
                                 ),
                                 const SizedBox(height: 24),
                               ],
+                              // Trueque
+                              if (modalidades.containsKey('trueque')) ...[
+                                const Text(
+                                  'Intercambio / Trueque',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFBF9F9),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFE3BFB1)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.swap_horiz, color: Color(0xFFF25A22)),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          modalidades['trueque']['descripcion'] != null &&
+                                                  modalidades['trueque']['descripcion'].toString().trim().isNotEmpty
+                                              ? modalidades['trueque']['descripcion']
+                                              : 'Acepta trueque (sin especificar artículos de interés).',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Color(0xFF2E3137),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                              ],
                               // Botón contactar
                               SizedBox(
                                 width: double.infinity,

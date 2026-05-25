@@ -33,6 +33,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
   String? _selectedCondition;
   bool _campusPickup = true;
   bool _isLoading = false;
+  bool _acceptsTrade = false;
   String? _titleError;
   String? _descriptionError;
   String? _priceError;
@@ -145,7 +146,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
             )
             .toList();
       }
-      if (_selectedTypes.contains(TransactionType.trueque)) {
+      if (_acceptsTrade) {
         modalidades['trueque'] = {
           'descripcion': _tradeForController.text.trim(),
         };
@@ -753,21 +754,72 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
               ),
               const SizedBox(height: 20),
 
-              // Sección de trueque dinámica
-              if (_selectedTypes.contains(TransactionType.trueque))
-                Column(
+              // Switch de Aceptar Trueque
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: borderInput),
+                ),
+                child: Row(
                   children: [
-                    buildInputField(
-                      labelStyle,
-                      inputStyle,
-                      borderInput,
-                      'Trueque',
-                      controller: _tradeForController,
-                      hintText: '¿Con qué quieres hacer trueque?',
+                    Icon(Icons.swap_horiz, color: primaryOrange, size: 24),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Aceptar trueque',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: Color(0xFF2E3137),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Activa esta opción si estás dispuesto a recibir otros artículos como intercambio.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 20),
+                    Switch(
+                      value: _acceptsTrade,
+                      activeColor: primaryOrange,
+                      onChanged: (val) {
+                        setState(() {
+                          _acceptsTrade = val;
+                          if (val) {
+                            _selectedTypes.add(TransactionType.trueque);
+                          } else {
+                            _selectedTypes.remove(TransactionType.trueque);
+                          }
+                        });
+                      },
+                    ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 20),
+
+              // Campo de Intereses de Trueque dinámico
+              if (_acceptsTrade) ...[
+                buildInputField(
+                  labelStyle,
+                  inputStyle,
+                  borderInput,
+                  'Intereses de trueque (Cosas de interés)',
+                  controller: _tradeForController,
+                  hintText: '¿Qué te interesaría recibir a cambio?',
+                ),
+                const SizedBox(height: 20),
+              ],
 
               // Campo Descripción
               buildInputField(
@@ -1151,8 +1203,14 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
             setState(() {
               if (_selectedTypes.contains(type)) {
                 _selectedTypes.remove(type);
+                if (type == TransactionType.trueque) {
+                  _acceptsTrade = false;
+                }
               } else {
                 _selectedTypes.add(type);
+                if (type == TransactionType.trueque) {
+                  _acceptsTrade = true;
+                }
               }
             });
           },

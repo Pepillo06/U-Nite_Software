@@ -155,9 +155,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
   List<Map<String, dynamic>> get _chatsFiltrados {
     if (_searchQuery.isEmpty) return _conversaciones;
     return _conversaciones.where((conv) {
-      final nombre = conv['otro_nombre'].toString().toLowerCase();
-      final preview = conv['preview'].toString().toLowerCase();
-      final query = _searchQuery.toLowerCase();
+      final nombre = _quitarAcentos(conv['otro_nombre'].toString());
+      final preview = _quitarAcentos(conv['preview'].toString());
+      final query = _quitarAcentos(_searchQuery);
       return nombre.contains(query) || preview.contains(query);
     }).toList();
   }
@@ -399,13 +399,15 @@ class _ChatTile extends StatelessWidget {
   });
 
   Widget _buildHighlightedText(String text, String query, TextStyle style) {
-    if (query.isEmpty)
+    if (query.isEmpty) {
       return Text(text, style: style, overflow: TextOverflow.ellipsis);
-    final lowerText = text.toLowerCase();
-    final lowerQuery = query.toLowerCase();
-    final index = lowerText.indexOf(lowerQuery);
-    if (index == -1)
+    }
+    final textNormalizado = _quitarAcentos(text);
+    final queryNormalizada = _quitarAcentos(query);
+    final index = textNormalizado.indexOf(queryNormalizada);
+    if (index == -1) {
       return Text(text, style: style, overflow: TextOverflow.ellipsis);
+    }
     return RichText(
       overflow: TextOverflow.ellipsis,
       text: TextSpan(
@@ -415,8 +417,9 @@ class _ChatTile extends StatelessWidget {
           TextSpan(
             text: text.substring(index, index + query.length),
             style: style.copyWith(
-                backgroundColor: const Color(0xFFFFB598),
-                fontWeight: FontWeight.w700),
+              backgroundColor: const Color(0xFFFFB598),
+              fontWeight: FontWeight.w700,
+            ),
           ),
           TextSpan(text: text.substring(index + query.length)),
         ],
@@ -519,4 +522,14 @@ class _ChatTile extends StatelessWidget {
       ),
     );
   }
+}
+
+String _quitarAcentos(String texto) {
+  var conAcento = 'áéíóúÁÉÍÓÚüÜ';
+  var sinAcento = 'aeiouAEIOUuU';
+  String resultado = texto;
+  for (int i = 0; i < conAcento.length; i++) {
+    resultado = resultado.replaceAll(conAcento[i], sinAcento[i]);
+  }
+  return resultado;
 }
