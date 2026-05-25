@@ -1,12 +1,11 @@
-import 'dart:typed_data';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'market.dart';
-import 'package:flutter/services.dart';
+import 'widgets/unite_header.dart';
 
 // Definición de tipos de transacción
 enum TransactionType { venta, alquiler, trueque }
@@ -234,139 +233,108 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
 
     return Scaffold(
       backgroundColor: background,
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            child: Center(
-              // Agregamos Center para que en Web quede al medio
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1000),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0,
-                    vertical: 60.0,
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      bool isDesktop = constraints.maxWidth > 900;
-                      return Column(
+      appBar: const UniteHeader(currentIndex: 1),
+      body: SingleChildScrollView(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1000),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 40.0,
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  bool isDesktop = constraints.maxWidth > 900;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Título principal
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Título principal
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Crear artículo', style: headerStyle),
-                              const SizedBox(height: 10),
-                              ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  maxWidth: isDesktop
-                                      ? constraints.maxWidth * 0.6
-                                      : constraints.maxWidth,
-                                ),
-                                child: const Text(
-                                  'Completa los detalles para publicar en tu comunidad universitaria.',
-                                  style: descriptionHeaderStyle,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 60),
-
-                          // Diseño Responsivo principal
-                          if (isDesktop)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 3,
-                                  child: buildMainForm(
-                                    headerStyle,
-                                    descriptionHeaderStyle,
-                                    labelStyle,
-                                    inputStyle,
-                                    primaryOrange,
-                                    darkText,
-                                    borderInput,
-                                    unselectedConditionBg,
-                                    background,
-                                  ),
-                                ),
-                                const SizedBox(width: 50),
-                                Expanded(
-                                  flex: 2,
-                                  child: buildRightPanel(
-                                    labelStyle,
-                                    primaryOrange,
-                                    darkText,
-                                    unselectedGrey,
-                                    background,
-                                    activeGreen,
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            Column(
-                              children: [
-                                buildMainForm(
-                                  headerStyle,
-                                  descriptionHeaderStyle,
-                                  labelStyle,
-                                  inputStyle,
-                                  primaryOrange,
-                                  darkText,
-                                  borderInput,
-                                  unselectedConditionBg,
-                                  background,
-                                ),
-                                const SizedBox(height: 40),
-                                buildRightPanel(
-                                  labelStyle,
-                                  primaryOrange,
-                                  darkText,
-                                  unselectedGrey,
-                                  background,
-                                  activeGreen,
-                                ),
-                              ],
+                          const Text('Crear artículo', style: headerStyle),
+                          const SizedBox(height: 10),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: isDesktop
+                                  ? constraints.maxWidth * 0.6
+                                  : constraints.maxWidth,
                             ),
+                            child: const Text(
+                              'Completa los detalles para publicar en tu comunidad universitaria.',
+                              style: descriptionHeaderStyle,
+                            ),
+                          ),
                         ],
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                      const SizedBox(height: 40),
+
+                      // Diseño Responsivo principal
+                      if (isDesktop)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: buildMainForm(
+                                headerStyle,
+                                descriptionHeaderStyle,
+                                labelStyle,
+                                inputStyle,
+                                primaryOrange,
+                                darkText,
+                                borderInput,
+                                unselectedConditionBg,
+                                background,
+                              ),
+                            ),
+                            const SizedBox(width: 50),
+                            Expanded(
+                              flex: 2,
+                              child: buildRightPanel(
+                                labelStyle,
+                                primaryOrange,
+                                darkText,
+                                unselectedGrey,
+                                background,
+                                activeGreen,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        Column(
+                          children: [
+                            buildMainForm(
+                              headerStyle,
+                              descriptionHeaderStyle,
+                              labelStyle,
+                              inputStyle,
+                              primaryOrange,
+                              darkText,
+                              borderInput,
+                              unselectedConditionBg,
+                              background,
+                            ),
+                            const SizedBox(height: 40),
+                            buildRightPanel(
+                              labelStyle,
+                              primaryOrange,
+                              darkText,
+                              unselectedGrey,
+                              background,
+                              activeGreen,
+                            ),
+                          ],
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
-          Positioned(
-            top: 16,
-            left: 16,
-            child: SafeArea(
-              child: Material(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(50),
-                elevation: 2,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(50),
-                  onTap: () {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => const MarketPage()),
-                    );
-                  },
-                  child: const Padding(
-                    padding: EdgeInsets.all(10),
-                    child: Icon(
-                      Icons.arrow_back,
-                      color: Color(0xFF2E3137),
-                      size: 24,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -420,13 +388,6 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
                     buildTabItem(
                       'Alquiler',
                       TransactionType.alquiler,
-                      primaryOrange,
-                      darkText,
-                      background,
-                    ),
-                    buildTabItem(
-                      'Trueque',
-                      TransactionType.trueque,
                       primaryOrange,
                       darkText,
                       background,
