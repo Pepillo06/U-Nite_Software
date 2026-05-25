@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'register_step2_page.dart';
 import 'theme.dart';
 import 'user_model.dart';
+import 'login_page.dart';
+import 'home_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -94,6 +96,22 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
                   child: Container(color: Colors.black.withValues(alpha: 0.3)),
+                ),
+              ),
+
+              Positioned(
+                top: 40,  // Ajusta según el notch o status bar
+                left: 20,
+                child: SafeArea(
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => const HomePage()),
+                      );
+                    },
+                  ),
                 ),
               ),
 
@@ -199,8 +217,40 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 15),
                       _buildNextButton(),
+
+                      const SizedBox(height: 15),
+                      const Divider(color: Colors.black12, indent: 40, endIndent: 40),
+                      
+                      // Link de Registro
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 1.0),
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LoginPage()),
+                            );
+                          },
+                          child: RichText(
+                            text: const TextSpan(
+                              text: "¿Ya tienes cuenta? ",
+                              style: TextStyle(color: Colors.black54, fontSize: 14),
+                              children: <TextSpan>[
+                                TextSpan(
+                                  text: 'Inicia Sesión',
+                                  style: TextStyle(
+                                    color: UColors.orangeDark,
+                                    fontWeight: FontWeight.bold,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

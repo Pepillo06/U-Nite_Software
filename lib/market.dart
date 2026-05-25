@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_page.dart';
 import 'post_item.dart';
 import 'login_page.dart';
-
+import 'screens/chat/chat_list_screen.dart';
+import 'widgets/unite_header.dart';
 
 // ==========================================
 // PANTALLA PRINCIPAL DEL MARKETPLACE
 // ==========================================
 class MarketPage extends StatefulWidget {
   const MarketPage({super.key});
-
   @override
   State<MarketPage> createState() => _MarketPageState();
 }
@@ -31,7 +32,18 @@ class _MarketPageState extends State<MarketPage> {
       backgroundColor: UColors.footerBg,
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: BarraNavegacionSuperior()),
+          const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
+          SliverToBoxAdapter(
+            child: _BarraSuperior(onVender: () {
+              if (_verificarAutenticacion(context)) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const PublicarArticuloPage()),
+                );
+              }
+            }),
+          ),
           SliverToBoxAdapter(
             child: _FiltrosCategorias(
               categoriaActual: _categoriaSeleccionada,
@@ -53,6 +65,25 @@ class _MarketPageState extends State<MarketPage> {
   }
 }
 
+// ==========================================
+// FUNCIÓN AUXILIAR DE AUTENTICACIÓN
+// ==========================================
+bool _verificarAutenticacion(BuildContext context) {
+  if (Supabase.instance.client.auth.currentUser == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Debes iniciar sesión para realizar esta acción'),
+        backgroundColor: UColors.orange,
+      ),
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+    );
+    return false;
+  }
+  return true;
+}
 
 // ==========================================
 // MODELOS Y DATOS DE PRUEBA
@@ -236,249 +267,90 @@ final List<_Producto> _productosPrueba = [
   ),
 ];
 
-
-
-
 // ==========================================
 // WIDGETS
 // ==========================================
 
-// Función auxiliar para verificar si el usuario está logueado
-bool _verificarAutenticacion(BuildContext context) {
-  if (Supabase.instance.client.auth.currentUser == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Debes iniciar sesión para realizar esta acción'),
-        backgroundColor: UColors.orange,
-      ),
-    );
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginPage()),
-    );
-    return false;
-  }
-  return true;
-}
-
 // ------------------------------------------
-// 1. Barra de Navegación Superior
+// BARRA SUPERIOR (búsqueda + vender)
 // ------------------------------------------
-// ------------------------------------------
-// 1. Barra de Navegación Superior (Integrada con Supabase)
-// ------------------------------------------
-class BarraNavegacionSuperior extends StatefulWidget {
-  const BarraNavegacionSuperior({super.key});
+class _BarraSuperior extends StatefulWidget {
+  final VoidCallback onVender;
+  const _BarraSuperior({required this.onVender});
 
   @override
-  State<BarraNavegacionSuperior> createState() => _BarraNavegacionSuperiorState();
+  State<_BarraSuperior> createState() => _BarraSuperiorState();
 }
 
-class _BarraNavegacionSuperiorState extends State<BarraNavegacionSuperior> {
-  final supabase = Supabase.instance.client;
-  String? nombreCompleto;
-  bool isLoading = true;
+class _BarraSuperiorState extends State<_BarraSuperior> {
+  final _searchController = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    _cargarDatosUsuario();
-  }
-
-  Future<void> _cargarDatosUsuario() async {
-    try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        setState(() => isLoading = false);
-        return;
-      }
-
-      // Hacemos el SELECT pidiendo primer_nombre y apellido
-      // (OJO: verifica que tu columna en la BD se llame 'apellido' o 'primer_apellido')
-      final response = await supabase
-          .from('usuarios')
-          .select('primer_nombre, primer_apellido')
-          .eq('id', user.id)
-          .single();
-
-      final nombre = response['primer_nombre'] as String? ?? '';
-      final apellido = response['primer_apellido'] as String? ?? '';
-
-      setState(() {
-        nombreCompleto = '$nombre $apellido'.trim();
-        isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error al cargar el nombre: $e');
-      setState(() => isLoading = false);
-    }
-  }
-
-  void _mostrarMensaje(BuildContext context, String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), duration: const Duration(seconds: 2)),
-    );
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
     return Container(
-      color: UColors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 16.0),
+      color: Colors.white,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 40,
+        vertical: 12,
+      ),
       child: Row(
         children: [
-          // Logo
-          InkWell(
-            onTap: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (context) => const MarketPage()),
-                (route) => false,
-              );
-            },
-            child: Row(
-              children: [
-                Image.asset(
-                  'assets/logo.png',
-                  height: 40,
-                  errorBuilder: (context, error, stackTrace) => const Icon(
-                    Icons.school,
-                    size: 40,
-                    color: UColors.orange,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 40),
-          
-          // Buscador
+          // Barra de búsqueda
           Expanded(
             child: Container(
-              height: 48,
+              height: 44,
               decoration: BoxDecoration(
-                color: UColors.footerBg,
+                color: const Color(0xFFF5F3F3),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: UColors.cardBorder),
+                border: Border.all(color: const Color(0xFFE3BFB1)),
               ),
               child: TextField(
+                controller: _searchController,
+                style: GoogleFonts.lexend(fontSize: 14),
                 decoration: InputDecoration(
                   hintText: 'Buscar libros, muebles, electrónica...',
-                  hintStyle: TextStyle(color: Colors.grey.shade500),
-                  prefixIcon: Icon(Icons.search, color: Colors.grey.shade500),
+                  hintStyle: GoogleFonts.lexend(
+                    color: const Color(0xFF8F7065),
+                    fontSize: 14,
+                  ),
+                  prefixIcon: const Icon(Icons.search,
+                      color: Color(0xFF8F7065), size: 20),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14.0),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                onSubmitted: (value) => _mostrarMensaje(context, 'Buscando: $value'),
               ),
             ),
           ),
-          const SizedBox(width: 40),
-          
-          // Iconos de acción y Botón Vender
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_none),
-                onPressed: () {
-                  if (_verificarAutenticacion(context)) {
-                    _mostrarMensaje(context, 'Abriendo Notificaciones');
-                  }
-                },
+          const SizedBox(width: 16),
+          // Botón Vender Artículo
+          ElevatedButton(
+            onPressed: widget.onVender,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: UColors.orange,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 20,
+                vertical: 12,
               ),
-              IconButton(
-                icon: const Icon(Icons.message_outlined),
-                onPressed: () {
-                  if (_verificarAutenticacion(context)) {
-                    _mostrarMensaje(context, 'Abriendo Mensajes');
-                  }
-                },
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              IconButton(
-                icon: const Icon(Icons.shopping_cart_outlined),
-                onPressed: () {
-                  if (_verificarAutenticacion(context)) {
-                    _mostrarMensaje(context, 'Abriendo Carrito');
-                  }
-                },
+            ),
+            child: Text(
+              isMobile ? 'Vender' : 'Vender Artículo',
+              style: GoogleFonts.lexend(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
-              const SizedBox(width: 16),
-              ElevatedButton(
-                onPressed: () {
-                  if (_verificarAutenticacion(context)) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const PublicarArticuloPage()),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: UColors.orange,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Vender Artículo',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-              ),
-              const SizedBox(width: 16),
-
-              // ---------------------------------------------------
-              // NUEVO BOTÓN DE PERFIL (AVATAR + NOMBRE + APELLIDO)
-              // ---------------------------------------------------
-              InkWell(
-                onTap: () async {
-                  if (_verificarAutenticacion(context)) {
-                    // Navegamos de forma real a la pantalla de Perfil
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const ProfilePage()),
-                    );
-                    _cargarDatosUsuario(); // Volvemos a llamar a la función que pide los datos a Supabase
-                  }
-                },
-                borderRadius: BorderRadius.circular(24),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage: const NetworkImage(
-                          'https://i.pravatar.cc/150?img=68', // Mantengo el placeholder de tu compañero
-                        ),
-                        onBackgroundImageError: (exception, stackTrace) {},
-                        child: const Icon(Icons.person, color: Colors.grey),
-                      ),
-                      const SizedBox(width: 10),
-                      // Lógica para mostrar estado de carga o el Nombre y Apellido
-                      isLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: UColors.orange),
-                            )
-                          : Text(
-                              nombreCompleto?.isNotEmpty == true
-                                  ? nombreCompleto!
-                                  : 'Mi Perfil', // Fallback por si el usuario no tiene nombre registrado
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15,
-                                color: Colors.black87,
-                              ),
-                            ),
-                    ],
-                  ),
-                ),
-              ),
-              // ---------------------------------------------------
-            ],
+            ),
           ),
         ],
       ),
@@ -518,7 +390,6 @@ class _FiltrosCategorias extends StatelessWidget {
           children: List.generate(categorias.length, (index) {
             final nombre = categorias[index]['nombre'] as String;
             final esSeleccionado = categoriaActual == nombre;
-
             return Padding(
               padding: const EdgeInsets.only(right: 12.0),
               child: InkWell(
@@ -526,9 +397,7 @@ class _FiltrosCategorias extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
+                      horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
                     color: esSeleccionado ? UColors.orange : UColors.footerBg,
                     borderRadius: BorderRadius.circular(24),
@@ -544,9 +413,12 @@ class _FiltrosCategorias extends StatelessWidget {
                       Text(
                         nombre,
                         style: TextStyle(
-                          color: esSeleccionado ? Colors.white : UColors.textDark,
-                          fontWeight:
-                              esSeleccionado ? FontWeight.bold : FontWeight.w500,
+                          color: esSeleccionado
+                              ? Colors.white
+                              : UColors.textDark,
+                          fontWeight: esSeleccionado
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                           fontSize: 15,
                         ),
                       ),
@@ -571,67 +443,57 @@ class _CuadriculaProductos extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Filtrado lógico
-    final productosFiltrados =
-        categoria == 'Todos'
-            ? _productosPrueba
-            : _productosPrueba.where((p) => p.categoria == categoria).toList();
+    final productosFiltrados = categoria == 'Todos'
+        ? _productosPrueba
+        : _productosPrueba.where((p) => p.categoria == categoria).toList();
 
-    // Determine cross axis count based on screen width
     double width = MediaQuery.of(context).size.width;
     int columnas = 4;
-    if (width < 600) {
-      columnas = 1;
-    } else if (width < 900) {
-      columnas = 2;
-    } else if (width < 1200) {
-      columnas = 3;
-    }
+    if (width < 600) columnas = 1;
+    else if (width < 900) columnas = 2;
+    else if (width < 1200) columnas = 3;
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
-      sliver:
-          productosFiltrados.isEmpty
-              ? SliverToBoxAdapter(
-                child: Container(
-                  height: 300,
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 64, color: UColors.textGray),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No hay productos en esta categoría',
-                        style: TextStyle(color: UColors.textGray, fontSize: 18),
-                      ),
-                    ],
-                  ),
+      sliver: productosFiltrados.isEmpty
+          ? SliverToBoxAdapter(
+              child: Container(
+                height: 300,
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.search_off, size: 64, color: UColors.textGray),
+                    const SizedBox(height: 16),
+                    Text('No hay productos en esta categoría',
+                        style:
+                            TextStyle(color: UColors.textGray, fontSize: 18)),
+                  ],
                 ),
-              )
-              : SliverGrid(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: columnas,
-                  crossAxisSpacing: 24,
-                  mainAxisSpacing: 24,
-                  childAspectRatio: 0.9,
-                ),
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final producto = productosFiltrados[index];
-                  return _TarjetaProducto(producto: producto);
-                }, childCount: productosFiltrados.length),
               ),
+            )
+          : SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: columnas,
+                crossAxisSpacing: 24,
+                mainAxisSpacing: 24,
+                childAspectRatio: 0.9,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) =>
+                    _TarjetaProducto(producto: productosFiltrados[index]),
+                childCount: productosFiltrados.length,
+              ),
+            ),
     );
   }
 }
-
 
 // ------------------------------------------
 // 4. Tarjeta Individual de Producto
 // ------------------------------------------
 class _TarjetaProducto extends StatelessWidget {
   final _Producto producto;
-
   const _TarjetaProducto({required this.producto});
 
   @override
@@ -642,12 +504,12 @@ class _TarjetaProducto extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => _PantallaDetalleProducto(producto: producto),
+              builder: (context) =>
+                  _PantallaDetalleProducto(producto: producto),
             ),
           );
         }
       },
-
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
@@ -664,7 +526,6 @@ class _TarjetaProducto extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen
             Expanded(
               flex: 5,
               child: Stack(
@@ -674,23 +535,18 @@ class _TarjetaProducto extends StatelessWidget {
                     height: double.infinity,
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(12),
-                      ),
+                          top: Radius.circular(12)),
                       child: Image.network(
                         producto.imagenUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: UColors.textGray,
-                            child: const Center(
-                              child: Icon(
-                                Icons.image_not_supported,
-                                color: Colors.grey,
-                                size: 40,
-                              ),
-                            ),
-                          );
-                        },
+                        errorBuilder: (context, error, stackTrace) =>
+                            Container(
+                          color: UColors.textGray,
+                          child: const Center(
+                            child: Icon(Icons.image_not_supported,
+                                color: Colors.grey, size: 40),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -699,9 +555,7 @@ class _TarjetaProducto extends StatelessWidget {
                     right: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: UColors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -709,16 +563,13 @@ class _TarjetaProducto extends StatelessWidget {
                       child: Text(
                         producto.esNuevo ? 'Nuevo' : 'Usado',
                         style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
+                            fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            // Detalles
             Expanded(
               flex: 3,
               child: Padding(
@@ -727,42 +578,27 @@ class _TarjetaProducto extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      producto.titulo,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      producto.precio,
-                      style: const TextStyle(
-                        color: UColors.greenDark,
-
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
+                    Text(producto.titulo,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 15),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                    Text(producto.precio,
+                        style: const TextStyle(
+                            color: UColors.greenDark,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18)),
                     Row(
                       children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 16,
-                          color: Colors.grey.shade600,
-                        ),
+                        Icon(Icons.location_on_outlined,
+                            size: 16, color: Colors.grey.shade600),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: Text(
-                            producto.ubicacion,
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: Text(producto.ubicacion,
+                              style: TextStyle(
+                                  color: Colors.grey.shade600, fontSize: 13),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
                         ),
                       ],
                     ),
@@ -786,7 +622,6 @@ class _BannersPromocionales extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     double width = MediaQuery.of(context).size.width;
-
     if (width < 800) {
       return Column(
         children: [
@@ -812,47 +647,39 @@ class _BannersPromocionales extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: UColors.orange,
-
-        borderRadius: BorderRadius.circular(12),
-      ),
+          color: UColors.orange, borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
-            '¡Libera espacio y gana dinero!',
-            style: TextStyle(
-              color: UColors.white,
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          const Text('¡Libera espacio y gana dinero!',
+              style: TextStyle(
+                  color: UColors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           const Text(
-            'Vende tus libros del semestre pasado o los muebles que\nya no necesitas a otros estudiantes de tu facultad.',
-            style: TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
-          ),
+              'Vende tus libros del semestre pasado o los muebles que\nya no necesitas a otros estudiantes de tu facultad.',
+              style:
+                  TextStyle(color: Colors.white, fontSize: 16, height: 1.5)),
           const SizedBox(height: 32),
           ElevatedButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Empezando proceso de venta...')),
-              );
+                  const SnackBar(
+                      content: Text('Empezando proceso de venta...')));
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: UColors.white,
               foregroundColor: UColors.orange,
-
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+                  borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text(
-              'Empezar a Vender',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
+            child: const Text('Empezar a Vender',
+                style:
+                    TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ),
         ],
       ),
@@ -863,10 +690,8 @@ class _BannersPromocionales extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: UColors.greenIcon.withValues(alpha: 0.2),
-
-        borderRadius: BorderRadius.circular(12),
-      ),
+          color: UColors.greenIcon.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -874,33 +699,23 @@ class _BannersPromocionales extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: const BoxDecoration(
-              color: UColors.greenDark,
-
-              shape: BoxShape.circle,
-            ),
+                color: UColors.greenDark, shape: BoxShape.circle),
             child: const Icon(Icons.security, size: 24, color: Colors.white),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Tratos Seguros',
-            style: TextStyle(
-              color: UColors.greenDark,
-
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          const Text('Tratos Seguros',
+              style: TextStyle(
+                  color: UColors.greenDark,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           Text(
-            'Encuentros exclusivos en puntos seguros dentro del campus universitario.',
-            style: TextStyle(
-              color: UColors.greenDark.withValues(alpha: 0.8),
-
-              fontSize: 16,
-              fontStyle: FontStyle.italic,
-              height: 1.5,
-            ),
-          ),
+              'Encuentros exclusivos en puntos seguros dentro del campus universitario.',
+              style: TextStyle(
+                  color: UColors.greenDark.withValues(alpha: 0.8),
+                  fontSize: 16,
+                  fontStyle: FontStyle.italic,
+                  height: 1.5)),
         ],
       ),
     );
@@ -912,31 +727,26 @@ class _BannersPromocionales extends StatelessWidget {
 // ------------------------------------------
 class _PantallaDetalleProducto extends StatelessWidget {
   final _Producto producto;
-
   const _PantallaDetalleProducto({required this.producto});
 
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 900;
-
     return Scaffold(
       backgroundColor: UColors.white,
       body: CustomScrollView(
         slivers: [
-          const SliverToBoxAdapter(child: BarraNavegacionSuperior()),
+          const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 20 : 40,
-                vertical: 32,
-              ),
-              child:
-                  isMobile
-                      ? Column(children: _buildContent(context, true))
-                      : Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: _buildContent(context, false),
-                      ),
+                  horizontal: isMobile ? 20 : 40, vertical: 32),
+              child: isMobile
+                  ? Column(children: _buildContent(context, true))
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _buildContent(context, false),
+                    ),
             ),
           ),
           const SliverToBoxAdapter(child: _PieDePagina()),
@@ -947,122 +757,88 @@ class _PantallaDetalleProducto extends StatelessWidget {
 
   List<Widget> _buildContent(BuildContext context, bool isMobile) {
     return [
-      // Lado Izquierdo: Galería de Imágenes
       Expanded(
         flex: isMobile ? 0 : 6,
         child: Column(
           children: [
             Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: UColors.cardBorder),
-              ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: UColors.cardBorder)),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  producto.imagenUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                ),
+                child: Image.network(producto.imagenUrl,
+                    fit: BoxFit.cover, width: double.infinity),
               ),
             ),
             const SizedBox(height: 16),
             if (producto.imagenesAdicionales.isNotEmpty)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children:
-                    producto.imagenesAdicionales.take(3).map((url) {
-                      return Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.network(
-                              url,
-                              height: 100,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                children: producto.imagenesAdicionales.take(3).map((url) {
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(url,
+                            height: 100, fit: BoxFit.cover),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
           ],
         ),
       ),
-
       if (!isMobile) const SizedBox(width: 48),
       if (isMobile) const SizedBox(height: 32),
-
-      // Lado Derecho: Información del Producto
       Expanded(
         flex: isMobile ? 0 : 4,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Badges Categoría
             Wrap(
               spacing: 8,
-              children:
-                  producto.etiquetas.map((e) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: UColors.footerBg,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        e,
-                        style: TextStyle(
+              children: producto.etiquetas.map((e) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                      color: UColors.footerBg,
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Text(e,
+                      style: TextStyle(
                           color: UColors.textGray,
                           fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                          fontWeight: FontWeight.bold)),
+                );
+              }).toList(),
             ),
             const SizedBox(height: 16),
-            // Título
-            Text(
-              producto.titulo,
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                color: UColors.textDark,
-              ),
-            ),
+            Text(producto.titulo,
+                style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: UColors.textDark)),
             const SizedBox(height: 16),
-            // Precio y Badge
-            Row(
-              children: [
-                Text(
-                  producto.precio,
-                  style: TextStyle(
+            Text(producto.precio,
+                style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w900,
-                    color: UColors.greenDark,
-                  ),
-                ),
-              ],
-            ),
-
+                    color: UColors.greenDark)),
             const SizedBox(height: 32),
-            // Vendedor Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: UColors.cardBorder),
-              ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: UColors.cardBorder)),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundImage: NetworkImage(producto.vendedor.avatarUrl),
+                    backgroundImage:
+                        NetworkImage(producto.vendedor.avatarUrl),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -1071,48 +847,34 @@ class _PantallaDetalleProducto extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              producto.vendedor.nombre,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
+                            Text(producto.vendedor.nombre,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
                             if (producto.vendedor.esVerificado) ...[
                               const SizedBox(width: 4),
-                              const Icon(
-                                Icons.verified,
-                                size: 16,
-                                color: UColors.blueIcon,
-                              ),
+                              const Icon(Icons.verified,
+                                  size: 16, color: UColors.blueIcon),
                             ],
                           ],
                         ),
-                        Text(
-                          producto.vendedor.facultad,
-                          style: TextStyle(color: UColors.textGray, fontSize: 13),
-                        ),
+                        Text(producto.vendedor.facultad,
+                            style: TextStyle(
+                                color: UColors.textGray, fontSize: 13)),
                         const SizedBox(height: 4),
                         Row(
                           children: [
                             ...List.generate(5, (i) {
-                              return Icon(
-                                Icons.star,
-                                size: 14,
-                                color:
-                                    i < producto.vendedor.estrellas.floor()
-                                        ? UColors.orange
-                                        : UColors.cardBorder,
-                              );
+                              return Icon(Icons.star,
+                                  size: 14,
+                                  color: i < producto.vendedor.estrellas.floor()
+                                      ? UColors.orange
+                                      : UColors.cardBorder);
                             }),
                             const SizedBox(width: 4),
-                            Text(
-                              '(${producto.vendedor.ventas} ventas)',
-                              style: TextStyle(
-                                color: UColors.textGray,
-                                fontSize: 12,
-                              ),
-                            ),
+                            Text('(${producto.vendedor.ventas} ventas)',
+                                style: TextStyle(
+                                    color: UColors.textGray, fontSize: 12)),
                           ],
                         ),
                       ],
@@ -1122,65 +884,59 @@ class _PantallaDetalleProducto extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            // Descripción del Producto (Cajita del Vendedor)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: UColors.cardBorder),
-              ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: UColors.cardBorder)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Descripción del Producto',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+                  const Text('Descripción del Producto',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 18)),
                   const SizedBox(height: 16),
-                  Text(
-                    producto.descripcion,
-                    style: TextStyle(
-                      color: UColors.textDark,
-                      fontSize: 15,
-                      height: 1.6,
-                    ),
-                  ),
+                  Text(producto.descripcion,
+                      style: TextStyle(
+                          color: UColors.textDark, fontSize: 15, height: 1.6)),
                   const SizedBox(height: 20),
-                  // Puntos clave (opcional, para que se vea más pro)
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 16, color: UColors.textGray),
+                      Icon(Icons.location_on,
+                          size: 16, color: UColors.textGray),
                       const SizedBox(width: 8),
-                      Text(
-                        'Entrega en: ${producto.ubicacion}',
-                        style: TextStyle(color: UColors.textGray, fontSize: 13),
-                      ),
+                      Text('Entrega en: ${producto.ubicacion}',
+                          style: TextStyle(
+                              color: UColors.textGray, fontSize: 13)),
                     ],
                   ),
                 ],
               ),
             ),
-
             const SizedBox(height: 32),
-            // Botones de Acción
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  if (_verificarAutenticacion(context)) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ChatListScreen()),
+                    );
+                  }
+                },
                 icon: const Icon(Icons.chat_bubble_outline),
                 label: const Text('Contactar Vendedor'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: UColors.orange,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      borderRadius: BorderRadius.circular(12)),
                   textStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                      fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ),
@@ -1196,12 +952,9 @@ class _PantallaDetalleProducto extends StatelessWidget {
                   foregroundColor: UColors.greenDark,
                   side: const BorderSide(color: UColors.greenDark, width: 2),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      borderRadius: BorderRadius.circular(12)),
                   textStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                      fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ),
@@ -1221,9 +974,8 @@ class _PieDePagina extends StatelessWidget {
   void _abrirEnlace(BuildContext context, String enlace) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Abriendo: $enlace'),
-        duration: const Duration(seconds: 1),
-      ),
+          content: Text('Abriendo: $enlace'),
+          duration: const Duration(seconds: 1)),
     );
   }
 
@@ -1241,24 +993,19 @@ class _PieDePagina extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'U-NITE',
-                  style: TextStyle(
-                    color: UColors.greenDark,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
+                const Text('U-NITE',
+                    style: TextStyle(
+                        color: UColors.greenDark,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2)),
                 const SizedBox(height: 12),
                 Text(
-                  '© 2024 U-NITE Campus Marketplace. Todos los derechos\nreservados.',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 13,
-                    height: 1.5,
-                  ),
-                ),
+                    '© 2024 U-NITE Campus Marketplace. Todos los derechos\nreservados.',
+                    style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 13,
+                        height: 1.5)),
               ],
             ),
           ),
@@ -1285,14 +1032,11 @@ class _PieDePagina extends StatelessWidget {
   Widget _construirEnlace(BuildContext context, String texto) {
     return InkWell(
       onTap: () => _abrirEnlace(context, texto),
-      child: Text(
-        texto,
-        style: TextStyle(
-          color: UColors.textDark,
-          fontWeight: FontWeight.w500,
-          fontSize: 14,
-        ),
-      ),
+      child: Text(texto,
+          style: TextStyle(
+              color: UColors.textDark,
+              fontWeight: FontWeight.w500,
+              fontSize: 14)),
     );
   }
 }

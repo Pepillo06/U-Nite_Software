@@ -285,14 +285,30 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             }
 
             _correoError = _correoController.text.trim().isEmpty ? "El correo es obligatorio" : null;
-            
-            if (_passwordController.text.isEmpty) {
+
+            // --- NUEVA VALIDACIÓN ---
+            final password = _passwordController.text;
+            final hasLetters = RegExp(r'[a-zA-Z]').hasMatch(password);
+            final hasNumbers = RegExp(r'[0-9]').hasMatch(password);
+
+            if (password.isEmpty) {
               _passwordError = "La contraseña es obligatoria";
-            } else if (_passwordController.text.length < 6) {
-              _passwordError = "La contraseña debe contener mínimo 6 caracteres";
+            } else if (password.length < 8) {
+              _passwordError = "Mínimo 8 caracteres";
+            } else if (!hasLetters || !hasNumbers) {
+              _passwordError = "Debe incluir letras y números";
             } else {
               _passwordError = null;
             }
+          
+            
+            // if (_passwordController.text.isEmpty) {
+            //   _passwordError = "La contraseña es obligatoria";
+            // } else if (_passwordController.text.length < 6) {
+            //   _passwordError = "La contraseña debe contener mínimo 6 caracteres";
+            // } else {
+            //   _passwordError = null;
+            // }
           });
 
           // Si hay algún error, detenemos la ejecución
