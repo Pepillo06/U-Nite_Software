@@ -67,10 +67,36 @@ class _ChatScreenState extends State<ChatScreen> {
     if (widget.anuncioId == null) return;
     final data = await _supabase
         .from('anuncios_marketplace')
-        .select('titulo, precio_monto, precio_moneda')
+        .select('titulo, detalles_modalidades')
         .eq('id', widget.anuncioId!)
         .maybeSingle();
     if (data != null) setState(() => _anuncio = data);
+  }
+
+  String _getPrecioAnuncio() {
+    final modalidades =
+        _anuncio!['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    if (modalidades.containsKey('venta')) {
+      final precio = modalidades['venta']['precio'];
+      return '\$${(precio as num?)?.toStringAsFixed(2) ?? '0.00'}';
+    }
+    if (modalidades.containsKey('alquiler')) {
+      final alquiler = modalidades['alquiler'];
+      if (alquiler is List && alquiler.isNotEmpty) {
+        final costo = alquiler[0]['costo'];
+        final unidad = alquiler[0]['unidad_tiempo'] ?? '';
+        return '\$${(costo as num?)?.toStringAsFixed(2) ?? '0.00'}/$unidad';
+      }
+    }
+    if (modalidades.containsKey('trueque')) return 'Trueque';
+    return 'Consultar';
+  }
+
+  String _getImagenAnuncio() {
+    final modalidades =
+        _anuncio!['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    final imagenes = modalidades['imagenes'] as List<dynamic>? ?? [];
+    return imagenes.isNotEmpty ? imagenes[0].toString() : '';
   }
 
   void _suscribirse() {
@@ -227,9 +253,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       fontSize: 14)),
             ),
             Positioned(
-              bottom: 0, right: 0,
+              bottom: 0,
+              right: 0,
               child: Container(
-                width: 10, height: 10,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(
                   color: const Color(0xFF306B18),
                   shape: BoxShape.circle,
@@ -251,7 +279,8 @@ class _ChatScreenState extends State<ChatScreen> {
             Row(
               children: [
                 Container(
-                  width: 6, height: 6,
+                  width: 6,
+                  height: 6,
                   decoration: const BoxDecoration(
                       color: Color(0xFF306B18), shape: BoxShape.circle),
                 ),
@@ -290,9 +319,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         fontSize: 15)),
               ),
               Positioned(
-                bottom: 0, right: 0,
+                bottom: 0,
+                right: 0,
                 child: Container(
-                  width: 11, height: 11,
+                  width: 11,
+                  height: 11,
                   decoration: BoxDecoration(
                     color: const Color(0xFF306B18),
                     shape: BoxShape.circle,
@@ -314,7 +345,8 @@ class _ChatScreenState extends State<ChatScreen> {
               Row(
                 children: [
                   Container(
-                    width: 7, height: 7,
+                    width: 7,
+                    height: 7,
                     decoration: const BoxDecoration(
                         color: Color(0xFF306B18), shape: BoxShape.circle),
                   ),
@@ -331,7 +363,8 @@ class _ChatScreenState extends State<ChatScreen> {
           const Spacer(),
           if (_anuncio != null)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F3F3),
                 borderRadius: BorderRadius.circular(12),
@@ -339,14 +372,35 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE3BFB1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.shopping_bag_outlined,
-                        color: Color(0xFF5B4137), size: 22),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: _getImagenAnuncio().isNotEmpty
+                        ? Image.network(
+                            _getImagenAnuncio(),
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE3BFB1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.shopping_bag_outlined,
+                                  color: Color(0xFF5B4137), size: 22),
+                            ),
+                          )
+                        : Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE3BFB1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.shopping_bag_outlined,
+                                color: Color(0xFF5B4137), size: 22),
+                          ),
                   ),
                   const SizedBox(width: 10),
                   Column(
@@ -358,7 +412,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               fontWeight: FontWeight.w600,
                               color: const Color(0xFF1A1A1A))),
                       Text(
-                        '\$${_anuncio!['precio_monto']} ${_anuncio!['precio_moneda'] ?? ''}',
+                        _getPrecioAnuncio(),
                         style: GoogleFonts.lexend(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -383,7 +437,8 @@ class _ChatScreenState extends State<ChatScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: const Color(0xFFEFEDED),
                 borderRadius: BorderRadius.circular(20),
@@ -476,13 +531,16 @@ class _SendButtonState extends State<_SendButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         margin: EdgeInsets.only(top: _pressed ? 4 : 0),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFFFF6100),
           borderRadius: BorderRadius.circular(16),
           border: Border(
             bottom: BorderSide(
-              color: _pressed ? Colors.transparent : const Color(0xFFCC4D00),
+              color: _pressed
+                  ? Colors.transparent
+                  : const Color(0xFFCC4D00),
               width: _pressed ? 0 : 4,
             ),
           ),
@@ -527,7 +585,8 @@ class _BurbujaMensaje extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 4),
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.65),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isMe
                   ? const Color(0xFFFFB598)
@@ -551,7 +610,8 @@ class _BurbujaMensaje extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(hora,
                 style: GoogleFonts.lexend(
-                    fontSize: 10, color: const Color(0xFF8F7065))),
+                    fontSize: 10,
+                    color: const Color(0xFF8F7065))),
           ),
         ],
       ),
