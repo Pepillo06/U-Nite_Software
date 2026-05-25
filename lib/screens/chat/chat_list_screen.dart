@@ -5,7 +5,19 @@ import '../../widgets/unite_header.dart';
 import 'chat_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
-  const ChatListScreen({super.key});
+  final String? conversacionInicial;
+  final String? nombreInicial;
+  final String? otroUserIdInicial;
+  final String? anuncioIdInicial;
+
+  const ChatListScreen({
+    super.key,
+    this.conversacionInicial,
+    this.nombreInicial,
+    this.otroUserIdInicial,
+    this.anuncioIdInicial,
+  });
+
   @override
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
@@ -101,6 +113,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
         _conversaciones = resultado;
         _loading = false;
       });
+
+      // Si viene con conversación inicial, buscarla y seleccionarla
+      if (widget.conversacionInicial != null) {
+        final idx = resultado.indexWhere(
+            (c) => c['id'] == widget.conversacionInicial);
+        if (idx != -1) {
+          setState(() => _selectedIndex = idx);
+        }
+      }
     } catch (e) {
       setState(() => _loading = false);
     }
@@ -158,6 +179,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildMobileLayout() {
+    // Si viene con conversación inicial en móvil, ir directo al chat
+    if (widget.conversacionInicial != null && _loading == false) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              conversacionId: widget.conversacionInicial!,
+              nombreOtro: widget.nombreInicial ?? 'Vendedor',
+              otroUserId: widget.otroUserIdInicial ?? '',
+              anuncioId: widget.anuncioIdInicial,
+            ),
+          ),
+        ).then((_) => _loadConversaciones());
+      });
+    }
+
     return Column(
       children: [
         _buildSidebarHeader(),
@@ -183,7 +221,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildDesktopLayout() {
-    final idx = _selectedIndex.clamp(0, _chatsFiltrados.isEmpty ? 0 : _chatsFiltrados.length - 1);
+    final idx = _selectedIndex.clamp(
+        0, _chatsFiltrados.isEmpty ? 0 : _chatsFiltrados.length - 1);
     return Row(
       children: [
         Container(
@@ -224,7 +263,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             children: [
                               Icon(Icons.forum_outlined,
                                   size: 48,
-                                  color: const Color(0xFF5B4137).withOpacity(0.3)),
+                                  color: const Color(0xFF5B4137)
+                                      .withOpacity(0.3)),
                               const SizedBox(height: 12),
                               Text(
                                 'Selecciona un chat para comenzar',
@@ -270,7 +310,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
         child: TextField(
           controller: _searchController,
-          style: GoogleFonts.lexend(fontSize: 14, color: const Color(0xFF1A1A1A)),
+          style: GoogleFonts.lexend(
+              fontSize: 14, color: const Color(0xFF1A1A1A)),
           onChanged: (value) => setState(() => _searchQuery = value),
           decoration: InputDecoration(
             hintText: 'Buscar chats...',
@@ -406,9 +447,11 @@ class _ChatTile extends StatelessWidget {
                 ),
                 if (isOnline)
                   Positioned(
-                    bottom: 1, right: 1,
+                    bottom: 1,
+                    right: 1,
                     child: Container(
-                      width: 11, height: 11,
+                      width: 11,
+                      height: 11,
                       decoration: BoxDecoration(
                         color: const Color(0xFF306B18),
                         shape: BoxShape.circle,
@@ -437,11 +480,13 @@ class _ChatTile extends StatelessWidget {
                       ),
                       Text(hora,
                           style: GoogleFonts.lexend(
-                              fontSize: 11, color: const Color(0xFF5B4137))),
+                              fontSize: 11,
+                              color: const Color(0xFF5B4137))),
                       if (unreadCount > 0) ...[
                         const SizedBox(width: 6),
                         Container(
-                          width: 20, height: 20,
+                          width: 20,
+                          height: 20,
                           decoration: const BoxDecoration(
                               color: Color(0xFF306B18),
                               shape: BoxShape.circle),

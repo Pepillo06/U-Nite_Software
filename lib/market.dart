@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'profile_page.dart';
 import 'post_item.dart';
 import 'login_page.dart';
 import 'screens/chat/chat_list_screen.dart';
@@ -19,10 +18,18 @@ class MarketPage extends StatefulWidget {
 
 class _MarketPageState extends State<MarketPage> {
   String _categoriaSeleccionada = 'Todos';
+  String _busquedaActual = ''; // <-- Nueva variable para la búsqueda
 
   void _onCategoriaChanged(String categoria) {
     setState(() {
       _categoriaSeleccionada = categoria;
+    });
+  }
+
+  // <-- Nueva función para manejar el cambio de texto
+  void _onBusquedaChanged(String texto) {
+    setState(() {
+      _busquedaActual = texto;
     });
   }
 
@@ -34,15 +41,19 @@ class _MarketPageState extends State<MarketPage> {
         slivers: [
           const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
           SliverToBoxAdapter(
-            child: _BarraSuperior(onVender: () {
-              if (_verificarAutenticacion(context)) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const PublicarArticuloPage()),
-                );
-              }
-            }),
+            child: _BarraSuperior(
+              onBusquedaChanged: _onBusquedaChanged, // <-- Pasamos la función
+              onVender: () {
+                if (_verificarAutenticacion(context)) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PublicarArticuloPage(),
+                    ),
+                  );
+                }
+              },
+            ),
           ),
           SliverToBoxAdapter(
             child: _FiltrosCategorias(
@@ -50,7 +61,11 @@ class _MarketPageState extends State<MarketPage> {
               onChanged: _onCategoriaChanged,
             ),
           ),
-          _CuadriculaProductos(categoria: _categoriaSeleccionada),
+          // <-- Pasamos el texto de búsqueda a la cuadrícula
+          _CuadriculaProductos(
+            categoria: _categoriaSeleccionada,
+            busqueda: _busquedaActual, 
+          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40.0),
@@ -276,7 +291,12 @@ final List<_Producto> _productosPrueba = [
 // ------------------------------------------
 class _BarraSuperior extends StatefulWidget {
   final VoidCallback onVender;
-  const _BarraSuperior({required this.onVender});
+  final ValueChanged<String> onBusquedaChanged; // <-- Nuevo parámetro
+
+  const _BarraSuperior({
+    required this.onVender,
+    required this.onBusquedaChanged, // <-- Requerido
+  });
 
   @override
   State<_BarraSuperior> createState() => _BarraSuperiorState();
@@ -294,61 +314,103 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 700;
+    const double alturaComponentes = 44.0;
+
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 16 : 40,
         vertical: 12,
       ),
-      child: Row(
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          // Barra de búsqueda
-          Expanded(
-            child: Container(
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F3F3),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE3BFB1)),
+          Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isMobile ? 240 : 700, 
               ),
-              child: TextField(
-                controller: _searchController,
-                style: GoogleFonts.lexend(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Buscar libros, muebles, electrónica...',
-                  hintStyle: GoogleFonts.lexend(
-                    color: const Color(0xFF8F7065),
-                    fontSize: 14,
+              child: Container(
+                height: alturaComponentes,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F3F3),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: const Color(0xFFE3BFB1)),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  style: GoogleFonts.lexend(fontSize: 14),
+                  onSubmitted: widget.onBusquedaChanged, 
+                  decoration: InputDecoration(
+                    hintText: 'Buscar libros, muebles...',
+                    hintStyle: GoogleFonts.lexend(
+                      color: const Color(0xFF8F7065),
+                      fontSize: 14,
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: Color(0xFF8F7065),
+                      size: 20,
+                    ),
+                    // MODIFICACIÓN AQUÍ: Agrupamos el botón de limpiar y el nuevo botón Buscar
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_searchController.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear, size: 18, color: Color(0xFF8F7065)),
+                            onPressed: () {
+                              _searchController.clear();
+                              widget.onBusquedaChanged('');
+                              setState(() {}); // Actualiza el estado para ocultar la equis
+                            },
+                          ),
+                        IconButton(
+                          icon: const Icon(Icons.arrow_forward_rounded, color: UColors.orange),
+                          tooltip: 'Buscar',
+                          onPressed: () {
+                            widget.onBusquedaChanged(_searchController.text);
+                          },
+                        ),
+                        const SizedBox(width: 6), // Separación del borde redondeado
+                      ],
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 11),
                   ),
-                  prefixIcon: const Icon(Icons.search,
-                      color: Color(0xFF8F7065), size: 20),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  // Escuchamos los cambios para ocultar o mostrar la 'X' dinámicamente si se borra texto
+                  onChanged: (text) {
+                    setState(() {});
+                  },
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 16),
-          // Botón Vender Artículo
-          ElevatedButton(
-            onPressed: widget.onVender,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: UColors.orange,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 12 : 20,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: Text(
-              isMobile ? 'Vender' : 'Vender Artículo',
-              style: GoogleFonts.lexend(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+          Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              height: alturaComponentes,
+              child: ElevatedButton.icon(
+                onPressed: widget.onVender,
+                icon: const Icon(Icons.add, size: 18),
+                label: Text(
+                  isMobile ? 'Vender' : 'Vender Artículo',
+                  style: GoogleFonts.lexend(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: UColors.orange,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 12 : 20,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
               ),
             ),
           ),
@@ -376,8 +438,8 @@ class _FiltrosCategorias extends StatelessWidget {
       {'nombre': 'Todos', 'icono': Icons.grid_view},
       {'nombre': 'Libros', 'icono': Icons.menu_book},
       {'nombre': 'Electrónica', 'icono': Icons.computer},
-      {'nombre': 'Muebles', 'icono': Icons.chair_alt},
-      {'nombre': 'Alojamientos', 'icono': Icons.home_outlined},
+      {'nombre': 'Herramientas', 'icono': Icons.architecture},
+      {'nombre': 'Accesorios', 'icono': Icons.checkroom},
     ];
 
     return Container(
@@ -390,6 +452,10 @@ class _FiltrosCategorias extends StatelessWidget {
           children: List.generate(categorias.length, (index) {
             final nombre = categorias[index]['nombre'] as String;
             final esSeleccionado = categoriaActual == nombre;
+            
+            // 1. Condición mágica: ¿Es el botón de "Todos"?
+            final esBotonTodos = index == 0; 
+
             return Padding(
               padding: const EdgeInsets.only(right: 12.0),
               child: InkWell(
@@ -397,26 +463,39 @@ class _FiltrosCategorias extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 12),
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
-                    color: esSeleccionado ? UColors.orange : UColors.footerBg,
+                    // 2. Color físico diferente si es "Todos" y no está seleccionado
+                    color: esSeleccionado 
+                        ? UColors.orange 
+                        : (esBotonTodos ? const Color.fromARGB(255, 221, 220, 220) : UColors.footerBg),
                     borderRadius: BorderRadius.circular(24),
+                    // 3. Le añadimos un borde físico solo si es el botón "Todos" no seleccionado
+                    // border: esBotonTodos && !esSeleccionado
+                    //     ? Border.all(color: UColors.orange.withOpacity(0.5), width: 1.5)
+                    //     : null,
                   ),
                   child: Row(
                     children: [
+                      // 4. Si quieres ocultar el icono en "Todos" para que sea diferente,
+                      // puedes condicionar su aparición aquí:
+                      
                       Icon(
                         categorias[index]['icono'] as IconData,
                         size: 20,
                         color: esSeleccionado ? Colors.white : UColors.textGray,
                       ),
                       const SizedBox(width: 8),
+                      
                       Text(
                         nombre,
                         style: TextStyle(
                           color: esSeleccionado
                               ? Colors.white
-                              : UColors.textDark,
-                          fontWeight: esSeleccionado
+                              : (esBotonTodos ? UColors.textDark : UColors.textDark), // Texto naranja si es "Todos"
+                          fontWeight: esSeleccionado || esBotonTodos
                               ? FontWeight.bold
                               : FontWeight.w500,
                           fontSize: 15,
@@ -435,27 +514,101 @@ class _FiltrosCategorias extends StatelessWidget {
 }
 
 // ------------------------------------------
-// 3. Cuadrícula de Productos
+// 3. Cuadrícula de Productos (desde Supabase)
 // ------------------------------------------
-class _CuadriculaProductos extends StatelessWidget {
+class _CuadriculaProductos extends StatefulWidget {
   final String categoria;
-  const _CuadriculaProductos({required this.categoria});
+  final String busqueda; // <-- Nuevo parámetro de búsqueda
+
+  const _CuadriculaProductos({
+    required this.categoria,
+    required this.busqueda, // <-- Requerido
+  });
+
+  @override
+  State<_CuadriculaProductos> createState() => _CuadriculaProductosState();
+}
+
+class _CuadriculaProductosState extends State<_CuadriculaProductos> {
+  final _supabase = Supabase.instance.client;
+  List<Map<String, dynamic>> _anuncios = [];
+  bool _cargando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarAnuncios();
+  }
+
+  @override
+  void didUpdateWidget(_CuadriculaProductos oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // <-- Si cambia la categoría O cambia el texto de búsqueda, recargamos de la DB
+    if (oldWidget.categoria != widget.categoria || oldWidget.busqueda != widget.busqueda) {
+      _cargarAnuncios();
+    }
+  }
+
+  Future<void> _cargarAnuncios() async {
+    setState(() => _cargando = true);
+    try {
+      // 1. Inicializamos la petición base
+      var baseQuery = _supabase
+          .from('anuncios_marketplace')
+          .select()
+          .eq('disponible', true);
+
+      // 2. Aplicamos condicionalmente el filtro de búsqueda si el usuario escribió algo
+      if (widget.busqueda.trim().isNotEmpty) {
+        baseQuery = baseQuery.ilike('titulo', '%${widget.busqueda.trim()}%');
+      }
+
+      // 3. Agregamos el ordenamiento justo al final del encadenamiento antes del await
+      final data = await baseQuery.order('fecha_publicacion', ascending: false);
+      
+      List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(data);
+
+      // 4. Filtrar por categoría en el cliente
+      if (widget.categoria != 'Todos') {
+        resultado = resultado
+            .where((a) => a['categoria'] == widget.categoria)
+            .toList();
+      }
+
+      setState(() {
+        _anuncios = resultado;
+        _cargando = false;
+      });
+    } catch (e) {
+      setState(() => _cargando = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final productosFiltrados = categoria == 'Todos'
-        ? _productosPrueba
-        : _productosPrueba.where((p) => p.categoria == categoria).toList();
+    if (_cargando) {
+      return const SliverToBoxAdapter(
+        child: SizedBox(
+          height: 300,
+          child: Center(
+            child: CircularProgressIndicator(color: UColors.orange),
+          ),
+        ),
+      );
+    }
 
     double width = MediaQuery.of(context).size.width;
     int columnas = 4;
-    if (width < 600) columnas = 1;
-    else if (width < 900) columnas = 2;
-    else if (width < 1200) columnas = 3;
+    if (width < 600)
+      columnas = 1;
+    else if (width < 900)
+      columnas = 2;
+    else if (width < 1200)
+      columnas = 3;
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
-      sliver: productosFiltrados.isEmpty
+      sliver: _anuncios.isEmpty
           ? SliverToBoxAdapter(
               child: Container(
                 height: 300,
@@ -465,9 +618,10 @@ class _CuadriculaProductos extends StatelessWidget {
                   children: [
                     Icon(Icons.search_off, size: 64, color: UColors.textGray),
                     const SizedBox(height: 16),
-                    Text('No hay productos en esta categoría',
-                        style:
-                            TextStyle(color: UColors.textGray, fontSize: 18)),
+                    Text(
+                      'No hay productos que coincidan con la búsqueda',
+                      style: TextStyle(color: UColors.textGray, fontSize: 18),
+                    ),
                   ],
                 ),
               ),
@@ -480,9 +634,8 @@ class _CuadriculaProductos extends StatelessWidget {
                 childAspectRatio: 0.9,
               ),
               delegate: SliverChildBuilderDelegate(
-                (context, index) =>
-                    _TarjetaProducto(producto: productosFiltrados[index]),
-                childCount: productosFiltrados.length,
+                (context, index) => _TarjetaAnuncio(anuncio: _anuncios[index]),
+                childCount: _anuncios.length,
               ),
             ),
     );
@@ -535,16 +688,19 @@ class _TarjetaProducto extends StatelessWidget {
                     height: double.infinity,
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(12)),
+                        top: Radius.circular(12),
+                      ),
                       child: Image.network(
                         producto.imagenUrl,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            Container(
+                        errorBuilder: (context, error, stackTrace) => Container(
                           color: UColors.textGray,
                           child: const Center(
-                            child: Icon(Icons.image_not_supported,
-                                color: Colors.grey, size: 40),
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey,
+                              size: 40,
+                            ),
                           ),
                         ),
                       ),
@@ -555,7 +711,9 @@ class _TarjetaProducto extends StatelessWidget {
                     right: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: UColors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -563,7 +721,9 @@ class _TarjetaProducto extends StatelessWidget {
                       child: Text(
                         producto.esNuevo ? 'Nuevo' : 'Usado',
                         style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.bold),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -578,27 +738,41 @@ class _TarjetaProducto extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(producto.titulo,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 15),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis),
-                    Text(producto.precio,
-                        style: const TextStyle(
-                            color: UColors.greenDark,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18)),
+                    Text(
+                      producto.titulo,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      producto.precio,
+                      style: const TextStyle(
+                        color: UColors.greenDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                     Row(
                       children: [
-                        Icon(Icons.location_on_outlined,
-                            size: 16, color: Colors.grey.shade600),
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: Text(producto.ubicacion,
-                              style: TextStyle(
-                                  color: Colors.grey.shade600, fontSize: 13),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
+                          child: Text(
+                            producto.ubicacion,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -608,6 +782,557 @@ class _TarjetaProducto extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------
+// Tarjeta de Anuncio (datos desde Supabase)
+// ------------------------------------------
+class _TarjetaAnuncio extends StatelessWidget {
+  final Map<String, dynamic> anuncio;
+  const _TarjetaAnuncio({required this.anuncio});
+
+  String _getPrecio() {
+    final modalidades =
+        anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    if (modalidades.containsKey('venta')) {
+      final precio = modalidades['venta']['precio'];
+      return '\$${precio?.toStringAsFixed(2) ?? '0.00'}';
+    }
+    if (modalidades.containsKey('alquiler')) {
+      final alquiler = modalidades['alquiler'];
+      if (alquiler is List && alquiler.isNotEmpty) {
+        final costo = alquiler[0]['costo'];
+        final unidad = alquiler[0]['unidad_tiempo'] ?? '';
+        return '\$${costo?.toStringAsFixed(2) ?? '0.00'}/$unidad';
+      }
+    }
+    if (modalidades.containsKey('trueque')) return 'Trueque';
+    return 'Consultar';
+  }
+
+  String _getImagenUrl() {
+    final modalidades =
+        anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    final imagenes = modalidades['imagenes'] as List<dynamic>? ?? [];
+    return imagenes.isNotEmpty ? imagenes[0].toString() : '';
+  }
+
+  bool _esNuevo() {
+    final estado = (anuncio['estado_producto'] ?? '').toString().toLowerCase();
+    return estado == 'nuevo';
+  }
+
+  String _getEstadoBadge() {
+    // Nos aseguramos de que si viene null, se convierta de forma segura en un String vacío
+    final String estado = (anuncio['estado_producto']?.toString() ?? '').trim();
+    if (estado.isEmpty) return 'Usado';
+    return estado[0].toUpperCase() + estado.substring(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imagenUrl = _getImagenUrl();
+    final tieneImagen = imagenUrl.isNotEmpty;
+
+    final String tituloSeguro = anuncio['titulo']?.toString() ?? 'Sin título';
+    final String categoriaSegura = anuncio['categoria']?.toString() ?? 'General';
+
+    return InkWell(
+      onTap: () {
+        if (_verificarAutenticacion(context)) {
+          _mostrarDetalleAnuncio(context, anuncio);
+        }
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: UColors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Imagen
+            Expanded(
+              flex: 5,
+              child: Stack(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
+                      child: tieneImagen
+                          ? Image.network(
+                              imagenUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                    color: const Color(0xFFF0F0F0),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.image_not_supported,
+                                        color: Colors.grey,
+                                        size: 40,
+                                      ),
+                                    ),
+                                  ),
+                            )
+                          : Container(
+                              color: const Color(0xFFF0F0F0),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.grey,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                  // Badge de condición
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: UColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getEstadoBadge(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Info
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      anuncio['titulo'] ?? '',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      _getPrecio(),
+                      style: const TextStyle(
+                        color: UColors.greenDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            anuncio['categoria'] ?? '',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------
+// Popup de Detalle de Anuncio
+// ------------------------------------------
+void _mostrarDetalleAnuncio(
+  BuildContext context,
+  Map<String, dynamic> anuncio,
+) {
+  final modalidades =
+      anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+  final imagenes = (modalidades['imagenes'] as List<dynamic>? ?? [])
+      .cast<String>();
+  final titulo = anuncio['titulo'] ?? '';
+  final descripcion = anuncio['descripcion'] ?? '';
+  final categoria = anuncio['categoria'] ?? '';
+  final estado = anuncio['estado_producto'] ?? '';
+
+  String precio = 'Consultar';
+  if (modalidades.containsKey('venta')) {
+    final p = modalidades['venta']['precio'];
+    precio = '\$${(p as num?)?.toStringAsFixed(2) ?? '0.00'}';
+  } else if (modalidades.containsKey('alquiler')) {
+    final alquiler = modalidades['alquiler'];
+    if (alquiler is List && alquiler.isNotEmpty) {
+      final costo = alquiler[0]['costo'];
+      final unidad = alquiler[0]['unidad_tiempo'] ?? '';
+      precio = '\$${(costo as num?)?.toStringAsFixed(2) ?? '0.00'}/$unidad';
+    }
+  } else if (modalidades.containsKey('trueque')) {
+    precio = 'Trueque';
+  }
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      int imagenSeleccionada = 0;
+      return StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 40,
+              vertical: 40,
+            ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 900),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Botón cerrar
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                          style: IconButton.styleFrom(
+                            backgroundColor: const Color(0xFFF5F5F5),
+                            shape: const CircleBorder(),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isWide = constraints.maxWidth > 600;
+
+                          final imageSection = Column(
+                            children: [
+                              // Imagen principal
+                              Container(
+                                height: 320,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF5F5F5),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: imagenes.isNotEmpty
+                                      ? Image.network(
+                                          imagenes[imagenSeleccionada],
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                                Icons.image_not_supported,
+                                                size: 60,
+                                                color: Colors.grey,
+                                              ),
+                                        )
+                                      : const Icon(
+                                          Icons.image_not_supported,
+                                          size: 60,
+                                          color: Colors.grey,
+                                        ),
+                                ),
+                              ),
+                              // Miniaturas (solo si hay más de 1 imagen)
+                              if (imagenes.length > 1) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  height: 80,
+                                  child: ListView.separated(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: imagenes.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(width: 10),
+                                    itemBuilder: (context, i) {
+                                      return GestureDetector(
+                                        onTap: () => setStateDialog(
+                                          () => imagenSeleccionada = i,
+                                        ),
+                                        child: Container(
+                                          width: 80,
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            border: Border.all(
+                                              color: imagenSeleccionada == i
+                                                  ? UColors.orange
+                                                  : Colors.transparent,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            child: Image.network(
+                                              imagenes[i],
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+
+                          final infoSection = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Badges
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  if (categoria.isNotEmpty)
+                                    _Badge(label: categoria),
+                                  if (estado.isNotEmpty)
+                                    _Badge(
+                                      label:
+                                          estado[0].toUpperCase() +
+                                          estado.substring(1),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              // Título
+                              Text(
+                                titulo,
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF1A1A1A),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              // Precio
+                              Text(
+                                precio,
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  color: UColors.greenDark,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              // Descripción
+                              if (descripcion.isNotEmpty) ...[
+                                const Text(
+                                  'Descripción',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  descripcion,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    height: 1.6,
+                                    color: Color(0xFF444444),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                              // Botón contactar
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      if (!_verificarAutenticacion(context)) return;
+
+                                      final supabase = Supabase.instance.client;
+                                      final compradorId = supabase.auth.currentUser!.id;
+                                      final vendedorId = anuncio['vendedor_id']?.toString() ?? '';
+                                      final anuncioId = anuncio['id']?.toString();
+
+                                      if (vendedorId.isEmpty || vendedorId == compradorId) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('No puedes contactarte contigo mismo')),
+                                        );
+                                        return;
+                                      }
+
+                                      try {
+                                        final existentes = await supabase
+                                            .from('conversaciones')
+                                            .select('id')
+                                            .eq('comprador_id', compradorId)
+                                            .eq('vendedor_id', vendedorId);
+
+                                        String conversacionId;
+                                        if (existentes.isNotEmpty) {
+                                          conversacionId = existentes.first['id'];
+                                        } else {
+                                          final nueva = await supabase
+                                              .from('conversaciones')
+                                              .insert({
+                                                'comprador_id': compradorId,
+                                                'vendedor_id': vendedorId,
+                                                'anuncio_id': anuncioId,
+                                              })
+                                              .select('id')
+                                              .single();
+                                          conversacionId = nueva['id'];
+                                        }
+
+                                        final vendedorData = await supabase
+                                            .from('usuarios')
+                                            .select('primer_nombre, primer_apellido')
+                                            .eq('id', vendedorId)
+                                            .maybeSingle();
+
+                                        final nombreVendedor = vendedorData != null
+                                            ? '${vendedorData['primer_nombre']} ${vendedorData['primer_apellido']}'
+                                            : 'Vendedor';
+
+                                        // Guardar el navigator antes de cerrar el dialog
+                                        final nav = Navigator.of(context);
+                                        nav.pop(); // cierra el dialog
+
+                                       nav.push(
+                                        MaterialPageRoute(
+                                          builder: (_) => ChatListScreen(
+                                            conversacionInicial: conversacionId,
+                                            nombreInicial: nombreVendedor,
+                                            otroUserIdInicial: vendedorId,
+                                            anuncioIdInicial: anuncioId,
+                                          ),
+                                        ),
+                                      );
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Error: $e')),
+                                          );
+                                        }
+                                      }
+                                    },
+                                  icon: const Icon(Icons.chat_bubble_outline),
+                                  label: const Text('Contactar Vendedor'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: UColors.orange,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    textStyle: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+
+                          if (isWide) {
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(flex: 5, child: imageSection),
+                                const SizedBox(width: 32),
+                                Expanded(flex: 4, child: infoSection),
+                              ],
+                            );
+                          } else {
+                            return Column(
+                              children: [
+                                imageSection,
+                                const SizedBox(height: 24),
+                                infoSection,
+                              ],
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  const _Badge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -647,39 +1372,45 @@ class _BannersPromocionales extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-          color: UColors.orange, borderRadius: BorderRadius.circular(12)),
+        color: UColors.orange,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text('¡Libera espacio y gana dinero!',
-              style: TextStyle(
-                  color: UColors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold)),
+          const Text(
+            '¡Libera espacio y gana dinero!',
+            style: TextStyle(
+              color: UColors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 16),
           const Text(
-              'Vende tus libros del semestre pasado o los muebles que\nya no necesitas a otros estudiantes de tu facultad.',
-              style:
-                  TextStyle(color: Colors.white, fontSize: 16, height: 1.5)),
+            'Vende tus libros del semestre pasado o los muebles que\nya no necesitas a otros estudiantes de tu facultad.',
+            style: TextStyle(color: Colors.white, fontSize: 16, height: 1.5),
+          ),
           const SizedBox(height: 32),
           ElevatedButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Empezando proceso de venta...')));
+                const SnackBar(content: Text('Empezando proceso de venta...')),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: UColors.white,
               foregroundColor: UColors.orange,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Empezar a Vender',
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            child: const Text(
+              'Empezar a Vender',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ),
         ],
       ),
@@ -690,8 +1421,9 @@ class _BannersPromocionales extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-          color: UColors.greenIcon.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(12)),
+        color: UColors.greenIcon.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -699,23 +1431,30 @@ class _BannersPromocionales extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: const BoxDecoration(
-                color: UColors.greenDark, shape: BoxShape.circle),
+              color: UColors.greenDark,
+              shape: BoxShape.circle,
+            ),
             child: const Icon(Icons.security, size: 24, color: Colors.white),
           ),
           const SizedBox(height: 24),
-          const Text('Tratos Seguros',
-              style: TextStyle(
-                  color: UColors.greenDark,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold)),
+          const Text(
+            'Tratos Seguros',
+            style: TextStyle(
+              color: UColors.greenDark,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 12),
           Text(
-              'Encuentros exclusivos en puntos seguros dentro del campus universitario.',
-              style: TextStyle(
-                  color: UColors.greenDark.withValues(alpha: 0.8),
-                  fontSize: 16,
-                  fontStyle: FontStyle.italic,
-                  height: 1.5)),
+            'Encuentros exclusivos en puntos seguros dentro del campus universitario.',
+            style: TextStyle(
+              color: UColors.greenDark.withValues(alpha: 0.8),
+              fontSize: 16,
+              fontStyle: FontStyle.italic,
+              height: 1.5,
+            ),
+          ),
         ],
       ),
     );
@@ -740,7 +1479,9 @@ class _PantallaDetalleProducto extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 20 : 40, vertical: 32),
+                horizontal: isMobile ? 20 : 40,
+                vertical: 32,
+              ),
               child: isMobile
                   ? Column(children: _buildContent(context, true))
                   : Row(
@@ -763,12 +1504,16 @@ class _PantallaDetalleProducto extends StatelessWidget {
           children: [
             Container(
               decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: UColors.cardBorder)),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: UColors.cardBorder),
+              ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.network(producto.imagenUrl,
-                    fit: BoxFit.cover, width: double.infinity),
+                child: Image.network(
+                  producto.imagenUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -781,8 +1526,11 @@ class _PantallaDetalleProducto extends StatelessWidget {
                       padding: const EdgeInsets.only(right: 8.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.network(url,
-                            height: 100, fit: BoxFit.cover),
+                        child: Image.network(
+                          url,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   );
@@ -803,42 +1551,54 @@ class _PantallaDetalleProducto extends StatelessWidget {
               children: producto.etiquetas.map((e) {
                 return Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                      color: UColors.footerBg,
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Text(e,
-                      style: TextStyle(
-                          color: UColors.textGray,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold)),
+                    color: UColors.footerBg,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    e,
+                    style: TextStyle(
+                      color: UColors.textGray,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 );
               }).toList(),
             ),
             const SizedBox(height: 16),
-            Text(producto.titulo,
-                style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: UColors.textDark)),
+            Text(
+              producto.titulo,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: UColors.textDark,
+              ),
+            ),
             const SizedBox(height: 16),
-            Text(producto.precio,
-                style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: UColors.greenDark)),
+            Text(
+              producto.precio,
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                color: UColors.greenDark,
+              ),
+            ),
             const SizedBox(height: 32),
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: UColors.cardBorder)),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: UColors.cardBorder),
+              ),
               child: Row(
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundImage:
-                        NetworkImage(producto.vendedor.avatarUrl),
+                    backgroundImage: NetworkImage(producto.vendedor.avatarUrl),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -847,34 +1607,50 @@ class _PantallaDetalleProducto extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Text(producto.vendedor.nombre,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16)),
+                            Text(
+                              producto.vendedor.nombre,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                             if (producto.vendedor.esVerificado) ...[
                               const SizedBox(width: 4),
-                              const Icon(Icons.verified,
-                                  size: 16, color: UColors.blueIcon),
+                              const Icon(
+                                Icons.verified,
+                                size: 16,
+                                color: UColors.blueIcon,
+                              ),
                             ],
                           ],
                         ),
-                        Text(producto.vendedor.facultad,
-                            style: TextStyle(
-                                color: UColors.textGray, fontSize: 13)),
+                        Text(
+                          producto.vendedor.facultad,
+                          style: TextStyle(
+                            color: UColors.textGray,
+                            fontSize: 13,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
                             ...List.generate(5, (i) {
-                              return Icon(Icons.star,
-                                  size: 14,
-                                  color: i < producto.vendedor.estrellas.floor()
-                                      ? UColors.orange
-                                      : UColors.cardBorder);
+                              return Icon(
+                                Icons.star,
+                                size: 14,
+                                color: i < producto.vendedor.estrellas.floor()
+                                    ? UColors.orange
+                                    : UColors.cardBorder,
+                              );
                             }),
                             const SizedBox(width: 4),
-                            Text('(${producto.vendedor.ventas} ventas)',
-                                style: TextStyle(
-                                    color: UColors.textGray, fontSize: 12)),
+                            Text(
+                              '(${producto.vendedor.ventas} ventas)',
+                              style: TextStyle(
+                                color: UColors.textGray,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -888,27 +1664,38 @@ class _PantallaDetalleProducto extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: UColors.cardBorder)),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: UColors.cardBorder),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Descripción del Producto',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 18)),
+                  const Text(
+                    'Descripción del Producto',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
                   const SizedBox(height: 16),
-                  Text(producto.descripcion,
-                      style: TextStyle(
-                          color: UColors.textDark, fontSize: 15, height: 1.6)),
+                  Text(
+                    producto.descripcion,
+                    style: TextStyle(
+                      color: UColors.textDark,
+                      fontSize: 15,
+                      height: 1.6,
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      Icon(Icons.location_on,
-                          size: 16, color: UColors.textGray),
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: UColors.textGray,
+                      ),
                       const SizedBox(width: 8),
-                      Text('Entrega en: ${producto.ubicacion}',
-                          style: TextStyle(
-                              color: UColors.textGray, fontSize: 13)),
+                      Text(
+                        'Entrega en: ${producto.ubicacion}',
+                        style: TextStyle(color: UColors.textGray, fontSize: 13),
+                      ),
                     ],
                   ),
                 ],
@@ -923,8 +1710,7 @@ class _PantallaDetalleProducto extends StatelessWidget {
                   if (_verificarAutenticacion(context)) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => const ChatListScreen()),
+                      MaterialPageRoute(builder: (_) => const ChatListScreen()),
                     );
                   }
                 },
@@ -934,9 +1720,12 @@ class _PantallaDetalleProducto extends StatelessWidget {
                   backgroundColor: UColors.orange,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   textStyle: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ),
@@ -952,9 +1741,12 @@ class _PantallaDetalleProducto extends StatelessWidget {
                   foregroundColor: UColors.greenDark,
                   side: const BorderSide(color: UColors.greenDark, width: 2),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   textStyle: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ),
@@ -974,8 +1766,9 @@ class _PieDePagina extends StatelessWidget {
   void _abrirEnlace(BuildContext context, String enlace) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text('Abriendo: $enlace'),
-          duration: const Duration(seconds: 1)),
+        content: Text('Abriendo: $enlace'),
+        duration: const Duration(seconds: 1),
+      ),
     );
   }
 
@@ -993,19 +1786,24 @@ class _PieDePagina extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('U-NITE',
-                    style: TextStyle(
-                        color: UColors.greenDark,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2)),
+                const Text(
+                  'U-NITE',
+                  style: TextStyle(
+                    color: UColors.greenDark,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Text(
-                    '© 2024 U-NITE Campus Marketplace. Todos los derechos\nreservados.',
-                    style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 13,
-                        height: 1.5)),
+                  '© 2024 U-NITE Campus Marketplace. Todos los derechos\nreservados.',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1032,11 +1830,14 @@ class _PieDePagina extends StatelessWidget {
   Widget _construirEnlace(BuildContext context, String texto) {
     return InkWell(
       onTap: () => _abrirEnlace(context, texto),
-      child: Text(texto,
-          style: TextStyle(
-              color: UColors.textDark,
-              fontWeight: FontWeight.w500,
-              fontSize: 14)),
+      child: Text(
+        texto,
+        style: TextStyle(
+          color: UColors.textDark,
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+        ),
+      ),
     );
   }
 }

@@ -676,18 +676,18 @@ packages:
     dependency: "direct main"
     description:
       name: rive
-      sha256: "4030119faa24050d0f5a49646e53f059121464e62662698c42c3d5886fe0ab27"
+      sha256: "3533244f855469047500c6d40c1232adf61e3ee35a6e706a6e8e5c6e2328c7df"
       url: "https://pub.dev"
     source: hosted
-    version: "0.14.6"
+    version: "0.14.7"
   rive_native:
     dependency: transitive
     description:
       name: rive_native
-      sha256: "05f59b4250410a634a3e4e8d07f97b2616ce20c24451b02ff814fb61135172bd"
+      sha256: "27ffdb21e0c2cc3b5d37bcfa6b198830954784adb82b798383d35b0c2603a74e"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.6"
+    version: "0.1.7"
   rxdart:
     dependency: transitive
     description:
@@ -857,10 +857,10 @@ packages:
     dependency: transitive
     description:
       name: url_launcher_android
-      sha256: "3bb000251e55d4a209aa0e2e563309dc9bb2befea2295fd0cec1f51760aac572"
+      sha256: "17bc677f0b301615530dd1d67e0a9828cafa2d0b6b6eae4cd3679b7eac4a273c"
       url: "https://pub.dev"
     source: hosted
-    version: "6.3.29"
+    version: "6.3.30"
   url_launcher_ios:
     dependency: transitive
     description:
