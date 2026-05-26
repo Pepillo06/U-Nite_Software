@@ -51,9 +51,9 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
       case 'Nuevo':
         return 'Nuevo';
       case 'Como nuevo':
-        return 'Usado - Como nuevo';
+        return 'Como nuevo';
       case 'Bueno':
-        return 'Usado - Buen estado';
+        return 'Bueno';
       case 'Regular':
         return 'Regular';
       default:

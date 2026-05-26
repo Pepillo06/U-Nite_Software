@@ -1,3 +1,4 @@
+import 'dart:async'; 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
@@ -20,6 +21,23 @@ class _MarketPageState extends State<MarketPage> {
   String _categoriaSeleccionada = 'Todos';
   String _busquedaActual = ''; // <-- Nueva variable para la búsqueda
 
+// ====== NUEVAS VARIABLES PARA LOS FILTROS ======
+  bool _mostrarFiltros = false;
+  double? _precioMinimo; // <-- Cambiado de double? a dos variables distintas
+  double? _precioMaximo; // <-- Nueva variable para el mínimo
+  List<String> _estadosSeleccionados = []; 
+  List<String> _tiposVentaSeleccionados = []; 
+
+  // NUEVAS VARIABLES ELEVADAS PARA LOS LÍMITES TOTALES
+  double _minPrecioGlobal = 0;
+  double _maxPrecioGlobal = 1000;
+
+  void _actualizarLimitesPrecio(double min, double max) {
+    setState(() {
+      _minPrecioGlobal = min;
+      _maxPrecioGlobal = max;
+    });
+  }
   void _onCategoriaChanged(String categoria) {
     setState(() {
       _categoriaSeleccionada = categoria;
@@ -37,43 +55,84 @@ class _MarketPageState extends State<MarketPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: UColors.footerBg,
-      body: CustomScrollView(
-        slivers: [
-          const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
-          SliverToBoxAdapter(
-            child: _BarraSuperior(
-              onBusquedaChanged: _onBusquedaChanged, // <-- Pasamos la función
-              onVender: () {
-                if (_verificarAutenticacion(context)) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const PublicarArticuloPage(),
-                    ),
-                  );
-                }
-              },
+      body: Column(
+        children: [
+          const UniteHeader(currentIndex: 1),
+          _BarraSuperior(
+            onBusquedaChanged: _onBusquedaChanged,
+            onVender: () {
+              if (_verificarAutenticacion(context)) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PublicarArticuloPage(),
+                  ),
+                );
+              }
+            },
+          ),
+          _FiltrosCategorias(
+            categoriaActual: _categoriaSeleccionada,
+            onChanged: _onCategoriaChanged,
+            filtrosVisibles: _mostrarFiltros,
+            onToggleFiltros: () {
+              setState(() {
+                _mostrarFiltros = !_mostrarFiltros;
+              });
+            },
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Panel de filtros lateral izquierdo
+// Panel de filtros lateral izquierdo
+                if (_mostrarFiltros)
+                  _PanelFiltrosLateral(
+                    precioMinimo: _precioMinimo, // <-- Añadido
+                    precioMaximo: _precioMaximo,
+                    estadosSeleccionados: _estadosSeleccionados,
+                    tiposVentaSeleccionados: _tiposVentaSeleccionados,
+                    onPrecioMinimoChanged: (val) => setState(() => _precioMinimo = val), // <-- Añadido
+                    onPrecioMaximoChanged: (val) => setState(() => _precioMaximo = val), // <-- Añadido
+                    onEstadosChanged: (lista) => setState(() => _estadosSeleccionados = lista),
+                    onTiposVentaChanged: (lista) => setState(() => _tiposVentaSeleccionados = lista),
+                    onLimpiarFiltros: () => setState(() {
+                      _precioMinimo = null; // <-- Limpiar ambos
+                      _precioMaximo = null; // <-- Limpiar ambos
+                      _estadosSeleccionados = [];
+                      _tiposVentaSeleccionados = [];
+                    }),
+                    minPrecio: _minPrecioGlobal,
+                    maxPrecio: _maxPrecioGlobal,
+                  ),
+                // Contenido principal de productos
+                Expanded(
+                  child: CustomScrollView(
+                    slivers: [
+                      _CuadriculaProductos(
+                        categoria: _categoriaSeleccionada,
+                        busqueda: _busquedaActual, 
+                        precioMinimo: _precioMinimo, // <-- Añadido
+                        precioMaximo: _precioMaximo,
+                        estadosSeleccionados: _estadosSeleccionados,
+                        tiposVentaSeleccionados: _tiposVentaSeleccionados,
+                        onLimpiarCalculados: _actualizarLimitesPrecio,
+                      ),
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 40.0),
+                          child: const _BannersPromocionales(),
+                        ),
+                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                      const SliverToBoxAdapter(child: _PieDePagina()),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          SliverToBoxAdapter(
-            child: _FiltrosCategorias(
-              categoriaActual: _categoriaSeleccionada,
-              onChanged: _onCategoriaChanged,
-            ),
-          ),
-          // <-- Pasamos el texto de búsqueda a la cuadrícula
-          _CuadriculaProductos(
-            categoria: _categoriaSeleccionada,
-            busqueda: _busquedaActual, 
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40.0),
-              child: const _BannersPromocionales(),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 40)),
-          const SliverToBoxAdapter(child: _PieDePagina()),
         ],
       ),
     );
@@ -304,11 +363,28 @@ class _BarraSuperior extends StatefulWidget {
 
 class _BarraSuperiorState extends State<_BarraSuperior> {
   final _searchController = TextEditingController();
+  Timer? _debounce; // <-- Nuevo: Temporizador para controlar el tiempo de espera
 
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel(); // <-- Nuevo: Cancelamos el timer si el widget se destruye
     super.dispose();
+  }
+
+  // Nuevo método para manejar la escritura con debounce
+  void _onTextoCambiado(String texto) {
+    // Si el usuario sigue escribiendo, cancelamos el temporizador anterior
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    // Creamos un nuevo temporizador de 300 milisegundos
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      // Este bloque se ejecutará SOLO cuando el usuario deje de escribir por 300ms
+      widget.onBusquedaChanged(texto);
+    });
+
+    // Forzamos un setState local únicamente para mostrar/ocultar el botón 'X' de limpiar
+    setState(() {});
   }
 
   @override
@@ -340,7 +416,8 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
                 child: TextField(
                   controller: _searchController,
                   style: GoogleFonts.lexend(fontSize: 14),
-                  onSubmitted: widget.onBusquedaChanged, 
+                  // Cambiamos 'onSubmitted' por 'onChanged' asignando nuestra nueva función
+                  onChanged: _onTextoCambiado, 
                   decoration: InputDecoration(
                     hintText: 'Buscar libros, muebles...',
                     hintStyle: GoogleFonts.lexend(
@@ -352,7 +429,6 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
                       color: Color(0xFF8F7065),
                       size: 20,
                     ),
-                    // MODIFICACIÓN AQUÍ: Agrupamos el botón de limpiar y el nuevo botón Buscar
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -361,27 +437,25 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
                             icon: const Icon(Icons.clear, size: 18, color: Color(0xFF8F7065)),
                             onPressed: () {
                               _searchController.clear();
-                              widget.onBusquedaChanged('');
-                              setState(() {}); // Actualiza el estado para ocultar la equis
+                              _debounce?.cancel(); // Cancelamos cualquier búsqueda pendiente
+                              widget.onBusquedaChanged(''); // Limpia la cuadrícula inmediatamente
+                              setState(() {}); 
                             },
                           ),
                         IconButton(
                           icon: const Icon(Icons.arrow_forward_rounded, color: UColors.orange),
-                          tooltip: 'Buscar',
+                          tooltip: 'Buscar ya',
                           onPressed: () {
+                            _debounce?.cancel(); // Cancelamos el timer si decide presionar el botón directamente
                             widget.onBusquedaChanged(_searchController.text);
                           },
                         ),
-                        const SizedBox(width: 6), // Separación del borde redondeado
+                        const SizedBox(width: 6), 
                       ],
                     ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(vertical: 11),
                   ),
-                  // Escuchamos los cambios para ocultar o mostrar la 'X' dinámicamente si se borra texto
-                  onChanged: (text) {
-                    setState(() {});
-                  },
                 ),
               ),
             ),
@@ -426,10 +500,14 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
 class _FiltrosCategorias extends StatelessWidget {
   final String categoriaActual;
   final Function(String) onChanged;
+  final bool filtrosVisibles;
+  final VoidCallback onToggleFiltros;
 
   const _FiltrosCategorias({
     required this.categoriaActual,
     required this.onChanged,
+    required this.filtrosVisibles,
+    required this.onToggleFiltros,
   });
 
   @override
@@ -449,55 +527,36 @@ class _FiltrosCategorias extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: List.generate(categorias.length, (index) {
-            final nombre = categorias[index]['nombre'] as String;
-            final esSeleccionado = categoriaActual == nombre;
-            
-            // 1. Condición mágica: ¿Es el botón de "Todos"?
-            final esBotonTodos = index == 0; 
-
-            return Padding(
-              padding: const EdgeInsets.only(right: 12.0),
+          children: [
+            // BOTÓN DE FILTROS DE BÚSQUEDA ADICIONADO AL LADO IZQUIERDO
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
               child: InkWell(
-                onTap: () => onChanged(nombre),
+                onTap: onToggleFiltros,
                 borderRadius: BorderRadius.circular(24),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    // 2. Color físico diferente si es "Todos" y no está seleccionado
-                    color: esSeleccionado 
-                        ? UColors.orange 
-                        : (esBotonTodos ? const Color.fromARGB(255, 221, 220, 220) : UColors.footerBg),
+                    color: filtrosVisibles ? UColors.orange : const Color(0xFFF5F3F3),
                     borderRadius: BorderRadius.circular(24),
-                    // 3. Le añadimos un borde físico solo si es el botón "Todos" no seleccionado
-                    // border: esBotonTodos && !esSeleccionado
-                    //     ? Border.all(color: UColors.orange.withOpacity(0.5), width: 1.5)
-                    //     : null,
+                    border: Border.all(
+                      color: filtrosVisibles ? UColors.orange : const Color(0xFFE3BFB1),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     children: [
-                      // 4. Si quieres ocultar el icono en "Todos" para que sea diferente,
-                      // puedes condicionar su aparición aquí:
-                      
                       Icon(
-                        categorias[index]['icono'] as IconData,
+                        Icons.tune_rounded,
                         size: 20,
-                        color: esSeleccionado ? Colors.white : UColors.textGray,
+                        color: filtrosVisibles ? Colors.white : UColors.orange,
                       ),
                       const SizedBox(width: 8),
-                      
                       Text(
-                        nombre,
+                        'Filtros',
                         style: TextStyle(
-                          color: esSeleccionado
-                              ? Colors.white
-                              : (esBotonTodos ? UColors.textDark : UColors.textDark), // Texto naranja si es "Todos"
-                          fontWeight: esSeleccionado || esBotonTodos
-                              ? FontWeight.bold
-                              : FontWeight.w500,
+                          color: filtrosVisibles ? Colors.white : UColors.orange,
+                          fontWeight: FontWeight.bold,
                           fontSize: 15,
                         ),
                       ),
@@ -505,8 +564,54 @@ class _FiltrosCategorias extends StatelessWidget {
                   ),
                 ),
               ),
-            );
-          }),
+            ),
+            // CATEGORÍAS ORIGINALES
+            ...List.generate(categorias.length, (index) {
+              final nombre = categorias[index]['nombre'] as String;
+              final esSeleccionado = categoriaActual == nombre;
+              final esBotonTodos = index == 0; 
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: InkWell(
+                  onTap: () => onChanged(nombre),
+                  borderRadius: BorderRadius.circular(24),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: esSeleccionado 
+                          ? UColors.orange 
+                          : (esBotonTodos ? const Color.fromARGB(255, 221, 220, 220) : UColors.footerBg),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                        categorias[index]['icono'] as IconData,
+                        size: 20,
+                        color: esSeleccionado ? Colors.white : UColors.textGray,
+                        ),
+                        const SizedBox(width: 8),
+                        
+                        Text(
+                          nombre,
+                          style: TextStyle(
+                            color: esSeleccionado
+                                ? Colors.white
+                                : (esBotonTodos ? UColors.textDark : UColors.textDark), // Texto naranja si es "Todos"
+                            fontWeight: esSeleccionado || esBotonTodos
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ],
         ),
       ),
     );
@@ -518,11 +623,22 @@ class _FiltrosCategorias extends StatelessWidget {
 // ------------------------------------------
 class _CuadriculaProductos extends StatefulWidget {
   final String categoria;
-  final String busqueda; // <-- Nuevo parámetro de búsqueda
+  final String busqueda;
+  final double? precioMinimo; // <-- Añadido
+  final double? precioMaximo;
+  final List<String> estadosSeleccionados;
+  final List<String> tiposVentaSeleccionados;
+  final Function(double min, double max) onLimpiarCalculados;
 
   const _CuadriculaProductos({
+    super.key,
     required this.categoria,
-    required this.busqueda, // <-- Requerido
+    required this.busqueda,
+    this.precioMinimo, // <-- Añadido
+    this.precioMaximo,
+    required this.estadosSeleccionados,
+    required this.tiposVentaSeleccionados,
+    required this.onLimpiarCalculados,
   });
 
   @override
@@ -534,6 +650,10 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   List<Map<String, dynamic>> _anuncios = [];
   bool _cargando = true;
 
+  // NUEVAS VARIABLES PARA LOS LÍMITES REALES DE PRECIO
+  double _precioMinimoGlobal = 0;
+  double _precioMaximoGlobal = 1000;
+
   @override
   void initState() {
     super.initState();
@@ -543,8 +663,12 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   @override
   void didUpdateWidget(_CuadriculaProductos oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // <-- Si cambia la categoría O cambia el texto de búsqueda, recargamos de la DB
-    if (oldWidget.categoria != widget.categoria || oldWidget.busqueda != widget.busqueda) {
+    if (oldWidget.categoria != widget.categoria || 
+        oldWidget.busqueda != widget.busqueda ||
+        oldWidget.precioMinimo != widget.precioMinimo || //_Añadido
+        oldWidget.precioMaximo != widget.precioMaximo ||
+        oldWidget.estadosSeleccionados != widget.estadosSeleccionados ||
+        oldWidget.tiposVentaSeleccionados != widget.tiposVentaSeleccionados) {
       _cargarAnuncios();
     }
   }
@@ -552,27 +676,109 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   Future<void> _cargarAnuncios() async {
     setState(() => _cargando = true);
     try {
-      // 1. Inicializamos la petición base
-      var baseQuery = _supabase
-          .from('anuncios_marketplace')
-          .select()
-          .eq('disponible', true);
+      // CÓDIGO NUEVO UTILIZANDO RPC (Insensible a acentos y mayúsculas)
+      final String queryTexto = widget.busqueda.trim();
+      dynamic baseQuery;
 
-      // 2. Aplicamos condicionalmente el filtro de búsqueda si el usuario escribió algo
-      if (widget.busqueda.trim().isNotEmpty) {
-        baseQuery = baseQuery.ilike('titulo', '%${widget.busqueda.trim()}%');
+      if (queryTexto.isNotEmpty) {
+        // Llamamos a la función RPC que creamos en Supabase
+        baseQuery = _supabase.rpc(
+          'buscar_anuncios_unaccent', 
+          params: {'search_term': queryTexto}
+        );
+      } else {
+        // Si no hay texto de búsqueda, usamos la consulta normal que ya tenías
+        baseQuery = _supabase
+            .from('anuncios_marketplace')
+            .select()
+            .eq('disponible', true);
       }
 
-      // 3. Agregamos el ordenamiento justo al final del encadenamiento antes del await
+      // Nota: Las funciones RPC retornan conjuntos de datos, asegúrate de aplicar el ordenamiento
       final data = await baseQuery.order('fecha_publicacion', ascending: false);
-      
       List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(data);
 
-      // 4. Filtrar por categoría en el cliente
-      if (widget.categoria != 'Todos') {
-        resultado = resultado
-            .where((a) => a['categoria'] == widget.categoria)
+      // FUNCIÓN INTERNA AUXILIAR PARA EXTRAER EL PRECIO CORRECTO DEL JSON
+      double? obtenerPrecioAnuncio(Map<String, dynamic> anuncio) {
+        final mod = anuncio['detalles_modalidades'];
+        if (mod == null) return null;
+        if (mod['venta'] != null && mod['venta']['precio'] != null) {
+          return double.tryParse(mod['venta']['precio'].toString());
+        }
+        if (mod['alquiler'] != null && mod['alquiler'] is List && (mod['alquiler'] as List).isNotEmpty) {
+          final primerAlquiler = (mod['alquiler'] as List)[0];
+          if (primerAlquiler != null && primerAlquiler['costo'] != null) {
+            return double.tryParse(primerAlquiler['costo'].toString());
+          }
+        }
+        return null;
+      }
+
+      // === NUEVO: CÁLCULO DINÁMICO DE LÍMITES BASADO EN LOS ANUNCIOS TOTALES ===
+      if (resultado.isNotEmpty) {
+        List<double> preciosValidos = resultado
+            .map((a) => obtenerPrecioAnuncio(a))
+            .whereType<double>()
             .toList();
+
+        // Busca esta sección dentro de su método _cargarAnuncios
+        if (preciosValidos.isNotEmpty) {
+          _precioMinimoGlobal = preciosValidos.reduce((a, b) => a < b ? a : b);
+          _precioMaximoGlobal = preciosValidos.reduce((a, b) => a > b ? a : b);
+          
+          if (_precioMinimoGlobal == _precioMaximoGlobal) {
+            _precioMaximoGlobal += 1;
+          }
+
+          // NUEVO: Notificar al widget padre inmediatamente
+          widget.onLimpiarCalculados(_precioMinimoGlobal, _precioMaximoGlobal);
+        }
+      }
+
+      // 1. Filtrar por categoría
+      if (widget.categoria != 'Todos') {
+        resultado = resultado.where((a) => a['categoria'] == widget.categoria).toList();
+      }
+
+// 2. Filtrar por rango de precio (Mínimo y Máximo)
+      if (widget.precioMinimo != null || widget.precioMaximo != null) {
+        resultado = resultado.where((a) {
+          final precio = obtenerPrecioAnuncio(a);
+          if (precio == null) return false;
+          
+          bool cumpleMin = widget.precioMinimo == null || precio >= widget.precioMinimo!;
+          bool cumpleMax = widget.precioMaximo == null || precio <= widget.precioMaximo!;
+          
+          return cumpleMin && cumpleMax;
+        }).toList();
+      }
+
+      // 3. Filtrar por Condición / Uso
+      if (widget.estadosSeleccionados.isNotEmpty) {
+        resultado = resultado.where((a) {
+          final estadoDb = a['estado_producto']?.toString() ?? '';
+          return widget.estadosSeleccionados.any((estUi) {
+            if (estUi == 'Nuevo' && estadoDb == 'Nuevo') return true;
+            if (estUi == 'Como nuevo' && estadoDb == 'Como nuevo') return true;
+            if (estUi == 'Bueno' && estadoDb == 'Bueno') return true;
+            if (estUi == 'Regular' && estadoDb == 'Regular') return true;
+            return false;
+          });
+        }).toList();
+      }
+
+      // 4. Filtrar por Tipo de Venta
+      if (widget.tiposVentaSeleccionados.isNotEmpty) {
+        resultado = resultado.where((a) {
+          final mod = a['detalles_modalidades'];
+          if (mod == null) return false;
+          return widget.tiposVentaSeleccionados.any((tipo) {
+            if (tipo == 'Venta' && mod['venta'] != null) return true;
+            if (tipo == 'Alquiler' && mod['alquiler'] != null) return true;
+            if (tipo == 'Trueque' && mod['trueque'] != null) return true;
+            return false;
+          });
+        }).toList();
       }
 
       setState(() {
@@ -590,21 +796,16 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
       return const SliverToBoxAdapter(
         child: SizedBox(
           height: 300,
-          child: Center(
-            child: CircularProgressIndicator(color: UColors.orange),
-          ),
+          child: Center(child: CircularProgressIndicator(color: UColors.orange)),
         ),
       );
     }
 
     double width = MediaQuery.of(context).size.width;
     int columnas = 4;
-    if (width < 600)
-      columnas = 1;
-    else if (width < 900)
-      columnas = 2;
-    else if (width < 1200)
-      columnas = 3;
+    if (width < 600) columnas = 1;
+    else if (width < 900) columnas = 2;
+    else if (width < 1200) columnas = 3;
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 40.0, vertical: 24.0),
@@ -619,8 +820,8 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
                     Icon(Icons.search_off, size: 64, color: UColors.textGray),
                     const SizedBox(height: 16),
                     Text(
-                      'No hay productos que coincidan con la búsqueda',
-                      style: TextStyle(color: UColors.textGray, fontSize: 18),
+                      'No hay productos que coincidan con los filtros seleccionados',
+                      style: TextStyle(color: UColors.textGray, fontSize: 17),
                     ),
                   ],
                 ),
@@ -1904,6 +2105,280 @@ class _PieDePagina extends StatelessWidget {
           color: UColors.textDark,
           fontWeight: FontWeight.w500,
           fontSize: 14,
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// WIDGET BARRA LATERAL DE FILTROS DE BÚSQUEDA
+// ==========================================
+class _PanelFiltrosLateral extends StatefulWidget {
+  final double? precioMinimo;
+  final double? precioMaximo;
+  final List<String> estadosSeleccionados;
+  final List<String> tiposVentaSeleccionados;
+  final ValueChanged<double?> onPrecioMinimoChanged;
+  final ValueChanged<double?> onPrecioMaximoChanged;
+  final ValueChanged<List<String>> onEstadosChanged;
+  final ValueChanged<List<String>> onTiposVentaChanged;
+  final VoidCallback onLimpiarFiltros;
+  final double minPrecio;
+  final double maxPrecio;
+
+  const _PanelFiltrosLateral({
+    required this.precioMinimo,
+    required this.precioMaximo,
+    required this.estadosSeleccionados,
+    required this.tiposVentaSeleccionados,
+    required this.onPrecioMinimoChanged,
+    required this.onPrecioMaximoChanged,
+    required this.onEstadosChanged,
+    required this.onTiposVentaChanged,
+    required this.onLimpiarFiltros,
+    required this.minPrecio,
+    required this.maxPrecio,
+  });
+
+  @override
+  State<_PanelFiltrosLateral> createState() => _PanelFiltrosLateralState();
+}
+
+class _PanelFiltrosLateralState extends State<_PanelFiltrosLateral> {
+  late TextEditingController _minController;
+  late TextEditingController _maxController;
+
+  @override
+  void initState() {
+    super.initState();
+    _minController = TextEditingController(text: widget.precioMinimo?.round().toString() ?? '');
+    _maxController = TextEditingController(text: widget.precioMaximo?.round().toString() ?? '');
+  }
+
+  @override
+  void didUpdateWidget(_PanelFiltrosLateral oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sincroniza los campos de texto si los filtros se limpian externamente
+    if (widget.precioMinimo == null && _minController.text.isNotEmpty) {
+      _minController.clear();
+    }
+    if (widget.precioMaximo == null && _maxController.text.isNotEmpty) {
+      _maxController.clear();
+    }
+  }
+
+  @override
+  void dispose() {
+    _minController.dispose();
+    _maxController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final opcionesEstado = ['Nuevo', 'Como nuevo', 'Bueno', 'Regular'];
+    final opcionesTipo = ['Venta', 'Alquiler', 'Trueque'];
+
+    double valorSliderActual = widget.precioMaximo ?? widget.maxPrecio;
+    if (valorSliderActual < widget.minPrecio) valorSliderActual = widget.minPrecio;
+    if (valorSliderActual > widget.maxPrecio) valorSliderActual = widget.maxPrecio;
+
+    return Container(
+      width: 290,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        color: UColors.white,
+        border: Border(
+          right: BorderSide(color: Color(0xFFE3BFB1), width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.all(24.0),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Filtros',
+                  style: GoogleFonts.lexend(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: UColors.textDark,
+                  ),
+                ),
+                TextButton(
+                  onPressed: widget.onLimpiarFiltros,
+                  child: Text(
+                    'Limpiar todo',
+                    style: GoogleFonts.lexend(
+                      fontSize: 13,
+                      color: UColors.orange,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 32, color: Color(0xFFE3BFB1)),
+            
+            // --- FILTRO: PRECIO SLIDER ---
+            Text(
+              'Rango de Precio',
+              style: GoogleFonts.lexend(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF8F7065),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Hasta \$${valorSliderActual.round()} USD',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: UColors.textDark,
+              ),
+            ),
+            Slider(
+              value: valorSliderActual,
+              min: widget.minPrecio,
+              max: widget.maxPrecio,
+              divisions: 20,
+              activeColor: UColors.orange,
+              inactiveColor: const Color(0xFFF5F3F3),
+              onChanged: (val) {
+                _maxController.text = val.round().toString();
+                if (val >= widget.maxPrecio) {
+                  widget.onPrecioMaximoChanged(null); 
+                } else {
+                  widget.onPrecioMaximoChanged(val);
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+
+            // --- NUEVOS CAMPOS DE TEXTO MANUALES ---
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _minController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Mínimo',
+                      prefixText: '\$ ',
+                      labelStyle: GoogleFonts.lexend(fontSize: 12, color: const Color(0xFF8F7065)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: UColors.orange),
+                      ),
+                    ),
+                    onChanged: (val) {
+                      final precio = double.tryParse(val);
+                      widget.onPrecioMinimoChanged(precio);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _maxController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 14),
+                    decoration: InputDecoration(
+                      labelText: 'Máximo',
+                      prefixText: '\$ ',
+                      labelStyle: GoogleFonts.lexend(fontSize: 12, color: const Color(0xFF8F7065)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: UColors.orange),
+                      ),
+                    ),
+                    onChanged: (val) {
+                      final precio = double.tryParse(val);
+                      widget.onPrecioMaximoChanged(precio);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // --- FILTRO: TIPO DE VENTA ---
+            Text(
+              'Tipo de Venta',
+              style: GoogleFonts.lexend(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF8F7065),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...opcionesTipo.map((tipo) {
+              final esSeleccionado = widget.tiposVentaSeleccionados.contains(tipo);
+              return CheckboxListTile(
+                value: esSeleccionado,
+                title: Text(
+                  tipo,
+                  style: const TextStyle(fontSize: 14, color: UColors.textDark, fontWeight: FontWeight.w500),
+                ),
+                activeColor: UColors.orange,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                onChanged: (bool? checked) {
+                  final nuevaLista = List<String>.from(widget.tiposVentaSeleccionados);
+                  if (checked == true) {
+                    nuevaLista.add(tipo);
+                  } else {
+                    nuevaLista.remove(tipo);
+                  }
+                  widget.onTiposVentaChanged(nuevaLista);
+                },
+              );
+            }),
+            const SizedBox(height: 24),
+
+            // --- FILTRO: USO / CONDICIÓN ---
+            Text(
+              'Uso / Condición',
+              style: GoogleFonts.lexend(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF8F7065),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...opcionesEstado.map((estado) {
+              final esSeleccionado = widget.estadosSeleccionados.contains(estado);
+              return CheckboxListTile(
+                value: esSeleccionado,
+                title: Text(
+                  estado,
+                  style: const TextStyle(fontSize: 14, color: UColors.textDark, fontWeight: FontWeight.w500),
+                ),
+                activeColor: UColors.orange,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                onChanged: (bool? checked) {
+                  final nuevaLista = List<String>.from(widget.estadosSeleccionados);
+                  if (checked == true) {
+                    nuevaLista.add(estado);
+                  } else {
+                    nuevaLista.remove(estado);
+                  }
+                  widget.onEstadosChanged(nuevaLista);
+                },
+              );
+            }),
+          ],
         ),
       ),
     );
