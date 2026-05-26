@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'profile_page.dart';
 import 'post_item.dart';
 import 'login_page.dart';
 import 'screens/chat/chat_list_screen.dart';
@@ -18,18 +19,10 @@ class MarketPage extends StatefulWidget {
 
 class _MarketPageState extends State<MarketPage> {
   String _categoriaSeleccionada = 'Todos';
-  String _busquedaActual = ''; // <-- Nueva variable para la búsqueda
 
   void _onCategoriaChanged(String categoria) {
     setState(() {
       _categoriaSeleccionada = categoria;
-    });
-  }
-
-  // <-- Nueva función para manejar el cambio de texto
-  void _onBusquedaChanged(String texto) {
-    setState(() {
-      _busquedaActual = texto;
     });
   }
 
@@ -42,7 +35,6 @@ class _MarketPageState extends State<MarketPage> {
           const SliverToBoxAdapter(child: UniteHeader(currentIndex: 1)),
           SliverToBoxAdapter(
             child: _BarraSuperior(
-              onBusquedaChanged: _onBusquedaChanged, // <-- Pasamos la función
               onVender: () {
                 if (_verificarAutenticacion(context)) {
                   Navigator.push(
@@ -61,11 +53,7 @@ class _MarketPageState extends State<MarketPage> {
               onChanged: _onCategoriaChanged,
             ),
           ),
-          // <-- Pasamos el texto de búsqueda a la cuadrícula
-          _CuadriculaProductos(
-            categoria: _categoriaSeleccionada,
-            busqueda: _busquedaActual, 
-          ),
+          _CuadriculaProductos(categoria: _categoriaSeleccionada),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40.0),
@@ -291,12 +279,7 @@ final List<_Producto> _productosPrueba = [
 // ------------------------------------------
 class _BarraSuperior extends StatefulWidget {
   final VoidCallback onVender;
-  final ValueChanged<String> onBusquedaChanged; // <-- Nuevo parámetro
-
-  const _BarraSuperior({
-    required this.onVender,
-    required this.onBusquedaChanged, // <-- Requerido
-  });
+  const _BarraSuperior({required this.onVender});
 
   @override
   State<_BarraSuperior> createState() => _BarraSuperiorState();
@@ -314,103 +297,64 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
   @override
   Widget build(BuildContext context) {
     final bool isMobile = MediaQuery.of(context).size.width < 700;
-    const double alturaComponentes = 44.0;
-
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(
         horizontal: isMobile ? 16 : 40,
         vertical: 12,
       ),
-      child: Stack(
-        alignment: Alignment.center,
+      child: Row(
         children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: isMobile ? 240 : 700, 
+          // Barra de búsqueda
+          Expanded(
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F3F3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE3BFB1)),
               ),
-              child: Container(
-                height: alturaComponentes,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F3F3),
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: const Color(0xFFE3BFB1)),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  style: GoogleFonts.lexend(fontSize: 14),
-                  onSubmitted: widget.onBusquedaChanged, 
-                  decoration: InputDecoration(
-                    hintText: 'Buscar libros, muebles...',
-                    hintStyle: GoogleFonts.lexend(
-                      color: const Color(0xFF8F7065),
-                      fontSize: 14,
-                    ),
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: Color(0xFF8F7065),
-                      size: 20,
-                    ),
-                    // MODIFICACIÓN AQUÍ: Agrupamos el botón de limpiar y el nuevo botón Buscar
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_searchController.text.isNotEmpty)
-                          IconButton(
-                            icon: const Icon(Icons.clear, size: 18, color: Color(0xFF8F7065)),
-                            onPressed: () {
-                              _searchController.clear();
-                              widget.onBusquedaChanged('');
-                              setState(() {}); // Actualiza el estado para ocultar la equis
-                            },
-                          ),
-                        IconButton(
-                          icon: const Icon(Icons.arrow_forward_rounded, color: UColors.orange),
-                          tooltip: 'Buscar',
-                          onPressed: () {
-                            widget.onBusquedaChanged(_searchController.text);
-                          },
-                        ),
-                        const SizedBox(width: 6), // Separación del borde redondeado
-                      ],
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 11),
+              child: TextField(
+                controller: _searchController,
+                style: GoogleFonts.lexend(fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Buscar libros, muebles, electrónica...',
+                  hintStyle: GoogleFonts.lexend(
+                    color: const Color(0xFF8F7065),
+                    fontSize: 14,
                   ),
-                  // Escuchamos los cambios para ocultar o mostrar la 'X' dinámicamente si se borra texto
-                  onChanged: (text) {
-                    setState(() {});
-                  },
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF8F7065),
+                    size: 20,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              height: alturaComponentes,
-              child: ElevatedButton.icon(
-                onPressed: widget.onVender,
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(
-                  isMobile ? 'Vender' : 'Vender Artículo',
-                  style: GoogleFonts.lexend(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: UColors.orange,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 12 : 20,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
+          const SizedBox(width: 16),
+          // Botón Vender Artículo
+          ElevatedButton(
+            onPressed: widget.onVender,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: UColors.orange,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 20,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              isMobile ? 'Vender' : 'Vender Artículo',
+              style: GoogleFonts.lexend(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
             ),
           ),
@@ -438,8 +382,8 @@ class _FiltrosCategorias extends StatelessWidget {
       {'nombre': 'Todos', 'icono': Icons.grid_view},
       {'nombre': 'Libros', 'icono': Icons.menu_book},
       {'nombre': 'Electrónica', 'icono': Icons.computer},
-      {'nombre': 'Herramientas', 'icono': Icons.architecture},
-      {'nombre': 'Accesorios', 'icono': Icons.checkroom},
+      {'nombre': 'Muebles', 'icono': Icons.chair_alt},
+      {'nombre': 'Alojamientos', 'icono': Icons.home_outlined},
     ];
 
     return Container(
@@ -452,10 +396,6 @@ class _FiltrosCategorias extends StatelessWidget {
           children: List.generate(categorias.length, (index) {
             final nombre = categorias[index]['nombre'] as String;
             final esSeleccionado = categoriaActual == nombre;
-            
-            // 1. Condición mágica: ¿Es el botón de "Todos"?
-            final esBotonTodos = index == 0; 
-
             return Padding(
               padding: const EdgeInsets.only(right: 12.0),
               child: InkWell(
@@ -467,35 +407,24 @@ class _FiltrosCategorias extends StatelessWidget {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    // 2. Color físico diferente si es "Todos" y no está seleccionado
-                    color: esSeleccionado 
-                        ? UColors.orange 
-                        : (esBotonTodos ? const Color.fromARGB(255, 221, 220, 220) : UColors.footerBg),
+                    color: esSeleccionado ? UColors.orange : UColors.footerBg,
                     borderRadius: BorderRadius.circular(24),
-                    // 3. Le añadimos un borde físico solo si es el botón "Todos" no seleccionado
-                    // border: esBotonTodos && !esSeleccionado
-                    //     ? Border.all(color: UColors.orange.withOpacity(0.5), width: 1.5)
-                    //     : null,
                   ),
                   child: Row(
                     children: [
-                      // 4. Si quieres ocultar el icono en "Todos" para que sea diferente,
-                      // puedes condicionar su aparición aquí:
-                      
                       Icon(
                         categorias[index]['icono'] as IconData,
                         size: 20,
                         color: esSeleccionado ? Colors.white : UColors.textGray,
                       ),
                       const SizedBox(width: 8),
-                      
                       Text(
                         nombre,
                         style: TextStyle(
                           color: esSeleccionado
                               ? Colors.white
-                              : (esBotonTodos ? UColors.textDark : UColors.textDark), // Texto naranja si es "Todos"
-                          fontWeight: esSeleccionado || esBotonTodos
+                              : UColors.textDark,
+                          fontWeight: esSeleccionado
                               ? FontWeight.bold
                               : FontWeight.w500,
                           fontSize: 15,
@@ -518,12 +447,7 @@ class _FiltrosCategorias extends StatelessWidget {
 // ------------------------------------------
 class _CuadriculaProductos extends StatefulWidget {
   final String categoria;
-  final String busqueda; // <-- Nuevo parámetro de búsqueda
-
-  const _CuadriculaProductos({
-    required this.categoria,
-    required this.busqueda, // <-- Requerido
-  });
+  const _CuadriculaProductos({required this.categoria});
 
   @override
   State<_CuadriculaProductos> createState() => _CuadriculaProductosState();
@@ -543,8 +467,7 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   @override
   void didUpdateWidget(_CuadriculaProductos oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // <-- Si cambia la categoría O cambia el texto de búsqueda, recargamos de la DB
-    if (oldWidget.categoria != widget.categoria || oldWidget.busqueda != widget.busqueda) {
+    if (oldWidget.categoria != widget.categoria) {
       _cargarAnuncios();
     }
   }
@@ -552,23 +475,18 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   Future<void> _cargarAnuncios() async {
     setState(() => _cargando = true);
     try {
-      // 1. Inicializamos la petición base
-      var baseQuery = _supabase
+      var query = _supabase
           .from('anuncios_marketplace')
           .select()
-          .eq('disponible', true);
+          .eq('disponible', true)
+          .order('fecha_publicacion', ascending: false);
 
-      // 2. Aplicamos condicionalmente el filtro de búsqueda si el usuario escribió algo
-      if (widget.busqueda.trim().isNotEmpty) {
-        baseQuery = baseQuery.ilike('titulo', '%${widget.busqueda.trim()}%');
-      }
+      final data = await query;
+      List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(
+        data,
+      );
 
-      // 3. Agregamos el ordenamiento justo al final del encadenamiento antes del await
-      final data = await baseQuery.order('fecha_publicacion', ascending: false);
-      
-      List<Map<String, dynamic>> resultado = List<Map<String, dynamic>>.from(data);
-
-      // 4. Filtrar por categoría en el cliente
+      // Filtrar por categoría en cliente (más simple que en query)
       if (widget.categoria != 'Todos') {
         resultado = resultado
             .where((a) => a['categoria'] == widget.categoria)
@@ -619,7 +537,7 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
                     Icon(Icons.search_off, size: 64, color: UColors.textGray),
                     const SizedBox(height: 16),
                     Text(
-                      'No hay productos que coincidan con la búsqueda',
+                      'No hay productos en esta categoría',
                       style: TextStyle(color: UColors.textGray, fontSize: 18),
                     ),
                   ],
@@ -826,8 +744,7 @@ class _TarjetaAnuncio extends StatelessWidget {
   }
 
   String _getEstadoBadge() {
-    // Nos aseguramos de que si viene null, se convierta de forma segura en un String vacío
-    final String estado = (anuncio['estado_producto']?.toString() ?? '').trim();
+    final estado = (anuncio['estado_producto'] ?? '').toString();
     if (estado.isEmpty) return 'Usado';
     return estado[0].toUpperCase() + estado.substring(1);
   }
@@ -836,9 +753,6 @@ class _TarjetaAnuncio extends StatelessWidget {
   Widget build(BuildContext context) {
     final imagenUrl = _getImagenUrl();
     final tieneImagen = imagenUrl.isNotEmpty;
-
-    final String tituloSeguro = anuncio['titulo']?.toString() ?? 'Sin título';
-    final String categoriaSegura = anuncio['categoria']?.toString() ?? 'General';
 
     return InkWell(
       onTap: () {
@@ -1193,113 +1107,66 @@ void _mostrarDetalleAnuncio(
                                 ),
                                 const SizedBox(height: 24),
                               ],
-                              // Trueque
-                              if (modalidades.containsKey('trueque')) ...[
-                                const Text(
-                                  'Intercambio / Trueque',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFBF9F9),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFE3BFB1)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.swap_horiz, color: Color(0xFFF25A22)),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          modalidades['trueque']['descripcion'] != null &&
-                                                  modalidades['trueque']['descripcion'].toString().trim().isNotEmpty
-                                              ? modalidades['trueque']['descripcion']
-                                              : 'Acepta trueque (sin especificar artículos de interés).',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Color(0xFF2E3137),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-                              ],
-                              // Botón contactar
+                              // Botón contactar vendedor
                               SizedBox(
                                 width: double.infinity,
                                 height: 52,
                                 child: ElevatedButton.icon(
-                                    onPressed: () async {
-                                      if (!_verificarAutenticacion(context)) return;
-
-                                      final supabase = Supabase.instance.client;
-                                      final compradorId = supabase.auth.currentUser!.id;
-                                      final vendedorId = anuncio['vendedor_id']?.toString() ?? '';
-                                      final anuncioId = anuncio['id']?.toString();
-
-                                      if (vendedorId.isEmpty || vendedorId == compradorId) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('No puedes contactarte contigo mismo')),
-                                        );
-                                        return;
-                                      }
-
-                                      try {
-                                        final existentes = await supabase
+                                  onPressed: () async {
+                                    if (!_verificarAutenticacion(context)) return;
+                                    final supabase = Supabase.instance.client;
+                                    final compradorId = supabase.auth.currentUser!.id;
+                                    final vendedorId = anuncio['vendedor_id']?.toString() ?? '';
+                                    final anuncioId = anuncio['id']?.toString();
+                                    if (vendedorId.isEmpty || vendedorId == compradorId) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('No puedes contactarte contigo mismo')),
+                                      );
+                                      return;
+                                    }
+                                    try {
+                                      final existentes = await supabase
+                                          .from('conversaciones')
+                                          .select('id')
+                                          .eq('comprador_id', compradorId)
+                                          .eq('vendedor_id', vendedorId);
+                                      String conversacionId;
+                                      final esNueva = existentes.isEmpty;
+                                      if (!esNueva) {
+                                        conversacionId = existentes.first['id'];
+                                        await supabase
                                             .from('conversaciones')
+                                            .update({'anuncio_id': anuncioId})
+                                            .eq('id', conversacionId);
+                                      } else {
+                                        final nueva = await supabase
+                                            .from('conversaciones')
+                                            .insert({
+                                              'comprador_id': compradorId,
+                                              'vendedor_id': vendedorId,
+                                              'anuncio_id': anuncioId,
+                                            })
                                             .select('id')
-                                            .eq('comprador_id', compradorId)
-                                            .eq('vendedor_id', vendedorId);
-
-                                        String conversacionId;
-                                        if (existentes.isNotEmpty) {
-                                          conversacionId = existentes.first['id'];
-                                          // Actualizar el anuncio_id al producto actual
-                                          await supabase
-                                              .from('conversaciones')
-                                              .update({'anuncio_id': anuncioId})
-                                              .eq('id', conversacionId);
-                                        } else {
-                                          final nueva = await supabase
-                                              .from('conversaciones')
-                                              .insert({
-                                                'comprador_id': compradorId,
-                                                'vendedor_id': vendedorId,
-                                                'anuncio_id': anuncioId,
-                                              })
-                                              .select('id')
-                                              .single();
-                                          conversacionId = nueva['id'];
-                                        }
-
-                                        final vendedorData = await supabase
+                                            .single();
+                                        conversacionId = nueva['id'];
+                                      }
+                                      final vendedorData = await supabase
+                                          .from('usuarios')
+                                          .select('primer_nombre, primer_apellido')
+                                          .eq('id', vendedorId)
+                                          .maybeSingle();
+                                      final nombreVendedor = vendedorData != null
+                                          ? '${vendedorData['primer_nombre']} ${vendedorData['primer_apellido']}'
+                                          : 'Vendedor';
+                                      if (esNueva) {
+                                        final compradorData = await supabase
                                             .from('usuarios')
                                             .select('primer_nombre, primer_apellido')
-                                            .eq('id', vendedorId)
+                                            .eq('id', compradorId)
                                             .maybeSingle();
-
-                                        final nombreVendedor = vendedorData != null
-                                            ? '${vendedorData['primer_nombre']} ${vendedorData['primer_apellido']}'
-                                            : 'Vendedor';
-                                            // Obtener nombre del comprador
-                                            final compradorData = await supabase
-                                                .from('usuarios')
-                                                .select('primer_nombre, primer_apellido')
-                                                .eq('id', compradorId)
-                                                .maybeSingle();
-
-                                            final nombreComprador = compradorData != null
-                                                ? '${compradorData['primer_nombre']} ${compradorData['primer_apellido']}'
-                                                : 'Un usuario';
-
-                                        // Crear notificación al vendedor
+                                        final nombreComprador = compradorData != null
+                                            ? '${compradorData['primer_nombre']} ${compradorData['primer_apellido']}'
+                                            : 'Un usuario';
                                         try {
                                           await supabase.from('notificaciones').insert({
                                             'usuario_id': vendedorId,
@@ -1315,27 +1182,25 @@ void _mostrarDetalleAnuncio(
                                             },
                                           });
                                         } catch (_) {}
-                                        // Guardar el navigator antes de cerrar el dialog
-                                        final nav = Navigator.of(context);
-                                        nav.pop(); // cierra el dialog
-                                        nav.push(
-                                        MaterialPageRoute(
-                                          builder: (_) => ChatListScreen(
-                                            conversacionInicial: conversacionId,
-                                            nombreInicial: nombreVendedor,
-                                            otroUserIdInicial: vendedorId,
-                                            anuncioIdInicial: anuncioId,
-                                          ),
-                                        ),
-                                      );
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(content: Text('Error: $e')),
-                                          );
-                                        }
                                       }
-                                    },
+                                      final nav = Navigator.of(context);
+                                      nav.pop();
+                                      nav.push(MaterialPageRoute(
+                                        builder: (_) => ChatListScreen(
+                                          conversacionInicial: conversacionId,
+                                          nombreInicial: nombreVendedor,
+                                          otroUserIdInicial: vendedorId,
+                                          anuncioIdInicial: anuncioId,
+                                        ),
+                                      ));
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Error: $e')),
+                                        );
+                                      }
+                                    }
+                                  },
                                   icon: const Icon(Icons.chat_bubble_outline),
                                   label: const Text('Contactar Vendedor'),
                                   style: ElevatedButton.styleFrom(
@@ -1351,6 +1216,30 @@ void _mostrarDetalleAnuncio(
                                   ),
                                 ),
                               ),
+                              // Botón Proponer Trueque (solo si el producto acepta trueque)
+                              if (modalidades.containsKey('trueque')) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 52,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _mostrarDialogTrueque(context, anuncio),
+                                    icon: const Icon(Icons.swap_horiz_rounded),
+                                    label: const Text('Proponer Trueque'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF245000),
+                                      side: const BorderSide(color: Color(0xFF245000), width: 2),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           );
 
@@ -1384,6 +1273,216 @@ void _mostrarDetalleAnuncio(
       );
     },
   );
+}
+
+void _mostrarDialogTrueque(BuildContext context, Map<String, dynamic> anuncio) {
+  final modalidades = anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+  final descripcionTrueque = modalidades['trueque']?['descripcion']?.toString() ?? '';
+  final titulo = anuncio['titulo'] ?? '';
+  final ofertaController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          const Icon(Icons.swap_horiz_rounded, color: Color(0xFF245000)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Proponer Trueque',
+              style: GoogleFonts.lexend(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: const Color(0xFF1A1A1A),
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (descripcionTrueque.isNotEmpty) ...[
+            Text(
+              'El vendedor busca:',
+              style: GoogleFonts.lexend(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF5B4137),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F3F3),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE3BFB1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.swap_horiz_rounded, color: Color(0xFFF36900), size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      descripcionTrueque,
+                      style: GoogleFonts.lexend(fontSize: 13, color: const Color(0xFF1A1A1A)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          Text(
+            '¿Qué ofreces a cambio de "$titulo"?',
+            style: GoogleFonts.lexend(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF1A1A1A),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: ofertaController,
+            maxLines: 3,
+            style: GoogleFonts.lexend(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: 'Ej: Tengo una calculadora científica...',
+              hintStyle: GoogleFonts.lexend(color: const Color(0xFF8F7065), fontSize: 13),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFE3BFB1)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF245000), width: 2),
+              ),
+              contentPadding: const EdgeInsets.all(12),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Cancelar', style: GoogleFonts.lexend(color: const Color(0xFF5B4137))),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final oferta = ofertaController.text.trim();
+            if (oferta.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Describe qué ofreces a cambio', style: GoogleFonts.lexend()),
+                  backgroundColor: const Color(0xFFF36900),
+                ),
+              );
+              return;
+            }
+            Navigator.pop(context);
+            await _enviarSolicitudTrueque(context, anuncio, oferta);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF245000),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: Text('Enviar Propuesta', style: GoogleFonts.lexend(fontWeight: FontWeight.w700)),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<void> _enviarSolicitudTrueque(
+  BuildContext context,
+  Map<String, dynamic> anuncio,
+  String objetoOfrecido,
+) async {
+  final supabase = Supabase.instance.client;
+  final compradorId = supabase.auth.currentUser?.id;
+  if (compradorId == null) return;
+
+  final vendedorId = anuncio['vendedor_id']?.toString() ?? '';
+  final anuncioId = anuncio['id']?.toString();
+  final titulo = anuncio['titulo'] ?? '';
+
+  if (vendedorId.isEmpty || vendedorId == compradorId) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No puedes proponer trueque contigo mismo')),
+    );
+    return;
+  }
+
+  try {
+    final existente = await supabase
+        .from('solicitudes_trueque')
+        .select('id')
+        .eq('anuncio_id', anuncioId!)
+        .eq('solicitante_id', compradorId)
+        .eq('estado', 'pendiente');
+
+    if (existente.isNotEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Ya tienes una propuesta pendiente para este producto', style: GoogleFonts.lexend()),
+            backgroundColor: const Color(0xFFF36900),
+          ),
+        );
+      }
+      return;
+    }
+
+    await supabase.from('solicitudes_trueque').insert({
+      'anuncio_id': anuncioId,
+      'solicitante_id': compradorId,
+      'receptor_id': vendedorId,
+      'objeto_ofrecido': objetoOfrecido,
+      'estado': 'pendiente',
+    });
+
+    final compradorData = await supabase
+        .from('usuarios')
+        .select('primer_nombre, primer_apellido')
+        .eq('id', compradorId)
+        .maybeSingle();
+    final nombreComprador = compradorData != null
+        ? '${compradorData['primer_nombre']} ${compradorData['primer_apellido']}'
+        : 'Un usuario';
+
+    await supabase.from('notificaciones').insert({
+      'usuario_id': vendedorId,
+      'tipo': 'trueque',
+      'titulo': 'Nueva propuesta de trueque',
+      'mensaje': '$nombreComprador ofrece "$objetoOfrecido" por "$titulo"',
+      'leida': false,
+      'datos': {
+        'anuncio_id': anuncioId,
+        'solicitante_id': compradorId,
+        'nombre_otro': nombreComprador,
+      },
+    });
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('¡Propuesta enviada! El vendedor te responderá pronto.', style: GoogleFonts.lexend()),
+          backgroundColor: const Color(0xFF245000),
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
 }
 
 class _Badge extends StatelessWidget {
