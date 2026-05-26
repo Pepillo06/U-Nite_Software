@@ -31,26 +31,146 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
   final List<String> _universidades = [
     "No estoy estudiando actualmente",
     "Universidad Metropolitana",
+    "Universidad Católica Andrés Bello",
+    "Universidad Santa María",
+    "Universidad Central de Venezuela",
+    "Universidad Monteávila",
+    "Universidad Simón Bolívar",
   ];
 
-  // Mapa de Carreras de la UNIMET
-  final List<String> _carrerasUnimet = [
-    "Ingeniería de Sistemas",
-    "Ingeniería Eléctrica",
-    "Ingeniería Mecánica",
-    "Ingeniería Civil",
-    "Ingeniería de Producción",
-    "Ingeniería Química",
-    "Administración de Empresas",
-    "Contaduría Pública",
-    "Economía",
-    "Derecho",
-    "Psicología",
-    "Idiomas Modernos",
-    "Estudios Liberales",
-    "Diseño Gráfico",
-    "Educación",
-  ];
+  // Mapa de Carreras por Universidad
+  final Map<String, List<String>> _carrerasPorUniversidad = {
+    "Universidad Metropolitana": [
+      "Ingeniería de Sistemas",
+      "Ingeniería Eléctrica",
+      "Ingeniería Mecánica",
+      "Ingeniería Civil",
+      "Ingeniería de Producción",
+      "Ingeniería Química",
+      "Administración de Empresas",
+      "Contaduría Pública",
+      "Economía",
+      "Derecho",
+      "Psicología",
+      "Idiomas Modernos",
+      "Estudios Liberales",
+      "Diseño Gráfico",
+      "Educación",
+    ],
+    "Universidad Católica Andrés Bello": [
+      "Ingeniería Civil",
+      "Ingeniería Eléctrica",
+      "Ingeniería de Telecomunicaciones",
+      "Ingeniería Industrial",
+      "Ingeniería Informática",
+      "Administración de Empresas",
+      "Contaduría Pública",
+      "Economía",
+      "Relaciones Industriales",
+      "Comunicación Social",
+      "Derecho",
+      "Psicología",
+      "Educación",
+      "Filosofía",
+      "Teología",
+      "Letras",
+      "Sociología",
+      "Ciencias Políticas",
+      "Trabajo Social",
+      "Arquitectura",
+    ],
+    "Universidad Santa María": [
+      "Ingeniería Civil",
+      "Ingeniería Eléctrica",
+      "Ingeniería Industrial",
+      "Ingeniería de Sistemas",
+      "Ingeniería Mecánica",
+      "Arquitectura",
+      "Administración de Empresas",
+      "Contaduría Pública",
+      "Derecho",
+      "Farmacia",
+      "Odontología",
+    ],
+    "Universidad Central de Venezuela": [
+      "Ingeniería Civil",
+      "Ingeniería Eléctrica",
+      "Ingeniería Mecánica",
+      "Ingeniería Industrial",
+      "Ingeniería Química",
+      "Ingeniería Geológica",
+      "Ingeniería de Computación",
+      "Ingeniería de Petróleo",
+      "Ingeniería Geodésica",
+      "Arquitectura",
+      "Urbanismo",
+      "Administración de Empresas",
+      "Contaduría Pública",
+      "Economía",
+      "Estudios Internacionales",
+      "Trabajo Social",
+      "Sociología",
+      "Antropología",
+      "Geografía",
+      "Historia",
+      "Filosofía",
+      "Letras",
+      "Idiomas Modernos",
+      "Comunicación Social",
+      "Derecho",
+      "Psicología",
+      "Educación",
+      "Medicina",
+      "Farmacia",
+      "Odontología",
+      "Bioanálisis",
+      "Enfermería",
+      "Ciencias Biológicas",
+      "Química",
+      "Matemáticas",
+      "Física",
+      "Computación",
+      "Estadística",
+      "Agronomía",
+      "Veterinaria",
+    ],
+    "Universidad Monteávila": [
+      "Administración de Empresas",
+      "Comunicación Social",
+      "Derecho",
+      "Educación",
+      "Psicología",
+      "Ingeniería Informática",
+      "Filosofía",
+    ],
+    "Universidad Simón Bolívar": [
+      "Ingeniería de Computación",
+      "Ingeniería Eléctrica",
+      "Ingeniería Electrónica",
+      "Ingeniería Mecánica",
+      "Ingeniería Química",
+      "Ingeniería de Materiales",
+      "Ingeniería de Producción",
+      "Ingeniería Geofísica",
+      "Ingeniería Ambiental",
+      "Ingeniería de la Computación (Tecnológica)",
+      "Ingeniería Electrónica (Tecnológica)",
+      "Licenciatura en Ciencias de los Materiales",
+      "Licenciatura en Biología",
+      "Licenciatura en Química",
+      "Licenciatura en Física",
+      "Licenciatura en Matemáticas",
+      "Licenciatura en Computación",
+      "Licenciatura en Estadística",
+      "Arquitectura",
+      "Urbanismo",
+      "Diseño Industrial",
+      "Diseño Gráfico",
+      "Administración del Turismo",
+      "Administración de Aduanas y Comercio Exterior",
+      "Ciencias Ambientales",
+    ],
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -180,36 +300,29 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                               ),
                               const SizedBox(height: 25),
 
-                              // Carrera (Se habilita solo si es la UNIMET)
+                              // Carrera (Se habilita si la universidad tiene carreras disponibles)
                               _buildFormField(
                                 label: "CARRERA / FACULTAD",
                                 optionalText:
-                                    _selectedUniversidad ==
-                                        "Universidad Metropolitana"
+                                    _carrerasPorUniversidad.containsKey(_selectedUniversidad)
                                     ? null
                                     : "No disponible",
                                 hint:
-                                    _selectedUniversidad ==
-                                        "Universidad Metropolitana"
+                                    _carrerasPorUniversidad.containsKey(_selectedUniversidad)
                                     ? "Selecciona tu carrera"
                                     : "N/A",
                                 icon: Icons.menu_book,
                                 errorText: _carreraError,
                                 isDropdown: true,
-                                // Solo mostramos carreras si seleccionó UNIMET
                                 dropdownItems:
-                                    _selectedUniversidad ==
-                                        "Universidad Metropolitana"
-                                    ? _carrerasUnimet
-                                    : [],
+                                    _carrerasPorUniversidad[_selectedUniversidad] ?? [],
                                 selectedValue: _selectedCarrera,
                                 onChanged:
-                                    _selectedUniversidad ==
-                                        "Universidad Metropolitana"
+                                    _carrerasPorUniversidad.containsKey(_selectedUniversidad)
                                     ? (value) => setState(
                                         () => _selectedCarrera = value,
                                       )
-                                    : null, // Deshabilitado si no es la UNIMET
+                                    : null, // Deshabilitado si no hay carreras disponibles
                               ),
                               const SizedBox(height: 25),
                               _buildFormField(
@@ -276,8 +389,8 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
           setState(() {
             _universidadError = _selectedUniversidad == null ? "Selecciona una universidad" : null;
             
-            // Validamos carrera solo si seleccionó UNIMET
-            if (_selectedUniversidad == "Universidad Metropolitana") {
+            // Validamos carrera si la universidad seleccionada tiene carreras disponibles
+            if (_carrerasPorUniversidad.containsKey(_selectedUniversidad)) {
               _carreraError = _selectedCarrera == null ? "Selecciona tu carrera" : null;
             } else {
               _carreraError = null;

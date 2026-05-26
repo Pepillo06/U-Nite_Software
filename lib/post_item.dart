@@ -31,7 +31,17 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
 
   String? _selectedCategory;
   String? _selectedCondition;
-  bool _campusPickup = true;
+  final Set<String> _selectedCampusUniversidades = {};
+
+  // Lista de universidades disponibles para entrega en campus
+  final List<String> _universidadesCampus = [
+    "Universidad Metropolitana",
+    "Universidad Católica Andrés Bello",
+    "Universidad Santa María",
+    "Universidad Central de Venezuela",
+    "Universidad Monteávila",
+    "Universidad Simón Bolívar",
+  ];
   bool _isLoading = false;
   bool _acceptsTrade = false;
   String? _titleError;
@@ -51,9 +61,9 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
       case 'Nuevo':
         return 'Nuevo';
       case 'Como nuevo':
-        return 'Usado - Como nuevo';
+        return 'Como nuevo';
       case 'Bueno':
-        return 'Usado - Buen estado';
+        return 'Bueno';
       case 'Regular':
         return 'Regular';
       default:
@@ -151,7 +161,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
           'descripcion': _tradeForController.text.trim(),
         };
       }
-      modalidades['campus_pickup'] = _campusPickup;
+      modalidades['campus_pickup'] = _selectedCampusUniversidades.toList();
       modalidades['imagenes'] = imageUrls;
 
       // 3. Insertar el anuncio en la tabla
@@ -1479,47 +1489,87 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
         borderRadius: BorderRadius.circular(10),
       ),
       padding: const EdgeInsets.all(25.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Encabezado
           Row(
             children: [
               const Icon(Icons.location_on, color: Color(0xFFA5B2BC), size: 24),
-              const SizedBox(width: 15),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Entrega solo en el campus',
-                    style: TextStyle(
-                      //fontFamily: 'Outfit',
-                      fontSize: 18,
-                      color: Color(0xFF2E3137),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'Disponible en la Universidad Metropolitana',
-                    style: TextStyle(
-                      //fontFamily: 'Outfit',
-                      fontSize: 16,
-                      color: const Color(0xFF5F6F5A),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              const Text(
+                'Entrega en campus',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Color(0xFF2E3137),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
-          Checkbox(
-            value: _campusPickup,
-            onChanged: (val) {
-              setState(() {
-                _campusPickup = val!;
-              });
-            },
-            activeColor: primaryOrange,
-            side: const BorderSide(color: Color(0xFFE0E0E0)),
+          const SizedBox(height: 6),
+          const Padding(
+            padding: EdgeInsets.only(left: 36),
+            child: Text(
+              'Selecciona en qué universidades puedes hacer la entrega.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF5F6F5A),
+              ),
+            ),
           ),
+          const SizedBox(height: 16),
+          // Lista de universidades con checkboxes
+          ..._universidadesCampus.map((uni) {
+            final isSelected = _selectedCampusUniversidades.contains(uni);
+            return InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selectedCampusUniversidades.remove(uni);
+                  } else {
+                    _selectedCampusUniversidades.add(uni);
+                  }
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: isSelected,
+                      onChanged: (val) {
+                        setState(() {
+                          if (val == true) {
+                            _selectedCampusUniversidades.add(uni);
+                          } else {
+                            _selectedCampusUniversidades.remove(uni);
+                          }
+                        });
+                      },
+                      activeColor: primaryOrange,
+                      side: const BorderSide(color: Color(0xFFE0E0E0)),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      uni,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isSelected
+                            ? const Color(0xFF2E3137)
+                            : const Color(0xFF8C95A3),
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
