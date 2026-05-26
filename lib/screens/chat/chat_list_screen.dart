@@ -114,7 +114,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
         _loading = false;
       });
 
-      // Si viene con conversación inicial, buscarla y seleccionarla
       if (widget.conversacionInicial != null) {
         final idx = resultado.indexWhere(
             (c) => c['id'] == widget.conversacionInicial);
@@ -179,7 +178,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildMobileLayout() {
-    // Si viene con conversación inicial en móvil, ir directo al chat
     if (widget.conversacionInicial != null && _loading == false) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.push(
@@ -280,7 +278,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           conversacionId: _chatsFiltrados[idx]['id'],
                           nombreOtro: _chatsFiltrados[idx]['otro_nombre'],
                           otroUserId: _chatsFiltrados[idx]['otro_id'],
-                          anuncioId: _chatsFiltrados[idx]['anuncio_id'],
+                          anuncioId: (_selectedIndex == 0 ||
+                                      _chatsFiltrados[idx]['id'] == widget.conversacionInicial) &&
+                                      widget.anuncioIdInicial != null
+                              ? widget.anuncioIdInicial
+                              : _chatsFiltrados[idx]['anucio_id'],
                           showAppBar: false,
                         ),
         ),

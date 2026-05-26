@@ -1261,6 +1261,11 @@ void _mostrarDetalleAnuncio(
                                         String conversacionId;
                                         if (existentes.isNotEmpty) {
                                           conversacionId = existentes.first['id'];
+                                          // Actualizar el anuncio_id al producto actual
+                                          await supabase
+                                              .from('conversaciones')
+                                              .update({'anuncio_id': anuncioId})
+                                              .eq('id', conversacionId);
                                         } else {
                                           final nueva = await supabase
                                               .from('conversaciones')
@@ -1283,12 +1288,37 @@ void _mostrarDetalleAnuncio(
                                         final nombreVendedor = vendedorData != null
                                             ? '${vendedorData['primer_nombre']} ${vendedorData['primer_apellido']}'
                                             : 'Vendedor';
+                                            // Obtener nombre del comprador
+                                            final compradorData = await supabase
+                                                .from('usuarios')
+                                                .select('primer_nombre, primer_apellido')
+                                                .eq('id', compradorId)
+                                                .maybeSingle();
 
+                                            final nombreComprador = compradorData != null
+                                                ? '${compradorData['primer_nombre']} ${compradorData['primer_apellido']}'
+                                                : 'Un usuario';
+
+                                        // Crear notificación al vendedor
+                                        try {
+                                          await supabase.from('notificaciones').insert({
+                                            'usuario_id': vendedorId,
+                                            'tipo': 'contacto',
+                                            'titulo': 'Nuevo mensaje sobre tu producto',
+                                            'mensaje': '$nombreComprador preguntó por "$titulo"',
+                                            'leida': false,
+                                            'datos': {
+                                              'conversacion_id': conversacionId,
+                                              'nombre_otro': nombreVendedor,
+                                              'otro_user_id': compradorId,
+                                              'anuncio_id': anuncioId,
+                                            },
+                                          });
+                                        } catch (_) {}
                                         // Guardar el navigator antes de cerrar el dialog
                                         final nav = Navigator.of(context);
                                         nav.pop(); // cierra el dialog
-
-                                       nav.push(
+                                        nav.push(
                                         MaterialPageRoute(
                                           builder: (_) => ChatListScreen(
                                             conversacionInicial: conversacionId,

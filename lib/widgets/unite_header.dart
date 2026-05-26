@@ -5,6 +5,7 @@ import '../market.dart';
 import '../login_page.dart';
 import '../profile_page.dart';
 import '../screens/chat/chat_list_screen.dart';
+import '../screens/chat/notifications_screen.dart';
 
 class UniteHeader extends StatefulWidget implements PreferredSizeWidget {
   final int currentIndex;
@@ -26,13 +27,16 @@ class _UniteHeaderState extends State<UniteHeader> {
   String? _nombreCompleto;
   String? _fotoPerfilUrl;
   int _mensajesPendientes = 0;
+  int _notificacionesPendientes = 0;
 
   @override
   void initState() {
     super.initState();
     _cargarUsuario();
     _cargarMensajesPendientes();
+    _cargarNotificacionesPendientes();
     _suscribirseAMensajes();
+    _suscribirseANotificaciones();
   }
 
   Future<void> _cargarUsuario() async {
@@ -41,7 +45,6 @@ class _UniteHeaderState extends State<UniteHeader> {
     try {
       final data = await _supabase
           .from('usuarios')
-          // --- MODIFICAR ESTA LÍNEA PARA AGREGAR 'foto_perfil_url' ---
           .select('primer_nombre, primer_apellido, foto_perfil_url')
           .eq('id', user.id)
           .maybeSingle();
@@ -50,8 +53,7 @@ class _UniteHeaderState extends State<UniteHeader> {
         setState(() {
           _nombreCompleto =
               "${data['primer_nombre'] ?? ''} ${data['primer_apellido'] ?? ''}";
-          // --- AGREGAR ESTA LÍNEA ---
-          _fotoPerfilUrl = data['foto_perfil_url']; 
+          _fotoPerfilUrl = data['foto_perfil_url'];
         });
       }
     } catch (e) {
@@ -71,6 +73,19 @@ class _UniteHeaderState extends State<UniteHeader> {
     }
   }
 
+  Future<void> _cargarNotificacionesPendientes() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final data = await _supabase
+          .from('notificaciones')
+          .select('id')
+          .eq('usuario_id', userId)
+          .eq('leida', false);
+      setState(() => _notificacionesPendientes = data.length);
+    } catch (_) {}
+  }
+
   void _suscribirseAMensajes() {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
@@ -87,6 +102,26 @@ class _UniteHeaderState extends State<UniteHeader> {
           schema: 'public',
           table: 'mensajes',
           callback: (_) => _cargarMensajesPendientes(),
+        )
+        .subscribe();
+  }
+
+  void _suscribirseANotificaciones() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    _supabase
+        .channel('header_notif_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notificaciones',
+          callback: (_) => _cargarNotificacionesPendientes(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'notificaciones',
+          callback: (_) => _cargarNotificacionesPendientes(),
         )
         .subscribe();
   }
@@ -168,7 +203,6 @@ class _UniteHeaderState extends State<UniteHeader> {
                   ),
                 ),
                 const SizedBox(width: 32),
-                // _NavLinkActivo(label: 'StudyMatch', isActive: false, onTap: () {}),
               ],
             ),
 
@@ -177,14 +211,67 @@ class _UniteHeaderState extends State<UniteHeader> {
           // Íconos y acciones
           Row(
             children: [
-              // Notificaciones
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined,
-                    color: Color(0xFF4A4A4A), size: 22),
-                onPressed: () {},
+              // Notificaciones con badge y subrayado naranja
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    decoration: widget.currentIndex == 3
+                        ? const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Color(0xFFFF6100),
+                                width: 3,
+                              ),
+                            ),
+                          )
+                        : null,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.notifications_outlined,
+                        color: widget.currentIndex == 3
+                            ? const Color(0xFFFF6100)
+                            : const Color(0xFF4A4A4A),
+                        size: 22,
+                      ),
+                      onPressed: () {
+                        if (_verificarAutenticacion()) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const NotificationsScreen()),
+                          ).then((_) => _cargarNotificacionesPendientes());
+                        }
+                      },
+                    ),
+                  ),
+                  if (_notificacionesPendientes > 0)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFF6100),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$_notificacionesPendientes',
+                            style: GoogleFonts.lexend(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
 
-              // Mensajes
+              // Mensajes con badge
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -244,13 +331,6 @@ class _UniteHeaderState extends State<UniteHeader> {
                 ],
               ),
 
-              // Carrito
-              // IconButton(
-              //   icon: const Icon(Icons.shopping_cart_outlined,
-              //       color: Color(0xFF4A4A4A), size: 22),
-              //   onPressed: () {},
-              // ),
-
               const SizedBox(width: 8),
 
               // Avatar + nombre
@@ -265,29 +345,24 @@ class _UniteHeaderState extends State<UniteHeader> {
                 },
                 child: Row(
                   children: [
-                    // CircleAvatar(
-                    //   radius: 18,
-                    //   backgroundColor: const Color(0xFFE3BFB1),
-                    //   child: const Icon(Icons.person,
-                    //       color: Color(0xFF5B4137), size: 20),
-                    // ),
                     if (!isMobile && _nombreCompleto != null) ...[
-                      // Usamos un Row para que la foto y el texto del saludo estén pegados
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Pequeño círculo para la foto de perfil
                           CircleAvatar(
-                            radius: 21, // Tamaño discreto para el header
+                            radius: 21,
                             backgroundColor: Colors.grey[200],
-                            backgroundImage: _fotoPerfilUrl != null && _fotoPerfilUrl!.isNotEmpty
+                            backgroundImage: _fotoPerfilUrl != null &&
+                                    _fotoPerfilUrl!.isNotEmpty
                                 ? NetworkImage(_fotoPerfilUrl!)
                                 : null,
-                            child: _fotoPerfilUrl == null || _fotoPerfilUrl!.isEmpty
-                                ? const Icon(Icons.person, size: 18, color: Colors.grey)
+                            child: _fotoPerfilUrl == null ||
+                                    _fotoPerfilUrl!.isEmpty
+                                ? const Icon(Icons.person,
+                                    size: 18, color: Colors.grey)
                                 : null,
                           ),
-                          const SizedBox(width: 8), // Separación entre la foto y el texto
+                          const SizedBox(width: 8),
                           Text(
                             "$_nombreCompleto",
                             style: GoogleFonts.lexend(
@@ -299,6 +374,20 @@ class _UniteHeaderState extends State<UniteHeader> {
                         ],
                       ),
                       const SizedBox(width: 16),
+                    ] else if (isMobile) ...[
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Colors.grey[200],
+                        backgroundImage: _fotoPerfilUrl != null &&
+                                _fotoPerfilUrl!.isNotEmpty
+                            ? NetworkImage(_fotoPerfilUrl!)
+                            : null,
+                        child: _fotoPerfilUrl == null ||
+                                _fotoPerfilUrl!.isEmpty
+                            ? const Icon(Icons.person,
+                                size: 18, color: Colors.grey)
+                            : null,
+                      ),
                     ],
                   ],
                 ),
