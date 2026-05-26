@@ -31,6 +31,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
   List<Map<String, dynamic>> _solicitudesTrueque = [];
   bool _loading = true;
   bool _bandejaTruequeExpandida = false;
+  bool _navegacionInicialHecha = false;
+  String? _conversacionActivaId;
 
   void _marcarConversacionLeida(String conversacionId) {
     setState(() {
@@ -95,13 +97,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // 1. Actualizar estado
       await _supabase
           .from('solicitudes_trueque')
           .update({'estado': nuevoEstado})
           .eq('id', solicitudId);
 
-      // 2. Obtener nombre del vendedor
       final vendedorData = await _supabase
           .from('usuarios')
           .select('primer_nombre, primer_apellido')
@@ -111,7 +111,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ? '${vendedorData['primer_nombre']} ${vendedorData['primer_apellido']}'
           : 'El vendedor';
 
-      // 3. Notificar al solicitante
       final mensajeNotif = nuevoEstado == 'aceptado'
           ? '$nombreVendedor aceptó tu propuesta de trueque por "$tituloAnuncio"'
           : '$nombreVendedor rechazó tu propuesta de trueque por "$tituloAnuncio"';
@@ -130,7 +129,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
         },
       });
 
-      // 4. Si acepta → crear conversación + mensaje automático + navegar
       if (nuevoEstado == 'aceptado') {
         final existentes = await _supabase
             .from('conversaciones')
@@ -153,7 +151,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
           conversacionId = nueva['id'];
         }
 
-        // Mensaje automático
         await _supabase.from('mensajes').insert({
           'conversacion_id': conversacionId,
           'remitente_id': userId,
@@ -161,7 +158,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
               '✅ ¡He aceptado tu propuesta de trueque por "$tituloAnuncio"! Podemos coordinar los detalles aquí.',
         });
 
-        // Obtener nombre del solicitante para mostrarlo en el chat
         final solicitanteData = await _supabase
             .from('usuarios')
             .select('primer_nombre, primer_apellido')
@@ -175,7 +171,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
         await _loadConversaciones();
 
         if (mounted) {
-          // Navegar a ChatListScreen con la conversación abierta
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -285,12 +280,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
         _loading = false;
       });
 
-      if (widget.conversacionInicial != null) {
-        final idx = resultado.indexWhere(
-            (c) => c['id'] == widget.conversacionInicial);
-        if (idx != -1) {
-          setState(() => _selectedIndex = idx);
-        }
+      // Si hay una conversación seleccionada manualmente, mantenerla
+      if (_conversacionActivaId != null) {
+        final idx = resultado.indexWhere((c) => c['id'] == _conversacionActivaId);
+        if (idx != -1) setState(() => _selectedIndex = idx);
+      } else if (widget.conversacionInicial != null) {
+        final idx = resultado.indexWhere((c) => c['id'] == widget.conversacionInicial);
+        if (idx != -1) setState(() => _selectedIndex = idx);
       }
     } catch (e) {
       setState(() => _loading = false);
@@ -350,7 +346,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildMobileLayout() {
-    if (widget.conversacionInicial != null && _loading == false) {
+    if (widget.conversacionInicial != null &&
+        _loading == false &&
+        !_navegacionInicialHecha) {
+      _navegacionInicialHecha = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.push(
           context,
@@ -417,7 +416,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     if (_solicitudesTrueque.isNotEmpty) _buildBandejaTrueque(),
                     ..._buildChatListItems(
                       onTap: (i) {
-                        setState(() => _selectedIndex = i);
+                        setState(() {
+                          _selectedIndex = i;
+                          _conversacionActivaId = _chatsFiltrados[i]['id'];
+                        });
                         _marcarLeidosDesktop(i);
                       },
                     ),
@@ -460,9 +462,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           conversacionId: _chatsFiltrados[idx]['id'],
                           nombreOtro: _chatsFiltrados[idx]['otro_nombre'],
                           otroUserId: _chatsFiltrados[idx]['otro_id'],
-                          anuncioId: (_selectedIndex == 0 ||
-                                      _chatsFiltrados[idx]['id'] ==
-                                          widget.conversacionInicial) &&
+                          anuncioId: _conversacionActivaId == null &&
                                   widget.anuncioIdInicial != null
                               ? widget.anuncioIdInicial
                               : _chatsFiltrados[idx]['anuncio_id'],
