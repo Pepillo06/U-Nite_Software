@@ -662,7 +662,7 @@ class _TarjetaProducto extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                       ),
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
@@ -708,10 +708,15 @@ class _TarjetaProducto extends StatelessWidget {
 // ------------------------------------------
 // Tarjeta de Anuncio (datos desde Supabase)
 // ------------------------------------------
+// ------------------------------------------
+// Tarjeta de Anuncio (datos desde Supabase)
+// ------------------------------------------
 class _TarjetaAnuncio extends StatelessWidget {
   final Map<String, dynamic> anuncio;
   const _TarjetaAnuncio({required this.anuncio});
 
+  // --- 1. FUNCIONES AUXILIARES (Deben estar dentro de la clase) ---
+  
   String _getPrecio() {
     final modalidades =
         anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
@@ -743,11 +748,14 @@ class _TarjetaAnuncio extends StatelessWidget {
     return estado == 'nuevo';
   }
 
+  // AQUÍ ESTÁ LA FUNCIÓN QUE TE MARCABA ERROR
   String _getEstadoBadge() {
     final estado = (anuncio['estado_producto'] ?? '').toString();
     if (estado.isEmpty) return 'Usado';
     return estado[0].toUpperCase() + estado.substring(1);
   }
+
+  // --- 2. MÉTODO BUILD (La interfaz visual) ---
 
   @override
   Widget build(BuildContext context) {
@@ -776,9 +784,8 @@ class _TarjetaAnuncio extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Imagen
+            // IMAGEN Y BADGE
             Expanded(
-              flex: 5,
               child: Stack(
                 children: [
                   SizedBox(
@@ -816,7 +823,7 @@ class _TarjetaAnuncio extends StatelessWidget {
                             ),
                     ),
                   ),
-                  // Badge de condición
+                  // EL BADGE DE "NUEVO/USADO"
                   Positioned(
                     top: 12,
                     right: 12,
@@ -830,7 +837,7 @@ class _TarjetaAnuncio extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        _getEstadoBadge(),
+                        _getEstadoBadge(), // Se llama a la función aquí
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -841,55 +848,56 @@ class _TarjetaAnuncio extends StatelessWidget {
                 ],
               ),
             ),
-            // Info
-            Expanded(
-              flex: 3,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      anuncio['titulo'] ?? '',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+            
+            // TEXTOS CON MAXLINES: 1
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    anuncio['titulo'] ?? '',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14, 
                     ),
-                    Text(
-                      _getPrecio(),
-                      style: const TextStyle(
-                        color: UColors.greenDark,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
+                    maxLines: 1, 
+                    overflow: TextOverflow.ellipsis, 
+                  ),
+                  const SizedBox(height: 6), 
+                  Text(
+                    _getPrecio(),
+                    style: const TextStyle(
+                      color: UColors.greenDark,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16, 
                     ),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 16,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            anuncio['categoria'] ?? '',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                    maxLines: 1, 
+                    overflow: TextOverflow.ellipsis, 
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          anuncio['categoria'] ?? '',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
