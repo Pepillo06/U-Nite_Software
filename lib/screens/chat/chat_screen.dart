@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:file_picker/file_picker.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversacionId;
@@ -29,6 +30,8 @@ class _ChatScreenState extends State<ChatScreen> {
   List<Map<String, dynamic>> _mensajes = [];
   Map<String, dynamic>? _anuncio;
   bool _loading = true;
+  // Preview del producto en el input (estilo WhatsApp)
+  bool _mostrarPreviewProducto = false;
 
   @override
   void initState() {
@@ -61,8 +64,6 @@ class _ChatScreenState extends State<ChatScreen> {
         .eq('conversacion_id', widget.conversacionId)
         .eq('leido', false)
         .neq('remitente_id', userId);
-
-    // Marcar notificaciones de esta conversación como leídas
     try {
       await _supabase
           .from('notificaciones')
@@ -77,13 +78,22 @@ class _ChatScreenState extends State<ChatScreen> {
     if (widget.anuncioId == null) return;
     final data = await _supabase
         .from('anuncios_marketplace')
-        .select('titulo, detalles_modalidades')
+        .select('titulo, detalles_modalidades, vendedor_id')
         .eq('id', widget.anuncioId!)
         .maybeSingle();
-    if (data != null) setState(() => _anuncio = data);
+    if (data != null) {
+      setState(() {
+        _anuncio = data;
+        // Solo mostrar preview si el usuario actual NO es el vendedor
+        final userId = _supabase.auth.currentUser?.id;
+        final vendedorId = data['vendedor_id']?.toString() ?? '';
+        _mostrarPreviewProducto = userId != vendedorId;
+      });
+    }
   }
 
   String _getPrecioAnuncio() {
+    if (_anuncio == null) return '';
     final modalidades =
         _anuncio!['detalles_modalidades'] as Map<String, dynamic>? ?? {};
     if (modalidades.containsKey('venta')) {
@@ -103,6 +113,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   String _getImagenAnuncio() {
+    if (_anuncio == null) return '';
     final modalidades =
         _anuncio!['detalles_modalidades'] as Map<String, dynamic>? ?? {};
     final imagenes = modalidades['imagenes'] as List<dynamic>? ?? [];
@@ -159,13 +170,22 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    // Si hay preview de producto activa, incluir referencia al producto
+    String contenido = text;
+    if (_mostrarPreviewProducto && _anuncio != null) {
+      final titulo = _anuncio!['titulo'] ?? '';
+      final precio = _getPrecioAnuncio();
+      final imagen = _getImagenAnuncio();
+      contenido = '[producto:$titulo|$precio|$imagen]$text';
+      setState(() => _mostrarPreviewProducto = false);
+    }
+
     await _supabase.from('mensajes').insert({
       'conversacion_id': widget.conversacionId,
       'remitente_id': userId,
-      'contenido': text,
+      'contenido': contenido,
     });
 
-    // Notificar al otro usuario
     try {
       final otroUserId = widget.otroUserId;
       final userData = await _supabase
@@ -194,18 +214,63 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _adjuntarArchivo() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Función de archivos disponible en la app móvil',
-          style: GoogleFonts.lexend(color: Colors.white, fontSize: 13),
-        ),
-        backgroundColor: const Color(0xFFF36900),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      final result = await FilePicker.pickFiles(
+        allowMultiple: false,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      if (file.bytes == null) return;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Subiendo archivo...', style: GoogleFonts.lexend()),
+            backgroundColor: const Color(0xFFF36900),
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
+
+      final extension = file.extension ?? 'bin';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+      final path = '$userId/$fileName';
+
+      await _supabase.storage
+          .from('chat_archivos')
+          .uploadBinary(path, file.bytes!);
+
+      final url = _supabase.storage
+          .from('chat_archivos')
+          .getPublicUrl(path);
+
+      if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      final esImagen = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+          .contains(extension.toLowerCase());
+
+      final contenido =
+          esImagen ? '[imagen]$url' : '[archivo:${file.name}]$url';
+
+      await _supabase.from('mensajes').insert({
+        'conversacion_id': widget.conversacionId,
+        'remitente_id': userId,
+        'contenido': contenido,
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 
   String _formatHora(String timestamp) {
@@ -246,12 +311,14 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFF36900)))
+                    child: CircularProgressIndicator(
+                        color: Color(0xFFF36900)))
                 : _mensajes.isEmpty
                     ? Center(
                         child: Text('Sé el primero en escribir 👋',
                             style: GoogleFonts.lexend(
-                                color: const Color(0xFF5B4137), fontSize: 14)))
+                                color: const Color(0xFF5B4137),
+                                fontSize: 14)))
                     : ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.symmetric(
@@ -334,6 +401,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // Header desktop SIN el card del producto
   Widget _buildDesktopChatHeader(String inicial) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -396,69 +464,6 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ],
           ),
-          const Spacer(),
-          if (_anuncio != null)
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F3F3),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE3BFB1)),
-              ),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: _getImagenAnuncio().isNotEmpty
-                        ? Image.network(
-                            _getImagenAnuncio(),
-                            width: 40,
-                            height: 40,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE3BFB1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.shopping_bag_outlined,
-                                  color: Color(0xFF5B4137), size: 22),
-                            ),
-                          )
-                        : Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE3BFB1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.shopping_bag_outlined,
-                                color: Color(0xFF5B4137), size: 22),
-                          ),
-                  ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(_anuncio!['titulo'] ?? '',
-                          style: GoogleFonts.lexend(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF1A1A1A))),
-                      Text(
-                        _getPrecioAnuncio(),
-                        style: GoogleFonts.lexend(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFFF36900)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
@@ -492,47 +497,136 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildInputBar() {
+  // Preview del producto estilo WhatsApp encima del input
+  Widget _buildPreviewProducto() {
+    if (!_mostrarPreviewProducto || _anuncio == null) return const SizedBox();
+    final titulo = _anuncio!['titulo'] ?? '';
+    final precio = _getPrecioAnuncio();
+    final imagen = _getImagenAnuncio();
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE3BFB1))),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F3F3),
+        border: const Border(
+          top: BorderSide(color: Color(0xFFE3BFB1)),
+          left: BorderSide(color: Color(0xFFF36900), width: 3),
+        ),
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.attach_file_rounded,
-                color: Color(0xFF5B4137), size: 22),
-            onPressed: _adjuntarArchivo,
-          ),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFFBF9F9),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFE3BFB1)),
-              ),
-              child: TextField(
-                controller: _controller,
-                style: GoogleFonts.lexend(
-                    fontSize: 14, color: const Color(0xFF1A1A1A)),
-                decoration: InputDecoration(
-                  hintText: 'Escribe un mensaje...',
-                  hintStyle: GoogleFonts.lexend(
-                      color: const Color(0xFF5B4137), fontSize: 14),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
+          if (imagen.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.network(
+                imagen,
+                width: 44,
+                height: 44,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 44,
+                  height: 44,
+                  color: const Color(0xFFE3BFB1),
+                  child: const Icon(Icons.shopping_bag_outlined,
+                      color: Color(0xFF5B4137), size: 20),
                 ),
-                onSubmitted: (_) => _enviar(),
               ),
+            )
+          else
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE3BFB1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.shopping_bag_outlined,
+                  color: Color(0xFF5B4137), size: 20),
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  titulo,
+                  style: GoogleFonts.lexend(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1A1A1A),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  precio,
+                  style: GoogleFonts.lexend(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFF36900),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: 8),
-          _SendButton(onPressed: _enviar),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18, color: Color(0xFF5B4137)),
+            onPressed: () => setState(() => _mostrarPreviewProducto = false),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInputBar() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildPreviewProducto(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xFFE3BFB1))),
+          ),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.attach_file_rounded,
+                    color: Color(0xFF5B4137), size: 22),
+                onPressed: _adjuntarArchivo,
+              ),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFBF9F9),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFFE3BFB1)),
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    style: GoogleFonts.lexend(
+                        fontSize: 14, color: const Color(0xFF1A1A1A)),
+                    decoration: InputDecoration(
+                      hintText: 'Escribe un mensaje...',
+                      hintStyle: GoogleFonts.lexend(
+                          color: const Color(0xFF5B4137), fontSize: 14),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                    onSubmitted: (_) => _enviar(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _SendButton(onPressed: _enviar),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -567,7 +661,8 @@ class _SendButtonState extends State<_SendButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         margin: EdgeInsets.only(top: _pressed ? 4 : 0),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFFFF6100),
           borderRadius: BorderRadius.circular(16),
@@ -608,6 +703,172 @@ class _BurbujaMensaje extends StatelessWidget {
     required this.isMe,
   });
 
+  // Parsea el prefijo [producto:titulo|precio|imagen]
+  Map<String, String>? _parsearProducto() {
+    if (!texto.startsWith('[producto:')) return null;
+    final endIdx = texto.indexOf(']');
+    if (endIdx == -1) return null;
+    final partes = texto.substring(10, endIdx).split('|');
+    if (partes.length < 2) return null;
+    return {
+      'titulo': partes[0],
+      'precio': partes[1],
+      'imagen': partes.length > 2 ? partes[2] : '',
+      'texto': texto.substring(endIdx + 1),
+    };
+  }
+
+  Widget _buildContenidoMensaje(BuildContext context) {
+    // Mensaje con referencia a producto
+    final producto = _parsearProducto();
+    if (producto != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Preview del producto
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isMe
+                  ? const Color(0xFFFF9070).withOpacity(0.4)
+                  : const Color(0xFFD0CFC9),
+              borderRadius: BorderRadius.circular(8),
+              border: Border(
+                left: BorderSide(
+                  color: isMe
+                      ? const Color(0xFFFF6100)
+                      : const Color(0xFF5B4137),
+                  width: 3,
+                ),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (producto['imagen']!.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      producto['imagen']!,
+                      width: 36,
+                      height: 36,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(
+                          Icons.shopping_bag_outlined,
+                          size: 16),
+                    ),
+                  )
+                else
+                  const Icon(Icons.shopping_bag_outlined, size: 16),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        producto['titulo']!,
+                        style: GoogleFonts.lexend(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isMe
+                              ? const Color(0xFF370E00)
+                              : const Color(0xFF1B1C1C),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        producto['precio']!,
+                        style: GoogleFonts.lexend(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isMe
+                              ? const Color(0xFFCC4D00)
+                              : const Color(0xFF5B4137),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (producto['texto']!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              producto['texto']!,
+              style: GoogleFonts.lexend(
+                fontSize: 14,
+                color: isMe
+                    ? const Color(0xFF370E00)
+                    : const Color(0xFF1B1C1C),
+                height: 1.5,
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // Imagen
+    if (texto.startsWith('[imagen]')) {
+      final url = texto.replaceFirst('[imagen]', '');
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          url,
+          width: 200,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Text(
+            '📎 Imagen no disponible',
+            style: GoogleFonts.lexend(fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    // Archivo
+    if (texto.startsWith('[archivo:')) {
+      final match = RegExp(r'\[archivo:(.+?)\](.+)').firstMatch(texto);
+      final nombre = match?.group(1) ?? 'Archivo';
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.attach_file,
+            size: 16,
+            color: isMe
+                ? const Color(0xFF370E00)
+                : const Color(0xFF1B1C1C),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              nombre,
+              style: GoogleFonts.lexend(
+                fontSize: 13,
+                color: isMe
+                    ? const Color(0xFF370E00)
+                    : const Color(0xFF1B1C1C),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Texto normal
+    return Text(
+      texto,
+      style: GoogleFonts.lexend(
+        fontSize: 14,
+        color: isMe ? const Color(0xFF370E00) : const Color(0xFF1B1C1C),
+        height: 1.5,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Align(
@@ -620,8 +881,8 @@ class _BurbujaMensaje extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 4),
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.65),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isMe
                   ? const Color(0xFFFFB598)
@@ -633,13 +894,7 @@ class _BurbujaMensaje extends StatelessWidget {
                 bottomRight: Radius.circular(isMe ? 4 : 16),
               ),
             ),
-            child: Text(texto,
-                style: GoogleFonts.lexend(
-                    fontSize: 14,
-                    color: isMe
-                        ? const Color(0xFF370E00)
-                        : const Color(0xFF1B1C1C),
-                    height: 1.5)),
+            child: _buildContenidoMensaje(context),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),

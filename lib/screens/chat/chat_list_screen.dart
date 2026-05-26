@@ -28,7 +28,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   List<Map<String, dynamic>> _conversaciones = [];
+  List<Map<String, dynamic>> _solicitudesTrueque = [];
   bool _loading = true;
+  bool _bandejaTruequeExpandida = false;
+  bool _navegacionInicialHecha = false;
+  String? _conversacionActivaId;
 
   void _marcarConversacionLeida(String conversacionId) {
     setState(() {
@@ -46,6 +50,156 @@ class _ChatListScreenState extends State<ChatListScreen> {
   void initState() {
     super.initState();
     _loadConversaciones();
+    _loadSolicitudesTrueque();
+  }
+
+  Future<void> _loadSolicitudesTrueque() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final data = await _supabase
+          .from('solicitudes_trueque')
+          .select('id, objeto_ofrecido, estado, creado_en, anuncio_id, solicitante_id')
+          .eq('receptor_id', userId)
+          .eq('estado', 'pendiente')
+          .order('creado_en', ascending: false);
+
+      final List<Map<String, dynamic>> resultado = [];
+      for (final sol in data) {
+        final solicitanteData = await _supabase
+            .from('usuarios')
+            .select('id, primer_nombre, primer_apellido')
+            .eq('id', sol['solicitante_id'])
+            .maybeSingle();
+
+        final anuncioData = await _supabase
+            .from('anuncios_marketplace')
+            .select('titulo')
+            .eq('id', sol['anuncio_id'])
+            .maybeSingle();
+
+        resultado.add({
+          ...sol,
+          'solicitante': solicitanteData,
+          'anuncio': anuncioData,
+        });
+      }
+
+      setState(() => _solicitudesTrueque = resultado);
+    } catch (e) {
+      debugPrint('Error cargando solicitudes trueque: $e');
+    }
+  }
+
+  Future<void> _responderTrueque(String solicitudId, String nuevoEstado,
+      String solicitanteId, String tituloAnuncio) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      await _supabase
+          .from('solicitudes_trueque')
+          .update({'estado': nuevoEstado})
+          .eq('id', solicitudId);
+
+      final vendedorData = await _supabase
+          .from('usuarios')
+          .select('primer_nombre, primer_apellido')
+          .eq('id', userId)
+          .maybeSingle();
+      final nombreVendedor = vendedorData != null
+          ? '${vendedorData['primer_nombre']} ${vendedorData['primer_apellido']}'
+          : 'El vendedor';
+
+      final mensajeNotif = nuevoEstado == 'aceptado'
+          ? '$nombreVendedor aceptó tu propuesta de trueque por "$tituloAnuncio"'
+          : '$nombreVendedor rechazó tu propuesta de trueque por "$tituloAnuncio"';
+
+      await _supabase.from('notificaciones').insert({
+        'usuario_id': solicitanteId,
+        'tipo': 'trueque',
+        'titulo': nuevoEstado == 'aceptado'
+            ? '¡Propuesta de trueque aceptada!'
+            : 'Propuesta de trueque rechazada',
+        'mensaje': mensajeNotif,
+        'leida': false,
+        'datos': {
+          'solicitante_id': solicitanteId,
+          'nombre_otro': nombreVendedor,
+        },
+      });
+
+      if (nuevoEstado == 'aceptado') {
+        final existentes = await _supabase
+            .from('conversaciones')
+            .select('id')
+            .eq('comprador_id', solicitanteId)
+            .eq('vendedor_id', userId);
+
+        String conversacionId;
+        if (existentes.isNotEmpty) {
+          conversacionId = existentes.first['id'];
+        } else {
+          final nueva = await _supabase
+              .from('conversaciones')
+              .insert({
+                'comprador_id': solicitanteId,
+                'vendedor_id': userId,
+              })
+              .select('id')
+              .single();
+          conversacionId = nueva['id'];
+        }
+
+        await _supabase.from('mensajes').insert({
+          'conversacion_id': conversacionId,
+          'remitente_id': userId,
+          'contenido':
+              '✅ ¡He aceptado tu propuesta de trueque por "$tituloAnuncio"! Podemos coordinar los detalles aquí.',
+        });
+
+        final solicitanteData = await _supabase
+            .from('usuarios')
+            .select('primer_nombre, primer_apellido')
+            .eq('id', solicitanteId)
+            .maybeSingle();
+        final nombreSolicitante = solicitanteData != null
+            ? '${solicitanteData['primer_nombre']} ${solicitanteData['primer_apellido']}'
+            : 'Usuario';
+
+        await _loadSolicitudesTrueque();
+        await _loadConversaciones();
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatListScreen(
+                conversacionInicial: conversacionId,
+                nombreInicial: nombreSolicitante,
+                otroUserIdInicial: solicitanteId,
+              ),
+            ),
+          );
+        }
+      } else {
+        await _loadSolicitudesTrueque();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Trueque rechazado.', style: GoogleFonts.lexend()),
+              backgroundColor: const Color(0xFF5B4137),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _loadConversaciones() async {
@@ -126,12 +280,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
         _loading = false;
       });
 
-      if (widget.conversacionInicial != null) {
-        final idx = resultado.indexWhere(
-            (c) => c['id'] == widget.conversacionInicial);
-        if (idx != -1) {
-          setState(() => _selectedIndex = idx);
-        }
+      // Si hay una conversación seleccionada manualmente, mantenerla
+      if (_conversacionActivaId != null) {
+        final idx = resultado.indexWhere((c) => c['id'] == _conversacionActivaId);
+        if (idx != -1) setState(() => _selectedIndex = idx);
+      } else if (widget.conversacionInicial != null) {
+        final idx = resultado.indexWhere((c) => c['id'] == widget.conversacionInicial);
+        if (idx != -1) setState(() => _selectedIndex = idx);
       }
     } catch (e) {
       setState(() => _loading = false);
@@ -142,19 +297,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
     final convId = _chatsFiltrados[index]['id'];
-
-    // 1. Actualizar local inmediatamente
     _marcarConversacionLeida(convId);
-
-    // 2. Marcar en Supabase ANTES de recargar
     await _supabase
         .from('mensajes')
         .update({'leido': true})
         .eq('conversacion_id', convId)
         .eq('leido', false)
         .neq('remitente_id', userId);
-
-    // 3. Recargar — Supabase ya tiene los datos correctos
     if (mounted) await _loadConversaciones();
   }
 
@@ -197,7 +346,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildMobileLayout() {
-    if (widget.conversacionInicial != null && _loading == false) {
+    if (widget.conversacionInicial != null &&
+        _loading == false &&
+        !_navegacionInicialHecha) {
+      _navegacionInicialHecha = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.push(
           context,
@@ -218,20 +370,25 @@ class _ChatListScreenState extends State<ChatListScreen> {
         _buildSidebarHeader(),
         _buildSearchBar(),
         Expanded(
-          child: _buildChatList(onTap: (i) {
-            setState(() => _selectedIndex = i);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ChatScreen(
-                  conversacionId: _chatsFiltrados[i]['id'],
-                  nombreOtro: _chatsFiltrados[i]['otro_nombre'],
-                  otroUserId: _chatsFiltrados[i]['otro_id'],
-                  anuncioId: _chatsFiltrados[i]['anuncio_id'],
-                ),
-              ),
-            ).then((_) => _loadConversaciones());
-          }),
+          child: ListView(
+            children: [
+              if (_solicitudesTrueque.isNotEmpty) _buildBandejaTrueque(),
+              ..._buildChatListItems(onTap: (i) {
+                setState(() => _selectedIndex = i);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatScreen(
+                      conversacionId: _chatsFiltrados[i]['id'],
+                      nombreOtro: _chatsFiltrados[i]['otro_nombre'],
+                      otroUserId: _chatsFiltrados[i]['otro_id'],
+                      anuncioId: _chatsFiltrados[i]['anuncio_id'],
+                    ),
+                  ),
+                ).then((_) => _loadConversaciones());
+              }),
+            ],
+          ),
         ),
       ],
     );
@@ -254,11 +411,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
               _buildSidebarHeader(),
               _buildSearchBar(),
               Expanded(
-                child: _buildChatList(
-                  onTap: (i) {
-                    setState(() => _selectedIndex = i);
-                    _marcarLeidosDesktop(i);
-                  },
+                child: ListView(
+                  children: [
+                    if (_solicitudesTrueque.isNotEmpty) _buildBandejaTrueque(),
+                    ..._buildChatListItems(
+                      onTap: (i) {
+                        setState(() {
+                          _selectedIndex = i;
+                          _conversacionActivaId = _chatsFiltrados[i]['id'];
+                        });
+                        _marcarLeidosDesktop(i);
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -297,9 +462,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           conversacionId: _chatsFiltrados[idx]['id'],
                           nombreOtro: _chatsFiltrados[idx]['otro_nombre'],
                           otroUserId: _chatsFiltrados[idx]['otro_id'],
-                          anuncioId: (_selectedIndex == 0 ||
-                                      _chatsFiltrados[idx]['id'] == widget.conversacionInicial) &&
-                                      widget.anuncioIdInicial != null
+                          anuncioId: _conversacionActivaId == null &&
+                                  widget.anuncioIdInicial != null
                               ? widget.anuncioIdInicial
                               : _chatsFiltrados[idx]['anuncio_id'],
                           showAppBar: false,
@@ -307,6 +471,268 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildBandejaTrueque() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () => setState(
+              () => _bandejaTruequeExpandida = !_bandejaTruequeExpandida),
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F7F0),
+              border: Border(
+                bottom: BorderSide(
+                  color: const Color(0xFF245000).withOpacity(0.2),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.swap_horiz_rounded,
+                    color: Color(0xFF245000), size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  'Solicitudes de Trueque',
+                  style: GoogleFonts.lexend(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF245000),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF245000),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${_solicitudesTrueque.length}',
+                    style: GoogleFonts.lexend(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _bandejaTruequeExpandida
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  color: const Color(0xFF245000),
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_bandejaTruequeExpandida)
+          ..._solicitudesTrueque.map((sol) {
+            final solicitante = sol['solicitante'];
+            final nombreSolicitante = solicitante != null
+                ? '${solicitante['primer_nombre']} ${solicitante['primer_apellido']}'
+                : 'Usuario';
+            final anuncio = sol['anuncio'];
+            final tituloAnuncio = anuncio?['titulo'] ?? 'Producto';
+            final objetoOfrecido = sol['objeto_ofrecido'] ?? '';
+            final solicitanteId = solicitante?['id'] ?? '';
+
+            return Container(
+              margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F7F0),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: const Color(0xFF245000).withOpacity(0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundColor: const Color(0xFF245000),
+                        child: Text(
+                          nombreSolicitante.isNotEmpty
+                              ? nombreSolicitante[0].toUpperCase()
+                              : '?',
+                          style: GoogleFonts.lexend(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              nombreSolicitante,
+                              style: GoogleFonts.lexend(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1A1A1A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              'por "$tituloAnuncio"',
+                              style: GoogleFonts.lexend(
+                                fontSize: 11,
+                                color: const Color(0xFF5B4137),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (objetoOfrecido.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: const Color(0xFFE3BFB1)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.swap_horiz_rounded,
+                              size: 14, color: Color(0xFFF36900)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              objetoOfrecido,
+                              style: GoogleFonts.lexend(
+                                fontSize: 12,
+                                color: const Color(0xFF1A1A1A),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _responderTrueque(sol['id'],
+                              'rechazado', solicitanteId, tituloAnuncio),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF5B4137),
+                            side: const BorderSide(
+                                color: Color(0xFF5B4137)),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            textStyle: GoogleFonts.lexend(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          child: const Text('Rechazar'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _responderTrueque(sol['id'],
+                              'aceptado', solicitanteId, tituloAnuncio),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF245000),
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            textStyle: GoogleFonts.lexend(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600),
+                          ),
+                          child: const Text('Aceptar'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        if (_bandejaTruequeExpandida) const SizedBox(height: 8),
+        const Divider(height: 1, color: Color(0xFFE3BFB1)),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  List<Widget> _buildChatListItems({required void Function(int) onTap}) {
+    if (_loading) {
+      return [
+        const Center(
+            child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(color: Color(0xFFF36900)),
+        ))
+      ];
+    }
+
+    final chats = _chatsFiltrados;
+
+    if (chats.isEmpty) {
+      return [
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                Icon(Icons.forum_outlined,
+                    size: 40,
+                    color: const Color(0xFF5B4137).withOpacity(0.3)),
+                const SizedBox(height: 12),
+                Text('No hay conversaciones',
+                    style: GoogleFonts.lexend(
+                        color: const Color(0xFF5B4137), fontSize: 14)),
+              ],
+            ),
+          ),
+        )
+      ];
+    }
+
+    return List.generate(chats.length, (i) {
+      final chat = chats[i];
+      return _ChatTile(
+        nombre: chat['otro_nombre']?.toString() ?? 'Usuario',
+        preview: chat['preview']?.toString() ?? '',
+        hora: chat['hora']?.toString() ?? '',
+        isActive: i == _selectedIndex,
+        isOnline: false,
+        unreadCount: chat['unread'] ?? 0,
+        searchQuery: _searchQuery,
+        onTap: () => onTap(i),
+      );
+    });
   }
 
   Widget _buildSidebarHeader() {
@@ -338,8 +764,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             hintText: 'Buscar chats...',
             hintStyle: GoogleFonts.lexend(
                 color: const Color(0xFF5B4137), fontSize: 14),
-            prefixIcon:
-                const Icon(Icons.search, color: Color(0xFF5B4137), size: 20),
+            prefixIcon: const Icon(Icons.search,
+                color: Color(0xFF5B4137), size: 20),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.close,
@@ -355,49 +781,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildChatList({required void Function(int) onTap}) {
-    if (_loading) {
-      return const Center(
-          child: CircularProgressIndicator(color: Color(0xFFF36900)));
-    }
-
-    final chats = _chatsFiltrados;
-
-    if (chats.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.forum_outlined,
-                size: 40,
-                color: const Color(0xFF5B4137).withOpacity(0.3)),
-            const SizedBox(height: 12),
-            Text('No hay conversaciones',
-                style: GoogleFonts.lexend(
-                    color: const Color(0xFF5B4137), fontSize: 14)),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: chats.length,
-      itemBuilder: (context, i) {
-        final chat = chats[i];
-        return _ChatTile(
-          nombre: chat['otro_nombre']?.toString() ?? 'Usuario',
-          preview: chat['preview']?.toString() ?? '',
-          hora: chat['hora']?.toString() ?? '',
-          isActive: i == _selectedIndex,
-          isOnline: false,
-          unreadCount: chat['unread'] ?? 0,
-          searchQuery: _searchQuery,
-          onTap: () => onTap(i),
-        );
-      },
     );
   }
 }
