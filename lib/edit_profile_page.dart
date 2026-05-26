@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:typed_data';
+import 'home_page.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -282,6 +283,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
     } finally {
       setState(() => _isSaving = false);
+    }
+  }
+  Future<void> _signOut() async {
+    await _supabase.auth.signOut();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomePage()),
+        (route) => false, // Elimina todas las rutas anteriores del stack
+      );
     }
   }
 
@@ -700,6 +710,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     title: "Privacidad y Seguridad",
                     child: Column(
                       children: [
+                        // 👇 NUEVO
+                        _buildActionTile(
+                          Icons.logout_outlined,
+                          "Cerrar Sesión",
+                          "Salir de tu cuenta en este dispositivo",
+                          onTap: _signOut,
+                        ),
+                        const Divider(height: 1),   // 👈 NUEVO
                         _buildActionTile(
                           Icons.key_outlined,
                           "Cambiar Contraseña",
@@ -917,6 +935,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     String title,
     String subtitle, {
     bool isDestructive = false,
+    VoidCallback? onTap,         // 👈 línea nueva
   }) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -934,7 +953,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       trailing: const Icon(Icons.chevron_right, size: 20),
-      onTap: () {},
+      onTap: onTap ?? () {},     // 👈 línea modificada
     );
   }
 
