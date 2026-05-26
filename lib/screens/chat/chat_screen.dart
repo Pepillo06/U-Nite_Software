@@ -49,6 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _loading = false;
     });
     _scrollToBottom();
+    await _marcarComoLeidos();
   }
 
   Future<void> _marcarComoLeidos() async {
@@ -60,6 +61,16 @@ class _ChatScreenState extends State<ChatScreen> {
         .eq('conversacion_id', widget.conversacionId)
         .eq('leido', false)
         .neq('remitente_id', userId);
+
+    // Marcar notificaciones de esta conversación como leídas
+    try {
+      await _supabase
+          .from('notificaciones')
+          .update({'leida': true})
+          .eq('usuario_id', userId)
+          .eq('leida', false)
+          .filter('datos->>conversacion_id', 'eq', widget.conversacionId);
+    } catch (_) {}
   }
 
   Future<void> _loadAnuncio() async {
