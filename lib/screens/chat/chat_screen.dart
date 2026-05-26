@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:file_picker/file_picker.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversacionId;
@@ -61,8 +62,6 @@ class _ChatScreenState extends State<ChatScreen> {
         .eq('conversacion_id', widget.conversacionId)
         .eq('leido', false)
         .neq('remitente_id', userId);
-
-    // Marcar notificaciones de esta conversación como leídas
     try {
       await _supabase
           .from('notificaciones')
@@ -165,7 +164,6 @@ class _ChatScreenState extends State<ChatScreen> {
       'contenido': text,
     });
 
-    // Notificar al otro usuario
     try {
       final otroUserId = widget.otroUserId;
       final userData = await _supabase
@@ -194,18 +192,63 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _adjuntarArchivo() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Función de archivos disponible en la app móvil',
-          style: GoogleFonts.lexend(color: Colors.white, fontSize: 13),
-        ),
-        backgroundColor: const Color(0xFFF36900),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    try {
+      final result = await FilePicker.pickFiles(
+        allowMultiple: false,
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      if (file.bytes == null) return;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Subiendo archivo...', style: GoogleFonts.lexend()),
+            backgroundColor: const Color(0xFFF36900),
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
+
+      final extension = file.extension ?? 'bin';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+      final path = '$userId/$fileName';
+
+      await _supabase.storage
+          .from('chat_archivos')
+          .uploadBinary(path, file.bytes!);
+
+      final url = _supabase.storage
+          .from('chat_archivos')
+          .getPublicUrl(path);
+
+      if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      final esImagen = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+          .contains(extension.toLowerCase());
+
+      final contenido =
+          esImagen ? '[imagen]$url' : '[archivo:${file.name}]$url';
+
+      await _supabase.from('mensajes').insert({
+        'conversacion_id': widget.conversacionId,
+        'remitente_id': userId,
+        'contenido': contenido,
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
   }
 
   String _formatHora(String timestamp) {
@@ -246,12 +289,14 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFF36900)))
+                    child: CircularProgressIndicator(
+                        color: Color(0xFFF36900)))
                 : _mensajes.isEmpty
                     ? Center(
                         child: Text('Sé el primero en escribir 👋',
                             style: GoogleFonts.lexend(
-                                color: const Color(0xFF5B4137), fontSize: 14)))
+                                color: const Color(0xFF5B4137),
+                                fontSize: 14)))
                     : ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.symmetric(
@@ -567,7 +612,8 @@ class _SendButtonState extends State<_SendButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         margin: EdgeInsets.only(top: _pressed ? 4 : 0),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFFFF6100),
           borderRadius: BorderRadius.circular(16),
@@ -608,6 +654,60 @@ class _BurbujaMensaje extends StatelessWidget {
     required this.isMe,
   });
 
+  Widget _buildContenidoMensaje(BuildContext context) {
+    if (texto.startsWith('[imagen]')) {
+      final url = texto.replaceFirst('[imagen]', '');
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          url,
+          width: 200,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Text(
+            '📎 Imagen no disponible',
+            style: GoogleFonts.lexend(fontSize: 13),
+          ),
+        ),
+      );
+    } else if (texto.startsWith('[archivo:')) {
+      final match = RegExp(r'\[archivo:(.+?)\](.+)').firstMatch(texto);
+      final nombre = match?.group(1) ?? 'Archivo';
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.attach_file,
+            size: 16,
+            color: isMe
+                ? const Color(0xFF370E00)
+                : const Color(0xFF1B1C1C),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              nombre,
+              style: GoogleFonts.lexend(
+                fontSize: 13,
+                color: isMe
+                    ? const Color(0xFF370E00)
+                    : const Color(0xFF1B1C1C),
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return Text(
+      texto,
+      style: GoogleFonts.lexend(
+        fontSize: 14,
+        color: isMe ? const Color(0xFF370E00) : const Color(0xFF1B1C1C),
+        height: 1.5,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Align(
@@ -620,8 +720,8 @@ class _BurbujaMensaje extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 4),
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.65),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isMe
                   ? const Color(0xFFFFB598)
@@ -633,13 +733,7 @@ class _BurbujaMensaje extends StatelessWidget {
                 bottomRight: Radius.circular(isMe ? 4 : 16),
               ),
             ),
-            child: Text(texto,
-                style: GoogleFonts.lexend(
-                    fontSize: 14,
-                    color: isMe
-                        ? const Color(0xFF370E00)
-                        : const Color(0xFF1B1C1C),
-                    height: 1.5)),
+            child: _buildContenidoMensaje(context),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
