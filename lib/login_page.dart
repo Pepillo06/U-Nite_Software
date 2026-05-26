@@ -15,8 +15,6 @@ class LoginPage extends StatefulWidget {
   _LoginPageState createState() => _LoginPageState();
 }
 
-
-
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -144,166 +142,175 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 30),
-                        
-                        // Logo insertado dentro de la tarjeta
-                        Image.asset(
-                          'assets/logo.png',
-                          height: 80, // Ajusta el tamaño según prefieras
-                          fit: BoxFit.contain,
-                        ),
-                        
-                        const SizedBox(height: 30),
-
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 30.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // --- CAMPO CORREO ELECTRÓNICO ---
-                              const Text(
-                                "CORREO ELECTRÓNICO",
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black54,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _emailController,
-                                keyboardType: TextInputType.emailAddress,
-                                style: const TextStyle(fontSize: 14),
-                                decoration: _myInputDecoration(
-                                  hint: 'ejemplo@universidad.edu',
-                                  icon: Icons.mail_outline_rounded,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-
-                              // --- CAMPO CONTRASEÑA ---
-                              Row(
-                                children: [
-                                  const Text(
-                                    "CONTRASEÑA",
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black54,
-                                      letterSpacing: 1.0,
-                                    ),
+                    // --- ENVOLVEMOS LOS CAMPOS EN UN FORM ---
+                    child: Form(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 30),
+                          
+                          // Logo insertado dentro de la tarjeta
+                          Image.asset(
+                            'assets/logo.png',
+                            height: 80, // Ajusta el tamaño según prefieras
+                            fit: BoxFit.contain,
+                          ),
+                          
+                          const SizedBox(height: 30),
+                      
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 30.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // --- CAMPO CORREO ELECTRÓNICO ---
+                                const Text(
+                                  "CORREO ELECTRÓNICO",
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black54,
+                                    letterSpacing: 1.0,
                                   ),
-                                  const Spacer(),
-                                  TextButton(
-                                    onPressed: () {},
-                                    style: TextButton.styleFrom(
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(50, 20),
-                                        tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                                    child: const Text(
-                                      "¿Olvidaste tu contraseña?",
+                                ),
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next, // Mueve el foco al siguiente campo
+                                  style: const TextStyle(fontSize: 14),
+                                  decoration: _myInputDecoration(
+                                    hint: 'ejemplo@universidad.edu',
+                                    icon: Icons.mail_outline_rounded,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                      
+                                // --- CAMPO CONTRASEÑA ---
+                                Row(
+                                  children: [
+                                    const Text(
+                                      "CONTRASEÑA",
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: UColors.orangeDark,
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black54,
+                                        letterSpacing: 1.0,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _passwordController,
-                                obscureText: _obscureText,
-                                style: const TextStyle(fontSize: 14),
-                                decoration: _myInputDecoration(
-                                  hint: '.........',
-                                  icon: Icons.lock_outline_rounded,
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                      color: Colors.black38,
-                                      size: 20,
-                                    ),
-                                    onPressed: () => setState(() => _obscureText = !_obscureText),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 30),
-
-                              // --- BOTÓN ENTRAR (AQUÍ CONECTAMOS LA LÓGICA) ---
-                              SizedBox(
-                                width: double.infinity,
-                                height: 50,
-                                child: ElevatedButton(
-                                  // Deshabilitamos el botón si está cargando para evitar doble clic
-                                  onPressed: _isLoading ? null : _iniciarSesion,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: UColors.orangeDark,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8.0),
-                                    ),
-                                  ),
-                                  // Mostramos el indicador de carga o el texto
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2.5,
-                                          ),
-                                        )
-                                      : const Text(
-                                          "Ingresar",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                    const Spacer(),
+                                    TextButton(
+                                      onPressed: () {},
+                                      style: TextButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          minimumSize: const Size(50, 20),
+                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                                      child: const Text(
+                                        "¿Olvidaste tu contraseña?",
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: UColors.orangeDark,
+                                          fontWeight: FontWeight.w600,
                                         ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-                        const Divider(color: Colors.black12, indent: 40, endIndent: 40),
-                        
-                        // Link de Registro
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20.0),
-                          child: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const RegisterPage()),
-                              );
-                            },
-                            child: RichText(
-                              text: const TextSpan(
-                                text: "¿No tienes cuenta? ",
-                                style: TextStyle(color: Colors.black54, fontSize: 14),
-                                children: <TextSpan>[
-                                  TextSpan(
-                                    text: 'Regístrate',
-                                    style: TextStyle(
-                                      color: UColors.orangeDark,
-                                      fontWeight: FontWeight.bold,
-                                      decoration: TextDecoration.underline,
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _passwordController,
+                                  obscureText: _obscureText,
+                                  textInputAction: TextInputAction.done, // Indica que terminó
+                                  onFieldSubmitted: (_) {
+                                    // Si no está cargando, ejecuta la función al presionar Enter
+                                    if (!_isLoading) _iniciarSesion();
+                                  },
+                                  style: const TextStyle(fontSize: 14),
+                                  decoration: _myInputDecoration(
+                                    hint: '.........',
+                                    icon: Icons.lock_outline_rounded,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscureText ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                        color: Colors.black38,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(() => _obscureText = !_obscureText),
                                     ),
                                   ),
-                                ],
+                                ),
+                                const SizedBox(height: 30),
+                      
+                                // --- BOTÓN ENTRAR (AQUÍ CONECTAMOS LA LÓGICA) ---
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 50,
+                                  child: ElevatedButton(
+                                    // Deshabilitamos el botón si está cargando para evitar doble clic
+                                    onPressed: _isLoading ? null : _iniciarSesion,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: UColors.orangeDark,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8.0),
+                                      ),
+                                    ),
+                                    // Mostramos el indicador de carga o el texto
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2.5,
+                                            ),
+                                          )
+                                        : const Text(
+                                            "Ingresar",
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      
+                          const SizedBox(height: 20),
+                          const Divider(color: Colors.black12, indent: 40, endIndent: 40),
+                          
+                          // Link de Registro
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20.0),
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const RegisterPage()),
+                                );
+                              },
+                              child: RichText(
+                                text: const TextSpan(
+                                  text: "¿No tienes cuenta? ",
+                                  style: TextStyle(color: Colors.black54, fontSize: 14),
+                                  children: <TextSpan>[
+                                    TextSpan(
+                                      text: 'Regístrate',
+                                      style: TextStyle(
+                                        color: UColors.orangeDark,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 30),
