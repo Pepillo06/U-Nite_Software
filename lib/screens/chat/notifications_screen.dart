@@ -166,7 +166,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF9F9),
-      appBar: const UniteHeader(currentIndex: -1),
+      appBar: const UniteHeader(currentIndex: 3),
       body: Column(
         children: [
           // Header de la sección

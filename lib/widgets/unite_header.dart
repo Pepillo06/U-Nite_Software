@@ -203,7 +203,6 @@ class _UniteHeaderState extends State<UniteHeader> {
                   ),
                 ),
                 const SizedBox(width: 32),
-                // _NavLinkActivo(label: 'StudyMatch', isActive: false, onTap: () {}),
               ],
             ),
 
@@ -212,22 +211,39 @@ class _UniteHeaderState extends State<UniteHeader> {
           // Íconos y acciones
           Row(
             children: [
-              // Notificaciones con badge
+              // Notificaciones con badge y subrayado naranja
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.notifications_outlined,
-                        color: Color(0xFF4A4A4A), size: 22),
-                    onPressed: () {
-                      if (_verificarAutenticacion()) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => const NotificationsScreen()),
-                        ).then((_) => _cargarNotificacionesPendientes());
-                      }
-                    },
+                  Container(
+                    decoration: widget.currentIndex == 3
+                        ? const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Color(0xFFFF6100),
+                                width: 3,
+                              ),
+                            ),
+                          )
+                        : null,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.notifications_outlined,
+                        color: widget.currentIndex == 3
+                            ? const Color(0xFFFF6100)
+                            : const Color(0xFF4A4A4A),
+                        size: 22,
+                      ),
+                      onPressed: () {
+                        if (_verificarAutenticacion()) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const NotificationsScreen()),
+                          ).then((_) => _cargarNotificacionesPendientes());
+                        }
+                      },
+                    ),
                   ),
                   if (_notificacionesPendientes > 0)
                     Positioned(
