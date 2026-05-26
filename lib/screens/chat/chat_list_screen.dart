@@ -30,6 +30,18 @@ class _ChatListScreenState extends State<ChatListScreen> {
   List<Map<String, dynamic>> _conversaciones = [];
   bool _loading = true;
 
+  void _marcarConversacionLeida(String conversacionId) {
+    setState(() {
+      final idx = _conversaciones.indexWhere((c) => c['id'] == conversacionId);
+      if (idx != -1) {
+        _conversaciones[idx] = {
+          ..._conversaciones[idx],
+          'unread': 0,
+        };
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -130,13 +142,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
     final convId = _chatsFiltrados[index]['id'];
+
+    // 1. Actualizar local inmediatamente
+    _marcarConversacionLeida(convId);
+
+    // 2. Marcar en Supabase ANTES de recargar
     await _supabase
         .from('mensajes')
         .update({'leido': true})
         .eq('conversacion_id', convId)
         .eq('leido', false)
         .neq('remitente_id', userId);
-    await _loadConversaciones();
+
+    // 3. Recargar — Supabase ya tiene los datos correctos
+    if (mounted) await _loadConversaciones();
   }
 
   String _formatHora(String timestamp) {
@@ -282,7 +301,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                       _chatsFiltrados[idx]['id'] == widget.conversacionInicial) &&
                                       widget.anuncioIdInicial != null
                               ? widget.anuncioIdInicial
-                              : _chatsFiltrados[idx]['anucio_id'],
+                              : _chatsFiltrados[idx]['anuncio_id'],
                           showAppBar: false,
                         ),
         ),

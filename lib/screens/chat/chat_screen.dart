@@ -49,7 +49,6 @@ class _ChatScreenState extends State<ChatScreen> {
       _loading = false;
     });
     _scrollToBottom();
-    await _marcarComoLeidos();
   }
 
   Future<void> _marcarComoLeidos() async {
@@ -114,7 +113,6 @@ class _ChatScreenState extends State<ChatScreen> {
           callback: (payload) {
             setState(() => _mensajes.add(payload.newRecord));
             _scrollToBottom();
-            _marcarComoLeidos();
           },
         )
         .subscribe();
@@ -155,6 +153,33 @@ class _ChatScreenState extends State<ChatScreen> {
       'remitente_id': userId,
       'contenido': text,
     });
+
+    // Notificar al otro usuario
+    try {
+      final otroUserId = widget.otroUserId;
+      final userData = await _supabase
+          .from('usuarios')
+          .select('primer_nombre, primer_apellido')
+          .eq('id', userId)
+          .maybeSingle();
+      final nombreRemitente = userData != null
+          ? '${userData['primer_nombre']} ${userData['primer_apellido']}'
+          : 'Alguien';
+
+      await _supabase.from('notificaciones').insert({
+        'usuario_id': otroUserId,
+        'tipo': 'mensaje',
+        'titulo': 'Nuevo mensaje de $nombreRemitente',
+        'mensaje': text.length > 50 ? '${text.substring(0, 50)}...' : text,
+        'leida': false,
+        'datos': {
+          'conversacion_id': widget.conversacionId,
+          'nombre_otro': nombreRemitente,
+          'otro_user_id': userId,
+          'anuncio_id': widget.anuncioId,
+        },
+      });
+    } catch (_) {}
   }
 
   Future<void> _adjuntarArchivo() async {
@@ -531,8 +556,7 @@ class _SendButtonState extends State<_SendButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         margin: EdgeInsets.only(top: _pressed ? 4 : 0),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFFFF6100),
           borderRadius: BorderRadius.circular(16),
@@ -585,8 +609,8 @@ class _BurbujaMensaje extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 4),
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.65),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 10),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isMe
                   ? const Color(0xFFFFB598)
@@ -610,8 +634,7 @@ class _BurbujaMensaje extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(hora,
                 style: GoogleFonts.lexend(
-                    fontSize: 10,
-                    color: const Color(0xFF8F7065))),
+                    fontSize: 10, color: const Color(0xFF8F7065))),
           ),
         ],
       ),
