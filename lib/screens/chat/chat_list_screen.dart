@@ -280,7 +280,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           conversacionId: _chatsFiltrados[idx]['id'],
                           nombreOtro: _chatsFiltrados[idx]['otro_nombre'],
                           otroUserId: _chatsFiltrados[idx]['otro_id'],
-                          anuncioId: _chatsFiltrados[idx]['anuncio_id'],
+                          anuncioId: (_selectedIndex == 0 || 
+                                      _chatsFiltrados[idx]['id'] == widget.conversacionInicial) && 
+                                      widget.anuncioIdInicial != null
+                              ? widget.anuncioIdInicial
+                              : _chatsFiltrados[idx]['anuncio_id'],
                           showAppBar: false,
                         ),
         ),
