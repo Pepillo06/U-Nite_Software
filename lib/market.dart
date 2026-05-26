@@ -7,6 +7,7 @@ import 'post_item.dart';
 import 'login_page.dart';
 import 'screens/chat/chat_list_screen.dart';
 import 'widgets/unite_header.dart';
+import 'urgencia_dialog.dart';
 
 // ==========================================
 // PANTALLA PRINCIPAL DEL MARKETPLACE
@@ -1114,6 +1115,8 @@ void _mostrarDetalleAnuncio(
                                 child: ElevatedButton.icon(
                                   onPressed: () async {
                                     if (!_verificarAutenticacion(context)) return;
+                                    final urgencia = await mostrarDialogUrgencia(context);
+                                    if (urgencia == null || !context.mounted) return;
                                     final supabase = Supabase.instance.client;
                                     final compradorId = supabase.auth.currentUser!.id;
                                     final vendedorId = anuncio['vendedor_id']?.toString() ?? '';
@@ -1873,13 +1876,14 @@ class _PantallaDetalleProducto extends StatelessWidget {
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  if (_verificarAutenticacion(context)) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ChatListScreen()),
-                    );
-                  }
+                onPressed: () async {
+                  if (!_verificarAutenticacion(context)) return;
+                  final urgencia = await mostrarDialogUrgencia(context);
+                  if (urgencia == null || !context.mounted) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ChatListScreen()),
+                  );
                 },
                 icon: const Icon(Icons.chat_bubble_outline),
                 label: const Text('Contactar Vendedor'),
