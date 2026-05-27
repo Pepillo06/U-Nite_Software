@@ -455,8 +455,12 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
             final String? userId = res.user?.id;
 
             if (userId != null) {
-              final bool esVendedor = widget.model.perfilSeleccionado == 1;
-              final bool esEstudiante = widget.model.perfilSeleccionado == 2;
+              // Verificamos si la lista de perfiles contiene el ID respectivo
+              // Usamos un casting explícito a List por seguridad
+              final listaPerfiles = widget.model.perfilSeleccionado as List<int>;
+              
+              final bool esVendedor = listaPerfiles.contains(1);
+              final bool esEstudiante = listaPerfiles.contains(2);
 
               // 3. Hacemos un UPDATE en vez de un INSERT
               await supabase

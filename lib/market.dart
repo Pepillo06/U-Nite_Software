@@ -22,6 +22,7 @@ class MarketPage extends StatefulWidget {
 class _MarketPageState extends State<MarketPage> {
   String _categoriaSeleccionada = 'Todos';
   String _busquedaActual = '';
+  bool _esVendedor = false;
 
 // ====== NUEVAS VARIABLES PARA LOS FILTROS ======
   bool _mostrarFiltros = false;
@@ -33,6 +34,12 @@ class _MarketPageState extends State<MarketPage> {
   // NUEVAS VARIABLES ELEVADAS PARA LOS LÍMITES TOTALES
   double _minPrecioGlobal = 0;
   double _maxPrecioGlobal = 1000;
+
+  @override
+  void initState() {
+    super.initState();
+    _verificarRolVendedor(); // Llama a la verificación al iniciar
+  }
 
   void _actualizarLimitesPrecio(double min, double max) {
     setState(() {
@@ -51,6 +58,26 @@ class _MarketPageState extends State<MarketPage> {
       _busquedaActual = texto;
     });
   }
+  Future<void> _verificarRolVendedor() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final data = await Supabase.instance.client
+          .from('usuarios')
+          .select('es_vendedor')
+          .eq('id', user.id)
+          .single();
+
+      if (mounted) {
+        setState(() {
+          _esVendedor = data['es_vendedor'] ?? false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error verificando rol en MarketPage: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +88,7 @@ class _MarketPageState extends State<MarketPage> {
           const UniteHeader(currentIndex: 1),
           _BarraSuperior(
             onBusquedaChanged: _onBusquedaChanged,
+            mostrarBotonVender: _esVendedor,
             onVender: () {
               if (_verificarAutenticacion(context)) {
                 Navigator.push(
@@ -352,10 +380,12 @@ final List<_Producto> _productosPrueba = [
 class _BarraSuperior extends StatefulWidget {
   final VoidCallback onVender;
   final ValueChanged<String> onBusquedaChanged; // <-- Nuevo parámetro
+  final bool mostrarBotonVender;
 
   const _BarraSuperior({
     required this.onVender,
     required this.onBusquedaChanged, // <-- Requerido
+    required this.mostrarBotonVender,
   });
 
   @override
@@ -463,31 +493,33 @@ class _BarraSuperiorState extends State<_BarraSuperior> {
           ),
           Align(
             alignment: Alignment.centerRight,
-            child: SizedBox(
-              height: alturaComponentes,
-              child: ElevatedButton.icon(
-                onPressed: widget.onVender,
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(
-                  isMobile ? 'Vender' : 'Vender Artículo',
-                  style: GoogleFonts.lexend(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
+            child: widget.mostrarBotonVender
+              ? SizedBox(
+                height: alturaComponentes,
+                child: ElevatedButton.icon(
+                  onPressed: widget.onVender,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: Text(
+                    isMobile ? 'Vender' : 'Vender Artículo',
+                    style: GoogleFonts.lexend(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: UColors.orange,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 12 : 20,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                   ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: UColors.orange,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 12 : 20,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                ),
-              ),
-            ),
+              )
+              : const SizedBox.shrink(),
           ),
         ],
       ),
@@ -649,6 +681,7 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _anuncios = [];
   bool _cargando = true;
+  bool _esVendedor = false;
 
   // NUEVAS VARIABLES PARA LOS LÍMITES REALES DE PRECIO
   double _precioMinimoGlobal = 0;
@@ -658,6 +691,7 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
   void initState() {
     super.initState();
     _cargarAnuncios();
+    _verificarRolVendedor();
   }
 
   @override
@@ -670,6 +704,26 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
         oldWidget.estadosSeleccionados != widget.estadosSeleccionados ||
         oldWidget.tiposVentaSeleccionados != widget.tiposVentaSeleccionados) {
       _cargarAnuncios();
+    }
+  }
+
+  Future<void> _verificarRolVendedor() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Reemplaza 'es_vendedor' por el nombre real de tu columna en Supabase
+      final data = await Supabase.instance.client
+          .from('usuarios')
+          .select('es_vendedor')
+          .eq('id', user.id)
+          .single();
+
+      setState(() {
+        _esVendedor = data['es_vendedor'] ?? false;
+      });
+    } catch (e) {
+      debugPrint('Error verificando rol: $e');
     }
   }
 

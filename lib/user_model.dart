@@ -6,7 +6,7 @@ class UserRegistrationModel {
   String? fechaNacimiento;
 
   // Datos del Paso 2
-  int? perfilSeleccionado;
+  List<int>? perfilSeleccionado;
 
   // Datos del Paso 3
   String? universidad;

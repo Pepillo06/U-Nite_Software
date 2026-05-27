@@ -34,6 +34,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String? _userId;
   List<Map<String, dynamic>> _misAnuncios = [];
   bool _isLoadingAnuncios = true;
+  bool _esVendedor = false;
+  bool _esEstudiante = false;
 
   // Controladores
   final _nombreController = TextEditingController();
@@ -91,6 +93,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           .single();
 
       setState(() {
+        _esVendedor = data['es_vendedor'] ?? false;
+        _esEstudiante = data['es_estudiante'] ?? false;
         _currentProfileUrl = data['foto_perfil_url'];
         _currentBannerUrl = data['foto_banner_url'];
         _nombreController.text = data['primer_nombre'] ?? '';
@@ -295,6 +299,89 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+  Future<void> _activarRol(String campo) async {
+    setState(() => _isSaving = true);
+    try {
+      await _supabase
+          .from('usuarios')
+          .update({campo: true})
+          .eq('id', _userId!);
+      
+      await _loadUserData(); // Recargamos para refrescar la interfaz
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("¡Perfil actualizado! Ahora puedes editar esta sección."), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error al actualizar rol: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _confirmarBajaRol(String titulo, String mensaje, String campo) async {
+    final bool? confirmar = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(mensaje),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text("Confirmar", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar == true) {
+      _desactivarRol(campo);
+    }
+  }
+
+  Future<void> _desactivarRol(String campo) async {
+    setState(() => _isSaving = true);
+    try {
+      await _supabase
+          .from('usuarios')
+          .update({campo: false})
+          .eq('id', _userId!);
+      
+      await _loadUserData(); // Recargamos la interfaz
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Acción realizada con éxito."), backgroundColor: Colors.black87),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingData) {
@@ -461,38 +548,60 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     title: "Perfil Académico",
                     icon: Icons.school,
                     iconColor: const Color(0xFF1B5E20),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildInputField(
-                                "Universidad",
-                                _universidadController,
+                    child: _esEstudiante
+                      ? Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildInputField(
+                                  "Universidad",
+                                  _universidadController,
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: _buildInputField(
+                                  "Carrera",
+                                  _carreraController,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 15),
+                          _buildInputField(
+                            "Semestre (Ej: 6)",
+                            _semestreController,
+                          ),
+                          const SizedBox(height: 15),
+                          _buildInputField(
+                            "Biografía Académica",
+                            _biografiaAcademicaController,
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 30),
+                          const Divider(),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _confirmarBajaRol(
+                                "¿Dejar de ser Estudiante?",
+                                "Tu información académica ya no será visible en tu perfil público.",
+                                "es_estudiante"
+                              ),
+                              icon: const Icon(Icons.no_accounts, size: 18),
+                              label: const Text("Ya no soy estudiante"),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                                side: const BorderSide(color: Colors.redAccent),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                             ),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: _buildInputField(
-                                "Carrera",
-                                _carreraController,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 15),
-                        _buildInputField(
-                          "Semestre (Ej: 6)",
-                          _semestreController,
-                        ),
-                        const SizedBox(height: 15),
-                        _buildInputField(
-                          "Biografía Académica",
-                          _biografiaAcademicaController,
-                          maxLines: 3,
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      )
+                      : _buildJoinSection("estudiante", () => _activarRol('es_estudiante')),
                   ),
 
                   const SizedBox(height: 30),
@@ -502,205 +611,227 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     title: "Perfil de Ventas (UniExchange)",
                     icon: Icons.local_offer,
                     iconColor: const Color(0xFF1B5E20),
-                    child: Column(
-                      children: [
-                        _buildInputField(
-                          "Biografía de Perfil de Ventas",
-                          _biografiaVentasController,
-                          maxLines: 3,
-                        ),
-                        const SizedBox(height: 20),
-                        const Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            "Inventario Activo",
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                    child: _esVendedor 
+                      ? Column(
+                        children: [
+                          _buildInputField(
+                            "Biografía de Perfil de Ventas",
+                            _biografiaVentasController,
+                            maxLines: 3,
                           ),
-                        ),
-                        const SizedBox(height: 15),
-                        _isLoadingAnuncios
-                            ? const Center(
-                                child: CircularProgressIndicator(
-                                  color: Color(0xFFF05600),
-                                ),
-                              )
-                            : _misAnuncios.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  "No tienes artículos en venta",
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              )
-                            : GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 3,
-                                      crossAxisSpacing: 15,
-                                      mainAxisSpacing: 15,
-                                      childAspectRatio: 1.4,
-                                    ),
-                                itemCount: _misAnuncios.length,
-                                itemBuilder: (context, index) {
-                                  final anuncio = _misAnuncios[index];
-                                  final modalidades =
-                                      anuncio['detalles_modalidades']
-                                          as Map<String, dynamic>? ??
-                                      {};
-                                  final imagenes =
-                                      modalidades['imagenes']
-                                          as List<dynamic>? ??
-                                      [];
-                                  final tieneImagen = imagenes.isNotEmpty;
-
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: const Color(0xFFEEEEEE),
+                          const SizedBox(height: 20),
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              "Inventario Activo",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          _isLoadingAnuncios
+                              ? const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFFF05600),
+                                  ),
+                                )
+                              : _misAnuncios.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    "No tienes artículos en venta",
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                )
+                              : GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        crossAxisSpacing: 15,
+                                        mainAxisSpacing: 15,
+                                        childAspectRatio: 1.4,
                                       ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.04),
-                                          blurRadius: 8,
-                                          offset: const Offset(0, 2),
+                                  itemCount: _misAnuncios.length,
+                                  itemBuilder: (context, index) {
+                                    final anuncio = _misAnuncios[index];
+                                    final modalidades =
+                                        anuncio['detalles_modalidades']
+                                            as Map<String, dynamic>? ??
+                                        {};
+                                    final imagenes =
+                                        modalidades['imagenes']
+                                            as List<dynamic>? ??
+                                        [];
+                                    final tieneImagen = imagenes.isNotEmpty;
+
+                                    return Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: const Color(0xFFEEEEEE),
                                         ),
-                                      ],
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // Imagen con badge de categoría
-                                        Stack(
-                                          children: [
-                                            ClipRRect(
-                                              borderRadius:
-                                                  const BorderRadius.vertical(
-                                                    top: Radius.circular(12),
-                                                  ),
-                                              child: tieneImagen
-                                                  ? Image.network(
-                                                      imagenes[0],
-                                                      height: 130,
-                                                      width: double.infinity,
-                                                      fit: BoxFit.cover,
-                                                    )
-                                                  : Container(
-                                                      height: 130,
-                                                      width: double.infinity,
-                                                      color: const Color(
-                                                        0xFFF0F0F0,
-                                                      ),
-                                                      child: const Icon(
-                                                        Icons
-                                                            .image_not_supported,
-                                                        color: Colors.grey,
-                                                        size: 40,
-                                                      ),
-                                                    ),
-                                            ),
-                                            if (anuncio['categoria'] != null)
-                                              Positioned(
-                                                top: 10,
-                                                right: 10,
-                                                child: Container(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 4,
-                                                      ),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          20,
-                                                        ),
-                                                  ),
-                                                  child: Text(
-                                                    anuncio['categoria'],
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                          ],
-                                        ),
-                                        // Info
-                                        Padding(
-                                          padding: const EdgeInsets.all(12),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.04),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Imagen con badge de categoría
+                                          Stack(
                                             children: [
-                                              Text(
-                                                anuncio['titulo'] ?? '',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 13,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
+                                              ClipRRect(
+                                                borderRadius:
+                                                    const BorderRadius.vertical(
+                                                      top: Radius.circular(12),
+                                                    ),
+                                                child: tieneImagen
+                                                    ? Image.network(
+                                                        imagenes[0],
+                                                        height: 130,
+                                                        width: double.infinity,
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                    : Container(
+                                                        height: 130,
+                                                        width: double.infinity,
+                                                        color: const Color(
+                                                          0xFFF0F0F0,
+                                                        ),
+                                                        child: const Icon(
+                                                          Icons
+                                                              .image_not_supported,
+                                                          color: Colors.grey,
+                                                          size: 40,
+                                                        ),
+                                                      ),
                                               ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                anuncio['descripcion'] ?? '',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: Colors.grey,
-                                                ),
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              const SizedBox(height: 10),
-                                              SizedBox(
-                                                width: double.infinity,
-                                                child: OutlinedButton(
-                                                  onPressed: () {},
-                                                  style: OutlinedButton.styleFrom(
+                                              if (anuncio['categoria'] != null)
+                                                Positioned(
+                                                  top: 10,
+                                                  right: 10,
+                                                  child: Container(
                                                     padding:
                                                         const EdgeInsets.symmetric(
-                                                          vertical: 6,
+                                                          horizontal: 8,
+                                                          vertical: 4,
                                                         ),
-                                                    side: const BorderSide(
-                                                      color: Color(0xFFCCCCCC),
-                                                    ),
-                                                    shape: RoundedRectangleBorder(
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
                                                       borderRadius:
                                                           BorderRadius.circular(
-                                                            8,
+                                                            20,
                                                           ),
                                                     ),
-                                                    textStyle: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                    ),
-                                                  ),
-                                                  child: const Text(
-                                                    "Editar Artículo",
-                                                    style: TextStyle(
-                                                      color: Colors.black87,
+                                                    child: Text(
+                                                      anuncio['categoria'],
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
-                                              ),
                                             ],
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
+                                          // Info
+                                          Padding(
+                                            padding: const EdgeInsets.all(12),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  anuncio['titulo'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  anuncio['descripcion'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 10),
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: OutlinedButton(
+                                                    onPressed: () {},
+                                                    style: OutlinedButton.styleFrom(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            vertical: 6,
+                                                          ),
+                                                      side: const BorderSide(
+                                                        color: Color(0xFFCCCCCC),
+                                                      ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                      ),
+                                                      textStyle: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    child: const Text(
+                                                      "Editar Artículo",
+                                                      style: TextStyle(
+                                                        color: Colors.black87,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                          const SizedBox(height: 30),
+                          const Divider(),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _confirmarBajaRol(
+                                "¿Cerrar Perfil de Vendedor?",
+                                "Tus artículos activos se ocultarán y tu placa de vendedor desaparecerá.",
+                                "es_vendedor"
                               ),
-                      ],
-                    ),
+                              icon: const Icon(Icons.remove_shopping_cart, size: 18),
+                              label: const Text("Ya no soy vendedor"),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                                side: const BorderSide(color: Colors.redAccent),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                      : _buildJoinSection("vendedor", () => _activarRol('es_vendedor')),
                   ),
 
                   const SizedBox(height: 30),
@@ -1070,6 +1201,52 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ],
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJoinSection(String tipo, VoidCallback onJoin) {
+    final bool esVenta = tipo == "vendedor";
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            esVenta ? Icons.storefront_outlined : Icons.school_outlined,
+            size: 48,
+            color: Colors.black26,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Aún no eres ${esVenta ? 'vendedor' : 'estudiante'} en U-NITE",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "¿Te gustaría expandir tu perfil para ${esVenta ? 'ofrecer tus artículos' : 'gestionar tu vida académica'}?",
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, color: Colors.black54),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: onJoin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF05600),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              "Convertirme en ${esVenta ? 'Vendedor' : 'Estudiante'}",
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
         ],
