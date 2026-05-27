@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 
-
 class ChatScreen extends StatefulWidget {
   final String conversacionId;
   final String nombreOtro;
@@ -33,6 +32,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   // Preview del producto en el input (estilo WhatsApp)
   bool _mostrarPreviewProducto = false;
+  String _estadoConexion = '';
 
   @override
   void initState() {
@@ -40,6 +40,43 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadMensajes();
     _loadAnuncio();
     _suscribirse();
+    _cargarEstadoConexion();
+  }
+
+  Future<void> _cargarEstadoConexion() async {
+    try {
+      final data = await _supabase
+          .from('usuarios')
+          .select('ultima_conexion')
+          .eq('id', widget.otroUserId)
+          .maybeSingle();
+
+      if (data == null || data['ultima_conexion'] == null) {
+        setState(() => _estadoConexion = 'Sin conexión reciente');
+        return;
+      }
+
+      final ultima = DateTime.parse(data['ultima_conexion']).toLocal();
+      final ahora = DateTime.now();
+      final diferencia = ahora.difference(ultima);
+
+      if (diferencia.inMinutes < 2) {
+        setState(() => _estadoConexion = 'En línea');
+      } else if (diferencia.inHours < 24 && ultima.day == ahora.day) {
+        final hora =
+            '${ultima.hour.toString().padLeft(2, '0')}:${ultima.minute.toString().padLeft(2, '0')}';
+        setState(() => _estadoConexion = 'Última vez conectado hoy a las $hora');
+      } else if (diferencia.inDays == 1) {
+        final hora =
+            '${ultima.hour.toString().padLeft(2, '0')}:${ultima.minute.toString().padLeft(2, '0')}';
+        setState(() => _estadoConexion = 'Última vez conectado ayer a las $hora');
+      } else {
+        setState(() =>
+            _estadoConexion = 'Última vez conectado ${ultima.day}/${ultima.month}');
+      }
+    } catch (_) {
+      setState(() => _estadoConexion = 'En línea');
+    }
   }
 
   Future<void> _loadMensajes() async {
@@ -239,8 +276,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       final extension = file.extension ?? 'bin';
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
       final path = '$userId/$fileName';
 
       await _supabase.storage
@@ -279,6 +315,8 @@ class _ChatScreenState extends State<ChatScreen> {
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
+  bool get _estaEnLinea => _estadoConexion == 'En línea';
+
   @override
   Widget build(BuildContext context) {
     final myId = _supabase.auth.currentUser?.id;
@@ -312,14 +350,12 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: _loading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFFF36900)))
+                    child: CircularProgressIndicator(color: Color(0xFFF36900)))
                 : _mensajes.isEmpty
                     ? Center(
                         child: Text('Sé el primero en escribir 👋',
                             style: GoogleFonts.lexend(
-                                color: const Color(0xFF5B4137),
-                                fontSize: 14)))
+                                color: const Color(0xFF5B4137), fontSize: 14)))
                     : ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.symmetric(
@@ -339,6 +375,34 @@ class _ChatScreenState extends State<ChatScreen> {
           _buildInputBar(),
         ],
       ),
+    );
+  }
+
+  Widget _buildEstadoConexionWidget() {
+    return Row(
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: _estaEnLinea
+                ? const Color(0xFF306B18)
+                : const Color(0xFF9E9E9E),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          _estadoConexion.isEmpty ? '...' : _estadoConexion,
+          style: GoogleFonts.lexend(
+            fontSize: 11,
+            color: _estaEnLinea
+                ? const Color(0xFF306B18)
+                : const Color(0xFF9E9E9E),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 
@@ -363,7 +427,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 width: 10,
                 height: 10,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF306B18),
+                  color: _estaEnLinea
+                      ? const Color(0xFF306B18)
+                      : const Color(0xFF9E9E9E),
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 1.5),
                 ),
@@ -380,22 +446,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFF1A1A1A))),
-            Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                      color: Color(0xFF306B18), shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 4),
-                Text('En línea',
-                    style: GoogleFonts.lexend(
-                        fontSize: 11,
-                        color: const Color(0xFF306B18),
-                        fontWeight: FontWeight.w500)),
-              ],
-            ),
+            _buildEstadoConexionWidget(),
           ],
         ),
       ],
@@ -430,7 +481,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   width: 11,
                   height: 11,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF306B18),
+                    color: _estaEnLinea
+                        ? const Color(0xFF306B18)
+                        : const Color(0xFF9E9E9E),
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 1.5),
                   ),
@@ -447,22 +500,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: const Color(0xFF1A1A1A))),
-              Row(
-                children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                        color: Color(0xFF306B18), shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 4),
-                  Text('En línea',
-                      style: GoogleFonts.lexend(
-                          fontSize: 11,
-                          color: const Color(0xFF306B18),
-                          fontWeight: FontWeight.w500)),
-                ],
-              ),
+              _buildEstadoConexionWidget(),
             ],
           ),
         ],
@@ -662,8 +700,7 @@ class _SendButtonState extends State<_SendButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         margin: EdgeInsets.only(top: _pressed ? 4 : 0),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           color: const Color(0xFFFF6100),
           borderRadius: BorderRadius.circular(16),
@@ -754,9 +791,8 @@ class _BurbujaMensaje extends StatelessWidget {
                       width: 36,
                       height: 36,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const Icon(
-                          Icons.shopping_bag_outlined,
-                          size: 16),
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.shopping_bag_outlined, size: 16),
                     ),
                   )
                 else
@@ -811,7 +847,6 @@ class _BurbujaMensaje extends StatelessWidget {
       );
     }
 
-    // Imagen
     if (texto.startsWith('[imagen]')) {
       final url = texto.replaceFirst('[imagen]', '');
       return ClipRRect(
@@ -828,20 +863,17 @@ class _BurbujaMensaje extends StatelessWidget {
       );
     }
 
-    // Archivo
     if (texto.startsWith('[archivo:')) {
       final match = RegExp(r'\[archivo:(.+?)\](.+)').firstMatch(texto);
       final nombre = match?.group(1) ?? 'Archivo';
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.attach_file,
-            size: 16,
-            color: isMe
-                ? const Color(0xFF370E00)
-                : const Color(0xFF1B1C1C),
-          ),
+          Icon(Icons.attach_file,
+              size: 16,
+              color: isMe
+                  ? const Color(0xFF370E00)
+                  : const Color(0xFF1B1C1C)),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
@@ -859,7 +891,6 @@ class _BurbujaMensaje extends StatelessWidget {
       );
     }
 
-    // Texto normal
     return Text(
       texto,
       style: GoogleFonts.lexend(
@@ -882,8 +913,8 @@ class _BurbujaMensaje extends StatelessWidget {
             margin: const EdgeInsets.symmetric(vertical: 4),
             constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.65),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 10),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: isMe
                   ? const Color(0xFFFFB598)
