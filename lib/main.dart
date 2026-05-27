@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'home_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,9 @@ void main() async {
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96anlwb2lhdXhndm9mcGViYm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MzE5MzEsImV4cCI6MjA5NDAwNzkzMX0.MkjT9UpYuF1oUNmD6-WJD5w6c0anhv86GxrhCbUtZlE',
   );
 
+  Timer.periodic(const Duration(seconds: 60), (_) {
+    _actualizarUltimaConexion();
+  });
   // Actualizar ultima_conexion al abrir la app
   _actualizarUltimaConexion();
 

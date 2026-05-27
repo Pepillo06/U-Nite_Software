@@ -230,8 +230,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             comprador:comprador_id(id, primer_nombre, primer_apellido),
             vendedor:vendedor_id(id, primer_nombre, primer_apellido)
           ''')
-          .or('comprador_id.eq.$userId,vendedor_id.eq.$userId')
-          .order('creado_en', ascending: false);
+          .or('comprador_id.eq.$userId,vendedor_id.eq.$userId');
 
       final List<Map<String, dynamic>> resultado = [];
       for (final conv in data) {
@@ -257,6 +256,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ? _formatHora(mensajes[0]['creado_en'])
             : '';
 
+        // Timestamp para ordenar — usar el del último mensaje o el de creación
+        final ultimoTimestamp = mensajes.isNotEmpty
+            ? mensajes[0]['creado_en']
+            : conv['creado_en'];
+
         final noLeidos = await _supabase
             .from('mensajes')
             .select('id')
@@ -272,8 +276,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
           'preview': preview,
           'hora': hora,
           'unread': noLeidos.length,
+          'ultimo_timestamp': ultimoTimestamp,
         });
       }
+
+      // Ordenar por último mensaje de más reciente a más antiguo
+      resultado.sort((a, b) {
+        final ta = DateTime.tryParse(a['ultimo_timestamp'] ?? '') ?? DateTime(0);
+        final tb = DateTime.tryParse(b['ultimo_timestamp'] ?? '') ?? DateTime(0);
+        return tb.compareTo(ta);
+      });
 
       setState(() {
         _conversaciones = resultado;

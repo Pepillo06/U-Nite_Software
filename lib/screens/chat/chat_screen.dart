@@ -160,7 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _suscribirse() {
     _supabase
-        .channel('mensajes:${widget.conversacionId}')
+        .channel('mensajes_${widget.conversacionId}')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -170,9 +170,20 @@ class _ChatScreenState extends State<ChatScreen> {
             column: 'conversacion_id',
             value: widget.conversacionId,
           ),
-          callback: (payload) {
-            setState(() => _mensajes.add(payload.newRecord));
-            _scrollToBottom();
+          callback: (payload) async {
+            // Recargar todos los mensajes para asegurar consistencia
+            final data = await _supabase
+                .from('mensajes')
+                .select()
+                .eq('conversacion_id', widget.conversacionId)
+                .order('creado_en', ascending: true);
+            if (mounted) {
+              setState(() {
+                _mensajes = List<Map<String, dynamic>>.from(data);
+              });
+              _scrollToBottom();
+              await _marcarComoLeidos();
+            }
           },
         )
         .subscribe();
