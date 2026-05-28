@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,6 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // Preview del producto en el input (estilo WhatsApp)
   bool _mostrarPreviewProducto = false;
   String _estadoConexion = '';
+  Timer? _timerConexion;
 
   @override
   void initState() {
@@ -41,6 +43,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _loadAnuncio();
     _suscribirse();
     _cargarEstadoConexion();
+    // Refrescar estado de conexión cada 1 minuto
+    _timerConexion = Timer.periodic(const Duration(minutes: 1), (_) {
+      _cargarEstadoConexion();
+    });
   }
 
   Future<void> _cargarEstadoConexion() async {
@@ -60,7 +66,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final ahora = DateTime.now();
       final diferencia = ahora.difference(ultima);
 
-      if (diferencia.inMinutes < 2) {
+      if (diferencia.inMinutes  < 0.3) {
         setState(() => _estadoConexion = 'En línea');
       } else if (diferencia.inHours < 24 && ultima.day == ahora.day) {
         final hora =
@@ -682,6 +688,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _timerConexion?.cancel();
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
