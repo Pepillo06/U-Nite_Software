@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'edit_profile_page.dart';
+import 'market.dart';
 import 'theme.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -94,6 +95,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final String bioVendedor = _perfilData!['biografia_vendedor'] ?? '';
     final String bioAcademica = _perfilData!['biografia_academica'] ?? '';
     final String biografia = bioVendedor.isNotEmpty ? bioVendedor : bioAcademica;
+    final bool esVendedor = _perfilData!['es_vendedor'] ?? false;
+    final bool esEstudiante = _perfilData!['es_estudiante'] ?? false;
 
     return Scaffold(
       backgroundColor: _bgScaffold,
@@ -101,6 +104,17 @@ class _ProfilePageState extends State<ProfilePage> {
         toolbarHeight: 64,
         backgroundColor: Colors.white,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () {
+            // Forzamos la redirección directa a la Landing Page para recargar el botón
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (_) => const MarketPage()),
+              (route) => false, // Esto limpia el historial para evitar acumulaciones de pantallas
+            );
+          },
+        ),
         centerTitle: false,
         titleSpacing: 0,    
         title: Row(
@@ -198,14 +212,14 @@ class _ProfilePageState extends State<ProfilePage> {
                                         children: [
                                           const SizedBox(width: 230), // Espacio exacto para el avatar flotante (40 padding + 150 ancho avatar)
                                           Expanded(
-                                            child: _buildProfileTextInfo(nombre, apellido, universidad, biografia, carrera, semestre, isMobile)
+                                            child: _buildProfileTextInfo(nombre, apellido, universidad, biografia, carrera, semestre, isMobile, esVendedor, esEstudiante)
                                           ),
                                         ],
                                       ),
                                     ] else ...[
                                       // Diseño Móvil (Vertical Centrado)
                                       const SizedBox(height: 65), // Espacio que deja el avatar arriba en celular
-                                      _buildProfileTextInfo(nombre, apellido, universidad, biografia, carrera, semestre, isMobile),
+                                      _buildProfileTextInfo(nombre, apellido, universidad, biografia, carrera, semestre, isMobile, esVendedor, esEstudiante),
                                     ],
 
                                     const SizedBox(height: 40),
@@ -282,7 +296,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // Widget para los textos informativos
-  Widget _buildProfileTextInfo(String nombre, String apellido, String universidad, String biografia, String carrera, String semestre, bool isMobile) {
+  Widget _buildProfileTextInfo(String nombre, String apellido, String universidad, String biografia, String carrera, String semestre, bool isMobile, bool esVendedor, bool esEstudiante) {
     final String infoAcademica = carrera.isNotEmpty 
     ? '$universidad • $carrera' 
     : universidad;
@@ -300,24 +314,48 @@ class _ProfilePageState extends State<ProfilePage> {
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black87),
               textAlign: isMobile ? TextAlign.center : TextAlign.start,
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFDE8E0),
-                borderRadius: BorderRadius.circular(20),
+            
+            // PLAQUITA DE VENDEDOR
+            if (esVendedor)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE8E0), // Naranja clarito
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.storefront, size: 14, color: _orangeDark),
+                    const SizedBox(width: 4),
+                    Text(
+                      "Vendedor",
+                      style: TextStyle(color: _orangeDark, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.storefront, size: 14, color: _orangeDark),
-                  const SizedBox(width: 4),
-                  Text(
-                    "Vendedor",
-                    style: TextStyle(color: _orangeDark, fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ],
+
+            // PLAQUITA DE ESTUDIANTE (Verde con birrete)
+            if (esEstudiante)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9), // Verde clarito
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.school, size: 14, color: Color(0xFF2E7D32)), // Icono de birrete
+                    const SizedBox(width: 4),
+                    const Text(
+                      "Estudiante",
+                      style: TextStyle(color: Color(0xFF2E7D32), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 8),

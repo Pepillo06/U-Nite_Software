@@ -32,10 +32,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .select()
           .eq('usuario_id', userId)
           .order('creado_en', ascending: false);
+      List<Map<String, dynamic>> listaNotifs = List<Map<String, dynamic>>.from(data);
+
+      int valorUrgencia(Map<String, dynamic> notif) {
+        final datos = notif['datos'] as Map<String, dynamic>? ?? {};
+        final urg = datos['urgencia'] as String?;
+        if (urg == 'alta') return 3;
+        if (urg == 'media') return 2;
+        if (urg == 'baja') return 1;
+        return 0;
+      }
+
+      listaNotifs.sort((a, b) {
+        final uA = valorUrgencia(a);
+        final uB = valorUrgencia(b);
+        if (uA != uB) return uB.compareTo(uA); 
+        // Si tienen la misma urgencia, prioriza la fecha (más reciente)
+        final dateA = DateTime.parse(a['creado_en'].toString()).toLocal();
+        final dateB = DateTime.parse(b['creado_en'].toString()).toLocal();
+        return dateB.compareTo(dateA);
+      });
+
       setState(() {
-        _notificaciones = List<Map<String, dynamic>>.from(data);
+        _notificaciones = listaNotifs;
         _loading = false;
       });
+
     } catch (e) {
       setState(() => _loading = false);
     }
@@ -159,7 +181,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (diff.inDays == 1) return 'Ayer';
     return '${dt.day}/${dt.month}/${dt.year}';
   }
-
+  String _getEmojiUrgencia(String nivel) {
+    switch (nivel.toLowerCase()) {
+      case 'alta':
+        return '🔴';
+      case 'media':
+        return '🟡';
+      case 'baja':
+        return '🟢';
+      default:
+        return ''; 
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final noLeidas = _notificaciones.where((n) => n['leida'] == false).length;
@@ -332,8 +365,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                     color: const Color(
                                                         0xFF1A1A1A),
                                                   ),
-                                                ),
+                                                ),                                           
                                               ),
+                                              if (notif['datos'] != null && notif['datos']['urgencia'] != null)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(right: 6.0),
+                                                  child: Text(
+                                                    _getEmojiUrgencia(notif['datos']['urgencia'].toString()),
+                                                    style: const TextStyle(fontSize: 10),
+                                                  ),
+                                                ),
                                               Text(
                                                 _formatFecha(notif[
                                                     'creado_en']),

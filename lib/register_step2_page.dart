@@ -14,7 +14,7 @@ class RegisterStep2Page extends StatefulWidget {
 
 
 class _RegisterStep2PageState extends State<RegisterStep2Page> {
-  int _selectedProfile = 1;
+  final List<int> _selectedProfiles = [1];
 
   @override
   Widget build(BuildContext context) {
@@ -143,10 +143,25 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
     required Color iconColor,
     required bool isMobile,
   }) {
-    bool isSelected = _selectedProfile == index;
+    bool isSelected = _selectedProfiles.contains(index);
 
     return GestureDetector(
-      onTap: () => setState(() => _selectedProfile = index),
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            // Evita que deseleccionen todos (al menos debe quedar uno)
+            if (_selectedProfiles.length > 1) {
+              _selectedProfiles.remove(index);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Debes seleccionar al menos un perfil.')),
+              );
+            }
+          } else {
+            _selectedProfiles.add(index);
+          }
+        });
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         height: isMobile ? null : 245, 
@@ -184,7 +199,7 @@ class _RegisterStep2PageState extends State<RegisterStep2Page> {
         onPressed: () {
           // 1. Guardamos la elección del perfil en el modelo antes de irnos
           // Usamos widget.model porque el modelo vive en la clase padre (StatefulWidget)
-          widget.model.perfilSeleccionado = _selectedProfile;
+          widget.model.perfilSeleccionado = _selectedProfiles;
 
           // 2. Pasamos el modelo al Paso 3
           Navigator.push(
