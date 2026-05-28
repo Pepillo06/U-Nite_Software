@@ -263,6 +263,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
             .eq('conversacion_id', conv['id'])
             .eq('leido', false)
             .neq('remitente_id', userId);
+        
+        String? urgenciaNivel;
+        try {
+          final urgenciaData = await _supabase
+              .from('solicitudes_urgencia')
+              .select('nivel_urgencia')
+              .eq('anuncio_id', conv['anuncio_id'])
+              .eq('comprador_id', comprador['id'])
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          if (urgenciaData != null) {
+            urgenciaNivel = urgenciaData['nivel_urgencia'];
+          }
+        } catch (_) {}
 
         resultado.add({
           'id': conv['id'],
@@ -272,8 +287,22 @@ class _ChatListScreenState extends State<ChatListScreen> {
           'preview': preview,
           'hora': hora,
           'unread': noLeidos.length,
+          'urgencia': urgenciaNivel,
         });
       }
+      int valorUrgencia(String? urg) {
+        if (urg == 'alta') return 3;
+        if (urg == 'media') return 2;
+        if (urg == 'baja') return 1;
+        return 0;
+      }
+
+      resultado.sort((a, b) {
+        final uA = valorUrgencia(a['urgencia'] as String?);
+        final uB = valorUrgencia(b['urgencia'] as String?);
+        if (uA != uB) return uB.compareTo(uA); // Prioriza el número mayor (alta)
+        return 0; // Si tienen igual urgencia, mantiene el orden de fecha
+      });
 
       setState(() {
         _conversaciones = resultado;
@@ -729,6 +758,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         isActive: i == _selectedIndex,
         isOnline: false,
         unreadCount: chat['unread'] ?? 0,
+        urgencia: chat['urgencia'],
         searchQuery: _searchQuery,
         onTap: () => onTap(i),
       );
@@ -787,6 +817,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
 class _ChatTile extends StatelessWidget {
   final String nombre, preview, hora, searchQuery;
+  final String? urgencia;
   final bool isActive, isOnline;
   final int unreadCount;
   final VoidCallback onTap;
@@ -799,6 +830,7 @@ class _ChatTile extends StatelessWidget {
     required this.isOnline,
     required this.unreadCount,
     required this.onTap,
+    this.urgencia,
     this.searchQuery = '',
   });
 
@@ -885,6 +917,14 @@ class _ChatTile extends StatelessWidget {
                               color: const Color(0xFF1A1A1A)),
                         ),
                       ),
+                      if (urgencia != null && urgencia!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6.0),
+                          child: Text(
+                            urgencia == 'alta' ? '🔴' : (urgencia == 'media' ? '🟡' : '🟢'),
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                        ),
                       Text(hora,
                           style: GoogleFonts.lexend(
                               fontSize: 11,

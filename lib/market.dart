@@ -1472,6 +1472,17 @@ void _mostrarDetalleAnuncio(
                                       return;
                                     }
                                     try {
+                                      await supabase.from('solicitudes_urgencia').insert({
+                                        'comprador_id': compradorId,
+                                        'vendedor_id': vendedorId,
+                                        'anuncio_id': anuncioId,
+                                        'nivel_urgencia': urgencia, // Aquí pasamos lo que eligió el usuario
+                                        'estado': 'pendiente',
+                                      });
+                                    } catch (e) {
+                                      debugPrint('Error guardando urgencia: $e');
+                                    }
+                                    try {
                                       final existentes = await supabase
                                           .from('conversaciones')
                                           .select('id')
@@ -1526,6 +1537,7 @@ void _mostrarDetalleAnuncio(
                                               'nombre_otro': nombreVendedor,
                                               'otro_user_id': compradorId,
                                               'anuncio_id': anuncioId,
+                                              'urgencia': urgencia,
                                             },
                                           });
                                         } catch (_) {}
