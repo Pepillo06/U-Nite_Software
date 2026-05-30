@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:typed_data';
 import 'home_page.dart';
+import 'edit_post_page.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -772,7 +773,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                                 SizedBox(
                                                   width: double.infinity,
                                                   child: OutlinedButton(
-                                                    onPressed: () {},
+                                                    onPressed: () async {
+                                                      final result = await Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (_) => EditarArticuloPage(anuncio: anuncio),
+                                                        ),
+                                                      );
+                                                      if (result == true) {
+                                                        _loadMisAnuncios();
+                                                      }
+                                                    },
                                                     style: OutlinedButton.styleFrom(
                                                       padding:
                                                           const EdgeInsets.symmetric(

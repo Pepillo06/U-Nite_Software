@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'edit_profile_page.dart';
 import 'market.dart';
 import 'theme.dart';
+import 'market_widgets/detalle_anuncio_dialog.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -696,90 +697,96 @@ class _ProfilePageState extends State<ProfilePage> {
         final imagenes = modalidades['imagenes'] as List<dynamic>? ?? [];
         final tieneImagen = imagenes.isNotEmpty;
 
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFEEEEEE)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                    child: tieneImagen
-                        ? Image.network(imagenes[0], height: 160, width: double.infinity, fit: BoxFit.cover)
-                        : Container(
-                            height: 160, 
-                            width: double.infinity, 
-                            color: const Color(0xFFF0F0F0),
-                            child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 35),
-                          ),
-                  ),
-                  if (anuncio['categoria'] != null)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          anuncio['categoria'],
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
-                        ),
-                      ),
+        return GestureDetector(
+          onTap: () => showDialog(context: context, builder: (_) => DetalleAnuncioDialog(anuncio: anuncio)),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFEEEEEE)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      child: tieneImagen
+                          ? Image.network(imagenes[0], height: 160, width: double.infinity, fit: BoxFit.cover)
+                          : Container(
+                              height: 160, 
+                              width: double.infinity, 
+                              color: const Color(0xFFF0F0F0),
+                              child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 35),
+                            ),
                     ),
-                ],
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            anuncio['titulo'] ?? 'Sin título',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                    if (anuncio['categoria'] != null)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            anuncio['descripcion'] ?? 'Sin descripción',
-                            style: const TextStyle(fontSize: 12, color: Colors.black54),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                          child: Text(
+                            anuncio['categoria'],
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
                           ),
-                        ],
-                      ),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF5F5F5),
-                            foregroundColor: Colors.black87,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                          child: const Text("Ver Artículo", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                         ),
                       ),
-                    ],
+                  ],
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              anuncio['titulo'] ?? 'Sin título',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              anuncio['descripcion'] ?? 'Sin descripción',
+                              style: const TextStyle(fontSize: 12, color: Colors.black54),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => showDialog(
+                              context: context,
+                              builder: (_) => DetalleAnuncioDialog(anuncio: anuncio),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF5F5F5),
+                              foregroundColor: Colors.black87,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                            ),
+                            child: const Text("Ver Artículo", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
