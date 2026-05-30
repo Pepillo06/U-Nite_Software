@@ -3,12 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'profile_page.dart';
 import 'post_item.dart';
 import 'login_page.dart';
-import 'screens/chat/chat_list_screen.dart';
 import 'widgets/unite_header.dart';
-import 'urgencia_dialog.dart';
 import 'market_widgets/detalle_anuncio_dialog.dart';
 
 // ==========================================

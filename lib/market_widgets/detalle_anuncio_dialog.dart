@@ -4,7 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../theme.dart';
 import '../screens/chat/chat_list_screen.dart';
 import '../urgencia_dialog.dart';
-import '../profile_page.dart'; // Ajusta la ruta si es necesario
+import '../profile_page.dart';
+import '../public_profile_page.dart'; // Ajusta la ruta si es necesario
 
 // ============================================================
 // DIÁLOGO PRINCIPAL DE DETALLE DE ANUNCIO (REDISEÑADO)
@@ -133,17 +134,19 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
   void _irAlPerfilVendedor(BuildContext context) {
     final vendedorId = widget.anuncio['vendedor_id']?.toString() ?? '';
     if (vendedorId.isEmpty) return;
+
+    Navigator.pop(context); // Cierra el popup primero
+
     final currentUser = Supabase.instance.client.auth.currentUser;
     if (currentUser != null && currentUser.id == vendedorId) {
-      Navigator.pop(context);
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
-      return;
+      // Es el propio usuario → perfil propio con edición
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const ProfilePage()));
+    } else {
+      // Es otro usuario → perfil público sin botón de editar
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => PublicProfilePage(userId: vendedorId)));
     }
-    // Para perfil público de otro usuario, implementar PublicProfilePage:
-    // Navigator.push(context, MaterialPageRoute(builder: (_) => PublicProfilePage(userId: vendedorId)));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Redirigiendo al perfil del vendedor...')),
-    );
   }
 
   // ─── Contactar Vendedor (lógica 100% intacta) ─────────────────────────────
