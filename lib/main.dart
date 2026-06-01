@@ -4,6 +4,7 @@ import 'theme.dart';
 import 'home_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,8 +53,22 @@ class UNITEApp extends StatelessWidget {
         textTheme: GoogleFonts.lexendTextTheme(),
         useMaterial3: true,
       ),
-      home: const HomePage(),
       debugShowCheckedModeBanner: false,
+      
+      // 2. AÑADE ESTAS DOS PROPIEDADES DENTRO DE MATERIALAPP:
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', ''), // Español (configuración general)
+      ],
+      
+      // Define el idioma por defecto de la app (opcional pero recomendado)
+      locale: const Locale('es', ''), 
+
+      home: const HomePage(), // O tu página inicial
     );
   }
 }

@@ -436,10 +436,7 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
           final supabase = Supabase.instance.client;
 
           try {
-            // 1. Crear el usuario en Supabase Auth
-            // widget.model tiene los datos de los pasos anteriores
-            // correoController tiene el del paso actual
-            
+            // 1. Crear el usuario en Supabase Auth incluyendo la fecha en los user_metadata si lo desean
             final AuthResponse res = await supabase.auth.signUp(
               email: _correoController.text.trim(),
               password: _passwordController.text.trim(),
@@ -449,25 +446,25 @@ class _RegisterStep3PageState extends State<RegisterStep3Page> {
                 'cedula': widget.model.cedula,
                 'universidad': _selectedUniversidad, 
                 'carrera': _selectedCarrera, 
+                'fecha_nac': widget.model.fechaNacimiento, // Guardado en metadata
               },
             );
 
             final String? userId = res.user?.id;
 
             if (userId != null) {
-              // Verificamos si la lista de perfiles contiene el ID respectivo
-              // Usamos un casting explícito a List por seguridad
               final listaPerfiles = widget.model.perfilSeleccionado as List<int>;
               
               final bool esVendedor = listaPerfiles.contains(1);
               final bool esEstudiante = listaPerfiles.contains(2);
 
-              // 3. Hacemos un UPDATE en vez de un INSERT
+              // 2. Hacemos el UPDATE en la tabla 'usuarios' e inyectamos la fecha formateada
               await supabase
                   .from('usuarios')
                   .update({     
-                    'es_estudiante': esEstudiante, // Cambiará a TRUE si aplica
-                    'es_vendedor': esVendedor,     // Cambiará a TRUE si aplica
+                    'es_estudiante': esEstudiante, 
+                    'es_vendedor': esVendedor,
+                    'fecha_nac': widget.model.fechaNacimiento, // <-- AQUÍ SE GUARDE EN TU COLUMNA DE BD
                   })
                   .eq('id', userId);
 

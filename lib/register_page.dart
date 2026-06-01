@@ -23,9 +23,9 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _fechaController = TextEditingController();
   final TextEditingController _cedulaController = TextEditingController();
 
+  // 1. ACTUALIZA TU FUNCIÓN _goToStep2 PARA ASIGNAR EL VALOR CORRECTO
   void _goToStep2() {
     setState(() {
-      // Validamos cada campo y asignamos mensaje si está vacío
       _nombreError = _nombreController.text.trim().isEmpty 
           ? "* El nombre es obligatorio" 
           : null;
@@ -40,7 +40,6 @@ class _RegisterPageState extends State<RegisterPage> {
           : null;
     });
 
-    // Si alguno tiene error, detenemos la ejecución
     if (_nombreError != null || 
         _apellidoError != null || 
         _cedulaError != null || 
@@ -51,6 +50,7 @@ class _RegisterPageState extends State<RegisterPage> {
     registrationModel.nombre = _nombreController.text.trim();
     registrationModel.apellido = _apellidoController.text.trim();
     registrationModel.cedula = _cedulaController.text.trim();
+    // Aquí se guarda el texto con formato YYYY-MM-DD que ya tendrá el controlador
     registrationModel.fechaNacimiento = _fechaController.text.trim();
 
     Navigator.push(
@@ -181,16 +181,42 @@ class _RegisterPageState extends State<RegisterPage> {
                               _buildResponsiveNameFields(isMobile),
                               const SizedBox(height: 20),
                               _buildFormField(
-                                "Fecha de Nacimiento",
-                                "dd/mm/yyyy",
-                                controller: _fechaController,
-                                errorText: _fechaError,
-                                icon: Icons.calendar_today_outlined,
-                                readOnly: true,
-                                onTap: () => setState(
-                                  () => _showCalendar = !_showCalendar,
+                                  "Fecha de Nacimiento",
+                                  "Selecciona tu fecha",
+                                  controller: _fechaController,
+                                  errorText: _fechaError,
+                                  icon: Icons.calendar_today_outlined,
+                                  readOnly: true,
+                                  onTap: () async {
+                                    // Abre el DatePicker nativo de Flutter, mucho más amigable
+                                    DateTime? pickedDate = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime(2005), // Año sugerido de inicio
+                                      firstDate: DateTime(1900),
+                                      lastDate: DateTime.now(),
+                                      builder: (context, child) {
+                                        return Theme(
+                                          data: Theme.of(context).copyWith(
+                                            colorScheme: const ColorScheme.light(
+                                              primary: UColors.orangeDark, // Cambia el color del header al de tu app
+                                              onPrimary: Colors.white,
+                                              onSurface: Colors.black87,
+                                            ),
+                                          ),
+                                          child: child!,
+                                        );
+                                      },
+                                    );
+
+                                    if (pickedDate != null) {
+                                      setState(() {
+                                        _fechaError = null; // Limpiamos el error
+                                        // Formato YYYY-MM-DD recomendado por tu compañero de Base de Datos
+                                        _fechaController.text = "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+                                      });
+                                    }
+                                  },
                                 ),
-                              ),
                               if (_showCalendar) _buildCalendarWidget(),
                               const SizedBox(height: 20),
                               _buildFormField(

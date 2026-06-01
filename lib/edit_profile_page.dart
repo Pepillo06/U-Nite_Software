@@ -42,12 +42,74 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _nombreController = TextEditingController();
   final _apellidoController = TextEditingController();
   final _cedulaController = TextEditingController();
-  final _universidadController = TextEditingController();
-  final _carreraController = TextEditingController();
+  // final _universidadController = TextEditingController();
+  // final _carreraController = TextEditingController();
   final _semestreController = TextEditingController(); // Nuevo controlador
   final _biografiaAcademicaController = TextEditingController();
   final _biografiaVentasController = TextEditingController();
+  final _fechaNacimientoController = TextEditingController();
   DateTime? _selectedFechaNacimiento;
+
+  // Dropdowns de universidad y carrera
+  String? _selectedUniversidad;
+  String? _selectedCarrera;
+
+  final List<String> _universidades = [
+    "No estoy estudiando actualmente",
+    "Universidad Metropolitana",
+    "Universidad Católica Andrés Bello",
+    "Universidad Santa María",
+    "Universidad Central de Venezuela",
+    "Universidad Monteávila",
+    "Universidad Simón Bolívar",
+  ];
+
+  final Map<String, List<String>> _carrerasPorUniversidad = {
+    "Universidad Metropolitana": [
+      "Ingeniería de Sistemas", "Ingeniería Eléctrica", "Ingeniería Mecánica",
+      "Ingeniería Civil", "Ingeniería de Producción", "Ingeniería Química",
+      "Administración de Empresas", "Contaduría Pública", "Economía", "Derecho",
+      "Psicología", "Idiomas Modernos", "Estudios Liberales", "Diseño Gráfico", "Educación",
+    ],
+    "Universidad Católica Andrés Bello": [
+      "Ingeniería Civil", "Ingeniería Eléctrica", "Ingeniería de Telecomunicaciones",
+      "Ingeniería Industrial", "Ingeniería Informática", "Administración de Empresas",
+      "Contaduría Pública", "Economía", "Relaciones Industriales", "Comunicación Social",
+      "Derecho", "Psicología", "Educación", "Filosofía", "Teología", "Letras",
+      "Sociología", "Ciencias Políticas", "Trabajo Social", "Arquitectura",
+    ],
+    "Universidad Santa María": [
+      "Ingeniería Civil", "Ingeniería Eléctrica", "Ingeniería Industrial",
+      "Ingeniería de Sistemas", "Ingeniería Mecánica", "Arquitectura",
+      "Administración de Empresas", "Contaduría Pública", "Derecho", "Farmacia", "Odontología",
+    ],
+    "Universidad Central de Venezuela": [
+      "Ingeniería Civil", "Ingeniería Eléctrica", "Ingeniería Mecánica",
+      "Ingeniería Industrial", "Ingeniería Química", "Ingeniería Geológica",
+      "Ingeniería de Computación", "Ingeniería de Petróleo", "Ingeniería Geodésica",
+      "Arquitectura", "Urbanismo", "Administración de Empresas", "Contaduría Pública",
+      "Economía", "Estudios Internacionales", "Trabajo Social", "Sociología",
+      "Antropología", "Geografía", "Historia", "Filosofía", "Letras", "Idiomas Modernos",
+      "Comunicación Social", "Derecho", "Psicología", "Educación", "Medicina", "Farmacia",
+      "Odontología", "Bioanálisis", "Enfermería", "Ciencias Biológicas", "Química",
+      "Matemáticas", "Física", "Computación", "Estadística", "Agronomía", "Veterinaria",
+    ],
+    "Universidad Monteávila": [
+      "Administración de Empresas", "Comunicación Social", "Derecho",
+      "Educación", "Psicología", "Ingeniería Informática", "Filosofía",
+    ],
+    "Universidad Simón Bolívar": [
+      "Ingeniería de Computación", "Ingeniería Eléctrica", "Ingeniería Electrónica",
+      "Ingeniería Mecánica", "Ingeniería Química", "Ingeniería de Materiales",
+      "Ingeniería de Producción", "Ingeniería Geofísica", "Ingeniería Ambiental",
+      "Ingeniería de la Computación (Tecnológica)", "Ingeniería Electrónica (Tecnológica)",
+      "Licenciatura en Ciencias de los Materiales", "Licenciatura en Biología",
+      "Licenciatura en Química", "Licenciatura en Física", "Licenciatura en Matemáticas",
+      "Licenciatura en Computación", "Licenciatura en Estadística", "Arquitectura",
+      "Urbanismo", "Diseño Industrial", "Diseño Gráfico", "Administración del Turismo",
+      "Administración de Aduanas y Comercio Exterior", "Ciencias Ambientales",
+    ],
+  };
 
   @override
   void initState() {
@@ -62,8 +124,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _nombreController.dispose();
     _apellidoController.dispose();
     _cedulaController.dispose();
-    _universidadController.dispose();
-    _carreraController.dispose();
+    _fechaNacimientoController.dispose();
+    // _universidadController.dispose();
+    // _carreraController.dispose();
     _semestreController.dispose();
     _biografiaAcademicaController.dispose();
     _biografiaVentasController.dispose();
@@ -101,15 +164,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _nombreController.text = data['primer_nombre'] ?? '';
         _apellidoController.text = data['primer_apellido'] ?? '';
         _cedulaController.text = data['cedula']?.toString() ?? '';
-        _universidadController.text = data['universidad'] ?? '';
-        _carreraController.text = data['carrera'] ?? '';
+        // _universidadController.text = data['universidad'] ?? '';
+        // _carreraController.text = data['carrera'] ?? '';
         _semestreController.text = data['semestre']?.toString() ?? '';
         _biografiaAcademicaController.text = data['biografia_academica'] ?? '';
         _biografiaVentasController.text = data['biografia_vendedor'] ?? '';
         _newProfileImageBytes = null;
+        _selectedUniversidad = data['universidad'];
+        _selectedCarrera = data['carrera'];
 
-        if (data['fecha_nacimiento'] != null) {
-          _selectedFechaNacimiento = DateTime.parse(data['fecha_nacimiento']);
+        if (data['fecha_nac'] != null) {
+          _selectedFechaNacimiento = DateTime.tryParse(data['fecha_nac']);
+          if (_selectedFechaNacimiento != null) {
+            _fechaNacimientoController.text = DateFormat('dd/MM/yyyy').format(_selectedFechaNacimiento!);
+          }
+        } else {
+          _fechaNacimientoController.text = ""; // Por si no tiene fecha registrada
         }
         _isLoadingData = false;
       });
@@ -259,12 +329,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
           .update({
             'primer_nombre': _nombreController.text.trim(),
             'primer_apellido': _apellidoController.text.trim(),
-            'universidad': _universidadController.text.trim(),
-            'carrera': _carreraController.text.trim(),
+            // 'universidad': _universidadController.text.trim(),
+            // 'carrera': _carreraController.text.trim(),
             //'semestre': int.tryParse(_semestreController.text),
             'biografia_academica': _biografiaAcademicaController.text.trim(),
             'biografia_vendedor': _biografiaVentasController.text.trim(),
-            //'fecha_nacimiento': _selectedFechaNacimiento?.toIso8601String(),
+            'fecha_nac': _selectedFechaNacimiento?.toIso8601String(),
+            'universidad': _selectedUniversidad,
+            'carrera': _selectedCarrera,
           })
           .eq('id', _userId!);
       //Navigator.pop(context, true);  //Esto es lo que hace que se recargue el nombre en el profile_page
@@ -555,16 +627,33 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           Row(
                             children: [
                               Expanded(
-                                child: _buildInputField(
-                                  "Universidad",
-                                  _universidadController,
+                                child: _buildDropdownField(
+                                  label: "Universidad",
+                                  hint: "Selecciona tu universidad",
+                                  value: _selectedUniversidad,
+                                  items: _universidades,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _selectedUniversidad = val;
+                                      _selectedCarrera = null; // Resetea la carrera al cambiar universidad
+                                    });
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 20),
                               Expanded(
-                                child: _buildInputField(
-                                  "Carrera",
-                                  _carreraController,
+                                child: _buildDropdownField(
+                                  label: "Carrera",
+                                  hint: "Selecciona tu carrera",
+                                  value: _selectedCarrera,
+                                  items: (_selectedUniversidad != null &&
+                                          _selectedUniversidad != "No estoy estudiando actualmente")
+                                      ? (_carrerasPorUniversidad[_selectedUniversidad] ?? [])
+                                      : [],
+                                  onChanged: _selectedUniversidad == null ||
+                                          _selectedUniversidad == "No estoy estudiando actualmente"
+                                      ? null
+                                      : (val) => setState(() => _selectedCarrera = val),
                                 ),
                               ),
                             ],
@@ -1039,32 +1128,36 @@ class _EditProfilePageState extends State<EditProfilePage> {
               firstDate: DateTime(1950),
               lastDate: DateTime.now(),
             );
-            if (picked != null)
-              setState(() => _selectedFechaNacimiento = picked);
+            if (picked != null) {
+              setState(() {
+                _selectedFechaNacimiento = picked;
+                // 👈 Actualiza el texto en pantalla inmediatamente al seleccionar
+                _fechaNacimientoController.text = DateFormat('dd/MM/yyyy').format(picked);
+              });
+            }
           },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F5),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _selectedFechaNacimiento == null
-                      ? "DD/MM/YYYY"
-                      : DateFormat(
-                          'dd/MM/yyyy',
-                        ).format(_selectedFechaNacimiento!),
-                  style: const TextStyle(fontSize: 14),
+          child: IgnorePointer( // Evita que se abra el teclado del sistema en web/móvil
+            child: TextField(
+              controller: _fechaNacimientoController,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFFF5F5F5),
+                hintText: "DD/MM/YYYY",
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 12,
                 ),
-                const Icon(
+                suffixIcon: const Icon(
                   Icons.calendar_today_outlined,
                   size: 16,
                   color: Colors.black54,
                 ),
-              ],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
             ),
           ),
         ),
@@ -1262,6 +1355,49 @@ class _EditProfilePageState extends State<EditProfilePage> {
           ),
         ],
       ),
+    );
+  }
+  Widget _buildDropdownField({
+    required String label,
+    required String hint,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?>? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: onChanged == null ? const Color(0xFFF0F0F0) : const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: items.contains(value) ? value : null,
+              hint: Text(hint, style: const TextStyle(fontSize: 14, color: Colors.black38)),
+              isExpanded: true,
+              onChanged: onChanged,
+              items: items.map((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item, style: const TextStyle(fontSize: 14)),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
