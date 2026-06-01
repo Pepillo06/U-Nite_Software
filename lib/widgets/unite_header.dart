@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../market.dart';
 import '../login_page.dart';
 import '../profile_page.dart';
+import '../home_page.dart';
 import '../screens/chat/chat_list_screen.dart';
 import '../screens/chat/notifications_screen.dart';
 
@@ -333,16 +334,66 @@ class _UniteHeaderState extends State<UniteHeader> {
 
               const SizedBox(width: 8),
 
-              // Avatar + nombre
-              GestureDetector(
-                onTap: () {
-                  if (_verificarAutenticacion()) {
+              // Avatar + nombre con dropdown
+              PopupMenuButton<String>(
+                offset: const Offset(0, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFEEEEEE)),
+                ),
+                color: Colors.white,
+                elevation: 8,
+                onSelected: (value) async {
+                  if (value == 'perfil') {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const ProfilePage()),
                     ).then((_) => _cargarUsuario());
+                  } else if (value == 'cerrar_sesion') {
+                    await _supabase.auth.signOut();
+                    if (mounted) {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const HomePage()),
+                        (route) => false,
+                      );
+                    }
                   }
                 },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'perfil',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_outline, size: 18, color: Color(0xFF4A4A4A)),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Ver perfil',
+                          style: GoogleFonts.lexend(
+                            fontSize: 14,
+                            color: const Color(0xFF333333),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(height: 1),
+                  PopupMenuItem(
+                    value: 'cerrar_sesion',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.logout_outlined, size: 18, color: Colors.redAccent),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Cerrar sesión',
+                          style: GoogleFonts.lexend(
+                            fontSize: 14,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 child: Row(
                   children: [
                     if (!isMobile && _nombreCompleto != null) ...[

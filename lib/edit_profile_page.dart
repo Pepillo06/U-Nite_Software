@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -63,6 +64,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
     "Universidad Monteávila",
     "Universidad Simón Bolívar",
   ];
+
+  // Universidades que usan trimestre (las demás usan semestre)
+  final Set<String> _universidadesPorTrimestre = {
+    "Universidad Metropolitana",
+    "Universidad Simón Bolívar",
+    "Universidad Monteávila",
+  };
+
+  // Getter que devuelve "Trimestre" o "Semestre" según la universidad seleccionada
+  String get _labelPeriodo {
+    if (_selectedUniversidad != null &&
+        _universidadesPorTrimestre.contains(_selectedUniversidad)) {
+      return "Trimestre";
+    }
+    return "Semestre";
+  }
 
   final Map<String, List<String>> _carrerasPorUniversidad = {
     "Universidad Metropolitana": [
@@ -166,7 +183,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _cedulaController.text = data['cedula']?.toString() ?? '';
         // _universidadController.text = data['universidad'] ?? '';
         // _carreraController.text = data['carrera'] ?? '';
-        _semestreController.text = data['semestre']?.toString() ?? '';
+        _semestreController.text = data['trimestre_actual']?.toString() ?? '';
         _biografiaAcademicaController.text = data['biografia_academica'] ?? '';
         _biografiaVentasController.text = data['biografia_vendedor'] ?? '';
         _newProfileImageBytes = null;
@@ -331,12 +348,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
             'primer_apellido': _apellidoController.text.trim(),
             // 'universidad': _universidadController.text.trim(),
             // 'carrera': _carreraController.text.trim(),
-            //'semestre': int.tryParse(_semestreController.text),
             'biografia_academica': _biografiaAcademicaController.text.trim(),
             'biografia_vendedor': _biografiaVentasController.text.trim(),
             'fecha_nac': _selectedFechaNacimiento?.toIso8601String(),
             'universidad': _selectedUniversidad,
             'carrera': _selectedCarrera,
+            'trimestre_actual': int.tryParse(_semestreController.text.trim()),
           })
           .eq('id', _userId!);
       //Navigator.pop(context, true);  //Esto es lo que hace que se recargue el nombre en el profile_page
@@ -636,6 +653,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     setState(() {
                                       _selectedUniversidad = val;
                                       _selectedCarrera = null; // Resetea la carrera al cambiar universidad
+                                      _semestreController.clear(); // Resetea el periodo al cambiar universidad
                                     });
                                   },
                                 ),
@@ -660,8 +678,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           ),
                           const SizedBox(height: 15),
                           _buildInputField(
-                            "Semestre (Ej: 6)",
+                            "$_labelPeriodo actual (Ej: ${_labelPeriodo == 'Trimestre' ? '3' : '6'})",
                             _semestreController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           ),
                           const SizedBox(height: 15),
                           _buildInputField(
@@ -1072,6 +1092,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     TextEditingController controller, {
     bool enabled = true,
     int maxLines = 1,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1089,6 +1111,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           controller: controller,
           enabled: enabled,
           maxLines: maxLines,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           style: const TextStyle(fontSize: 14),
           decoration: InputDecoration(
             filled: true,
