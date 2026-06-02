@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:typed_data';
 import 'home_page.dart';
 import 'edit_post_page.dart';
+import 'theme.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -15,6 +16,10 @@ class EditProfilePage extends StatefulWidget {
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
+  // 👇 NUEVOS ESTADOS Y CONTROLADORES PARA FORTALEZAS
+  List<String> _fortalezas = [];
+  final _fortalezaController = TextEditingController();
+  
   final _supabase = Supabase.instance.client;
   final _picker = ImagePicker();
 
@@ -54,6 +59,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   // Dropdowns de universidad y carrera
   String? _selectedUniversidad;
   String? _selectedCarrera;
+
+  String? _errorFortaleza;
 
   final List<String> _universidades = [
     "No estoy estudiando actualmente",
@@ -145,6 +152,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     // _universidadController.dispose();
     // _carreraController.dispose();
     _semestreController.dispose();
+    _fortalezaController.dispose();
     _biografiaAcademicaController.dispose();
     _biografiaVentasController.dispose();
     super.dispose();
@@ -189,6 +197,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _newProfileImageBytes = null;
         _selectedUniversidad = data['universidad'];
         _selectedCarrera = data['carrera'];
+
+        _fortalezas = List<String>.from(data['fortalezas'] ?? []);
 
         if (data['fecha_nac'] != null) {
           _selectedFechaNacimiento = DateTime.tryParse(data['fecha_nac']);
@@ -354,6 +364,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             'universidad': _selectedUniversidad,
             'carrera': _selectedCarrera,
             'trimestre_actual': int.tryParse(_semestreController.text.trim()),
+            'fortalezas': _fortalezas,
           })
           .eq('id', _userId!);
       //Navigator.pop(context, true);  //Esto es lo que hace que se recargue el nombre en el profile_page
@@ -678,7 +689,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                           ),
                           const SizedBox(height: 15),
                           _buildInputField(
-                            "$_labelPeriodo actual (Ej: ${_labelPeriodo == 'Trimestre' ? '3' : '6'})",
+                            "$_labelPeriodo actual...",
                             _semestreController,
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -689,6 +700,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             _biografiaAcademicaController,
                             maxLines: 3,
                           ),
+                          
+                          // 👇 AQUÍ LO INSERTAS
+                          const SizedBox(height: 20),
+                          _buildFortalezasSection(), 
+                          
                           const SizedBox(height: 30),
                           const Divider(),
                           const SizedBox(height: 10),
@@ -1420,6 +1436,165 @@ class _EditProfilePageState extends State<EditProfilePage> {
               }).toList(),
             ),
           ),
+        ),
+      ],
+    );
+  }
+  
+  // 👇 WIDGET ACTUALIZADO: BORDE DE ERROR DINÁMICO EN EL INPUT
+  Widget _buildFortalezasSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Mis Fortalezas Académicas",
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- COLUMNA IZQUIERDA: INPUT + BOTÓN ---
+            SizedBox(
+              width: 320,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _fortalezaController,
+                      maxLength: 30,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF5F5F5),
+                        hintText: "Ej: Cálculo, Flutter...",
+                        hintStyle: const TextStyle(color: Colors.black38),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        counterText: "",
+                        errorText: _errorFortaleza,
+                        errorStyle: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.redAccent, width: 2.0),
+                        ),
+                      ),
+                      onChanged: (text) {
+                        if (text.length >= 30) {
+                          setState(() {
+                            _errorFortaleza = "Máximo 30 caracteres permitidos";
+                          });
+                        } else if (_errorFortaleza != null) {
+                          setState(() {
+                            _errorFortaleza = null;
+                          });
+                        }
+                      },
+                      onSubmitted: (_) {
+                        final texto = _fortalezaController.text.trim();
+                        if (texto.isNotEmpty && !_fortalezas.contains(texto)) {
+                          setState(() {
+                            _fortalezas.add(texto);
+                            _fortalezaController.clear();
+                            _errorFortaleza = null;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final texto = _fortalezaController.text.trim();
+                      if (texto.isNotEmpty && !_fortalezas.contains(texto)) {
+                        setState(() {
+                          _fortalezas.add(texto);
+                          _fortalezaController.clear();
+                          _errorFortaleza = null;
+                        });
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF05600),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    child: const Icon(Icons.add, color: Colors.white, size: 20),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 24),
+            // --- COLUMNA DERECHA: APARTADO DE BURBUJAS ---
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: _fortalezas.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          "Las fortalezas añadidas aparecerán aquí.",
+                          style: TextStyle(fontSize: 13, color: Colors.black38, fontStyle: FontStyle.italic),
+                        ),
+                      )
+                    : Wrap(
+                        spacing: 8.0,
+                        runSpacing: 6.0,
+                        children: _fortalezas.map((fortaleza) {
+                          return Chip(
+                            label: Text(
+                              fortaleza,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Color.fromARGB(255, 13, 70, 26),
+                              ),
+                            ),
+                            backgroundColor: const Color.fromARGB(255, 223, 247, 228),
+                            side: BorderSide.none,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            deleteIcon: const Icon(Icons.cancel, size: 16, color: Color.fromARGB(255, 13, 70, 26)),
+                            onDeleted: () {
+                              setState(() {
+                                _fortalezas.remove(fortaleza);
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+              ),
+            ),
+          ],
         ),
       ],
     );

@@ -19,6 +19,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = true;
   Map<String, dynamic>? _perfilData;
   List<Map<String, dynamic>> _misAnuncios = [];
+  List<String> _fortalezas = [];
   
   // Estado para el toggle de perfiles dobles
   bool _isVendedorMode = false;
@@ -56,6 +57,7 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() {
           _perfilData = userData;
           _misAnuncios = List<Map<String, dynamic>>.from(anunciosData);
+          _fortalezas = List<String>.from(userData['fortalezas'] ?? []);
           
           if (userData['es_vendedor'] == true && userData['es_estudiante'] == false) {
             _isVendedorMode = true;
@@ -538,37 +540,52 @@ class _ProfilePageState extends State<ProfilePage> {
         valueColor: const Color(0xFF1B5E20), 
         subtitleColor: const Color(0xFF2E7D32), 
       ),
-      _buildStatCard(
-        title: "Zonas de Entrega",
-        icon: Icons.location_on_outlined, // ICONO AQUÍ
-        customContent: lugaresEntrega.isEmpty
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: const [
-                  Text('--', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Colors.black87)),
-                  SizedBox(width: 6),
-                  Text('UNIVERSIDADES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black45)),
-                ],
-              )
-            : Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: lugaresEntrega.map((lugar) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF2EFED),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      lugar,
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF5D4A41), fontWeight: FontWeight.bold),
-                    ),
-                  );
-                }).toList(),
-              ),
-      ),
+      // Mostrar "Habilidades y Perfil" si es solo estudiante, o si el switch está en modo estudiante
+      if (!_isVendedorMode)
+        _buildStatCard(
+          title: "Habilidades y Perfil",
+          icon: Icons.trending_up_outlined,
+          customContent: _buildHabilidadesBubbles(),
+        )
+      else
+        _buildStatCard(
+          title: "Zonas de Entrega",
+          icon: Icons.location_on_outlined,
+          customContent: lugaresEntrega.isEmpty
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: const [
+                    Text('--', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Colors.black87)),
+                    SizedBox(width: 6),
+                    Text('UNIVERSIDADES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black45)),
+                  ],
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: lugaresEntrega.map((lugar) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD5B8),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.location_on, size: 14, color: Color(0xFFBF360C)),
+                          const SizedBox(width: 5),
+                          Text(
+                            lugar,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
       _buildStatCard(
         title: "Antigüedad",
         icon: Icons.calendar_today_outlined, // ICONO AQUÍ
@@ -600,6 +617,43 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       );
     }
+  }
+
+  Widget _buildHabilidadesBubbles() {
+    if (_fortalezas.isEmpty) {
+      return const Text(
+        'Sin habilidades registradas.',
+        style: TextStyle(fontSize: 13, color: Colors.black45, fontStyle: FontStyle.italic),
+      );
+    }
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _fortalezas.map((fortaleza) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: const Color(0xFFB7F0B1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.trending_up, size: 14, color: Color(0xFF1B5E20)),
+              const SizedBox(width: 5),
+              Text(
+                fortaleza,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
   }
 
   Widget _buildStatCard({

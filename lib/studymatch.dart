@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'theme.dart';
 
 // ─── AJUSTA ESTE PATH según tu estructura de carpetas ───────────────────────
 import '../widgets/unite_header.dart';
@@ -315,40 +316,59 @@ class _Sidebar extends StatelessWidget {
     _SI(icon: Icons.grid_view_rounded, label: 'Grupos', isHeader: true),
     _SI(icon: null, label: 'Mis Grupos', isHeader: false),
     _SI(icon: null, label: 'Grupos Públicos', isHeader: false),
-    _SI(icon: Icons.people_alt_outlined, label: 'Amigos', isHeader: true),
+    // ─── NUEVA SUBDIVISIÓN DE PERSONAS ──────────────────────────────────────
+    _SI(icon: Icons.people_alt_outlined, label: 'Personas', isHeader: true),
+    _SI(icon: null, label: 'Amigos', isHeader: false),
+    _SI(icon: null, label: 'Estudiantes', isHeader: false),
+    // ────────────────────────────────────────────────────────────────────────
   ];
 
   @override
   Widget build(BuildContext context) {
-    final bool showSubItems = (selected == 0 || selected == 1 || selected == 2);
+    // Detectamos si el tab seleccionado pertenece al bloque de Grupos o al de Personas
+    final bool showGruposSubItems = (selected >= 0 && selected <= 2);
+    final bool showPersonasSubItems = (selected >= 3 && selected <= 5);
 
-    // Separamos los widgets en componentes para poder animar los subgrupos juntos
     Widget? gruposTile;
-    final List<Widget> subTiles = [];
-    Widget? amigosTile;
+    final List<Widget> gruposSubTiles = [];
+    Widget? personasTile;
+    final List<Widget> personasSubTiles = [];
 
     for (int i = 0; i < _items.length; i++) {
       final item = _items[i];
       final isSubItem = !item.isHeader;
 
+      // Lógica de activación visual:
       final bool isActive = (i == 0) 
-          ? (selected == 0 || selected == 1 || selected == 2) 
-          : (selected == i);
+          ? showGruposSubItems 
+          : (i == 3)
+              ? showPersonasSubItems
+              : (selected == i);
 
       final tile = GestureDetector(
-        onTap: () => onSelect(i),
+        onTap: () {
+          // ─── PRIMER CAMBIO: COLAPSAR SI YA ESTÁ ABIERTA LA SECCIÓN ───
+          if (i == 0 && showGruposSubItems) {
+            onSelect(-1); // Cierra grupos si vuelves a clickear el header
+          } else if (i == 3 && showPersonasSubItems) {
+            onSelect(-1); // Cierra personas si vuelves a clickear el header
+          } else {
+            onSelect(i);  // Navegación/Apertura normal
+          }
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          width: 160,
+          // ─── SEGUNDO CAMBIO: RESPONSIVE (En web/vertical mantiene 160, en móvil se adapta) ───
+          width: horizontal ? null : 160, 
           padding: horizontal
               ? EdgeInsets.symmetric(
-                  horizontal: compact ? 10 : 14, vertical: compact ? 7 : 9)
+                  horizontal: compact ? 12 : 14, vertical: compact ? 7 : 9)
               : EdgeInsets.symmetric(
                   horizontal: isSubItem ? 12 : 10, vertical: 9),
           decoration: BoxDecoration(
-            color: (isActive && i != 0 && i != 3) ? const Color(0xFFEFE0D0) : Colors.transparent,
+            color: (isActive && !item.isHeader) ? const Color(0xFFEFE0D0) : Colors.transparent,
             borderRadius: BorderRadius.circular(50),
-            border: (isActive && (i == 0 || i == 3)) 
+            border: (isActive && item.isHeader) 
                 ? Border.all(
                     color: const Color(0xFFE65100),
                     width: 1.0,
@@ -381,7 +401,7 @@ class _Sidebar extends StatelessWidget {
               Text(
                 item.label,
                 style: GoogleFonts.lexend(
-                  fontSize: compact ? 13 : 14,
+                  fontSize: compact ? 12 : 14, // Un punto menos en móvil para evitar saltos de línea rústicos
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                   color: isActive
                       ? const Color(0xFFE65100)
@@ -393,43 +413,57 @@ class _Sidebar extends StatelessWidget {
         ),
       );
 
-      // Preparamos el diseño del elemento con su respectivo espaciado
       final tileWithPadding = Padding(
         padding: horizontal 
-            ? const EdgeInsets.only(right: 6) 
+            ? const EdgeInsets.only(right: 8) // Separación un poco más amplia en el Row horizontal
             : const EdgeInsets.only(bottom: 2),
         child: tile,
       );
 
-      // Clasificamos cada botón según su índice
+      // Clasificamos cada botón según su nuevo índice en la lista
       if (i == 0) gruposTile = tileWithPadding;
-      if (i == 1 || i == 2) subTiles.add(tileWithPadding);
-      if (i == 3) amigosTile = tileWithPadding;
+      if (i == 1 || i == 2) gruposSubTiles.add(tileWithPadding);
+      if (i == 3) personasTile = tileWithPadding;
+      if (i == 4 || i == 5) personasSubTiles.add(tileWithPadding);
     }
 
     // --- CONSTRUCCIÓN DEL MENÚ CON ANIMACIÓN ---
     final List<Widget> tiles = [];
     
+    // 1. Bloque de Grupos
     if (gruposTile != null) tiles.add(gruposTile);
-
-    // Widget mágico que anima el tamaño fluidamente
     tiles.add(
       AnimatedSize(
-        duration: const Duration(milliseconds: 300), // Duración ideal para interfaces
-        curve: Curves.fastOutSlowIn,                // Una curva súper fluida y moderna
-        child: ClipRect(                            // Evita que los subgrupos se desborden mientras se encogen
-          child: showSubItems
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.fastOutSlowIn,
+        child: ClipRect(
+          child: showGruposSubItems
               ? (horizontal 
-                  ? Row(mainAxisSize: MainAxisSize.min, children: subTiles)
-                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: subTiles))
-              : (horizontal 
-                  ? const SizedBox(width: 0) 
-                  : const SizedBox(height: 0)), // Se encoge a tamaño cero
+                  ? Row(mainAxisSize: MainAxisSize.min, children: gruposSubTiles)
+                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: gruposSubTiles))
+              : (horizontal ? const SizedBox(width: 0) : const SizedBox(height: 0)),
         ),
       ),
     );
 
-    if (amigosTile != null) tiles.add(amigosTile);
+    // Espaciado sutil entre bloques si es vertical
+    if (!horizontal) tiles.add(const SizedBox(height: 6));
+
+    // 2. Bloque de Personas
+    if (personasTile != null) tiles.add(personasTile);
+    tiles.add(
+      AnimatedSize(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.fastOutSlowIn,
+        child: ClipRect(
+          child: showPersonasSubItems
+              ? (horizontal 
+                  ? Row(mainAxisSize: MainAxisSize.min, children: personasSubTiles)
+                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: personasSubTiles))
+              : (horizontal ? const SizedBox(width: 0) : const SizedBox(height: 0)),
+        ),
+      ),
+    );
 
     // Retorno estructural final
     if (horizontal) {
