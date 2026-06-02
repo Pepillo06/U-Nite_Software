@@ -6,7 +6,7 @@ import '../login_page.dart';
 import '../profile_page.dart';
 import '../home_page.dart';
 import '../screens/chat/chat_list_screen.dart';
-import '../screens/chat/notifications_screen.dart';
+import '../screens/chat/notifications_screen.dart'; //hola
 
 class UniteHeader extends StatefulWidget implements PreferredSizeWidget {
   final int currentIndex;
