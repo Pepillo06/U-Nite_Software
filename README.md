@@ -7,7 +7,7 @@ Integrantes:
 - Jabrieliz Cuello C.I: 31.979.214
 - Luis Arcia C.I: 30.124.773
 - Santiago Atacho C.I: 28.687.638
-- Sofia Machado C.I: 31.784.009
+- Sofia Machado C.I: 31.784.009 
 
 Link de github: https://github.com/Pepillo06/U-Nite_Software.git
 
