@@ -6,6 +6,7 @@ import '../login_page.dart';
 import '../profile_page.dart';
 import '../screens/chat/chat_list_screen.dart';
 import '../screens/chat/notifications_screen.dart';
+import '../studymatch.dart'; 
 
 class UniteHeader extends StatefulWidget implements PreferredSizeWidget {
   final int currentIndex;
@@ -200,6 +201,16 @@ class _UniteHeaderState extends State<UniteHeader> {
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const MarketPage()),
+                  ),
+                ),
+                const SizedBox(width: 32),
+                _NavLinkActivo(
+                  label: 'Studymatch',
+                  isActive: widget.currentIndex == 4,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const StudymatchPage()),
                   ),
                 ),
                 const SizedBox(width: 32),
