@@ -267,7 +267,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             .eq('conversacion_id', conv['id'])
             .eq('leido', false)
             .neq('remitente_id', userId);
-        
+
         String? urgenciaNivel;
         try {
           final urgenciaData = await _supabase
@@ -295,6 +295,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           'urgencia': urgenciaNivel,
         });
       }
+
       int valorUrgencia(String? urg) {
         if (urg == 'alta') return 3;
         if (urg == 'media') return 2;
@@ -368,6 +369,154 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final query = _quitarAcentos(_searchQuery);
       return nombre.contains(query) || preview.contains(query);
     }).toList();
+  }
+
+  // ─── Mostrar popup de solicitudes enviadas por el comprador ───────────────
+  Future<void> _mostrarSolicitudesEnviadas() async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    // Cargar solicitudes enviadas por el usuario actual
+    final data = await _supabase
+        .from('solicitudes_trueque')
+        .select('id, objeto_ofrecido, estado, creado_en, anuncio_id, receptor_id')
+        .eq('solicitante_id', userId)
+        .eq('estado', 'pendiente')
+        .order('creado_en', ascending: false);
+
+    final List<Map<String, dynamic>> solicitudes = [];
+    for (final sol in data) {
+      final anuncioData = await _supabase
+          .from('anuncios_marketplace')
+          .select('titulo')
+          .eq('id', sol['anuncio_id'])
+          .maybeSingle();
+      final receptorData = await _supabase
+          .from('usuarios')
+          .select('primer_nombre, primer_apellido')
+          .eq('id', sol['receptor_id'])
+          .maybeSingle();
+      solicitudes.add({
+        ...sol,
+        'anuncio': anuncioData,
+        'receptor': receptorData,
+      });
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => _DialogSolicitudesEnviadas(
+        solicitudes: solicitudes,
+        onEditar: (sol) async {
+          Navigator.pop(ctx);
+          await _editarSolicitudTrueque(sol);
+        },
+        onCancelar: (solId) async {
+          await _supabase
+              .from('solicitudes_trueque')
+              .delete()
+              .eq('id', solId);
+          if (mounted) {
+            Navigator.pop(ctx);
+            _mostrarSolicitudesEnviadas();
+          }
+        },
+      ),
+    );
+  }
+
+  // ─── Dialog para editar una solicitud enviada ─────────────────────────────
+  Future<void> _editarSolicitudTrueque(Map<String, dynamic> solicitud) async {
+    final tituloAnuncio = solicitud['anuncio']?['titulo'] ?? 'Producto';
+    final controller =
+        TextEditingController(text: solicitud['objeto_ofrecido'] ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.edit_rounded, color: Color(0xFF245000)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Editar Propuesta',
+                  style: GoogleFonts.lexend(
+                      fontWeight: FontWeight.w700, fontSize: 17)),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Producto: $tituloAnuncio',
+                style: GoogleFonts.lexend(
+                    fontSize: 13, color: const Color(0xFF5B4137))),
+            const SizedBox(height: 12),
+            Text('Tu oferta:',
+                style: GoogleFonts.lexend(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1A1A1A))),
+            const SizedBox(height: 8),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              style: GoogleFonts.lexend(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Describe qué ofreces a cambio...',
+                hintStyle: GoogleFonts.lexend(
+                    color: const Color(0xFF8F7065), fontSize: 13),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE3BFB1))),
+                focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: Color(0xFF245000), width: 2)),
+                contentPadding: const EdgeInsets.all(12),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancelar',
+                style: GoogleFonts.lexend(color: const Color(0xFF5B4137))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final nueva = controller.text.trim();
+              if (nueva.isEmpty) return;
+              await _supabase
+                  .from('solicitudes_trueque')
+                  .update({'objeto_ofrecido': nueva})
+                  .eq('id', solicitud['id']);
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Propuesta actualizada',
+                      style: GoogleFonts.lexend()),
+                  backgroundColor: const Color(0xFF245000),
+                ));
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF245000),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Guardar',
+                style: GoogleFonts.lexend(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -648,8 +797,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
-                        border:
-                            Border.all(color: const Color(0xFFE3BFB1)),
+                        border: Border.all(color: const Color(0xFFE3BFB1)),
                       ),
                       child: Row(
                         children: [
@@ -777,14 +925,37 @@ class _ChatListScreenState extends State<ChatListScreen> {
     });
   }
 
+  // ─── Header del sidebar con botón de solicitudes enviadas ─────────────────
   Widget _buildSidebarHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Text('Mensajes',
-          style: GoogleFonts.lexend(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1A1A1A))),
+      padding: const EdgeInsets.fromLTRB(20, 20, 16, 8),
+      child: Row(
+        children: [
+          Text('Mensajes',
+              style: GoogleFonts.lexend(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1A1A1A))),
+          const Spacer(),
+          // Botón para ver solicitudes de trueque enviadas por el comprador
+          TextButton.icon(
+            onPressed: _mostrarSolicitudesEnviadas,
+            icon: const Icon(Icons.swap_horiz_rounded,
+                color: Color(0xFF245000), size: 16),
+            label: Text('Mis trueques',
+                style: GoogleFonts.lexend(
+                    fontSize: 11,
+                    color: const Color(0xFF245000),
+                    fontWeight: FontWeight.w600)),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFFF0F7F0),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -827,6 +998,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 }
 
+// ─── Tile de chat ─────────────────────────────────────────────────────────────
 class _ChatTile extends StatelessWidget {
   final String nombre, preview, hora, searchQuery;
   final String? urgencia;
@@ -933,7 +1105,9 @@ class _ChatTile extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(right: 6.0),
                           child: Text(
-                            urgencia == 'alta' ? '🔴' : (urgencia == 'media' ? '🟡' : '🟢'),
+                            urgencia == 'alta'
+                                ? '🔴'
+                                : (urgencia == 'media' ? '🟡' : '🟢'),
                             style: const TextStyle(fontSize: 10),
                           ),
                         ),
@@ -980,6 +1154,194 @@ class _ChatTile extends StatelessWidget {
   }
 }
 
+// ─── Dialog de solicitudes enviadas por el comprador ─────────────────────────
+class _DialogSolicitudesEnviadas extends StatelessWidget {
+  final List<Map<String, dynamic>> solicitudes;
+  final void Function(Map<String, dynamic>) onEditar;
+  final void Function(String) onCancelar;
+
+  const _DialogSolicitudesEnviadas({
+    required this.solicitudes,
+    required this.onEditar,
+    required this.onCancelar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          const Icon(Icons.swap_horiz_rounded, color: Color(0xFF245000)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Mis Solicitudes Enviadas',
+                style: GoogleFonts.lexend(
+                    fontWeight: FontWeight.w700, fontSize: 17)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20),
+            onPressed: () => Navigator.pop(context),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 380,
+        child: solicitudes.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.swap_horiz_rounded,
+                        size: 48,
+                        color: const Color(0xFF5B4137).withOpacity(0.3)),
+                    const SizedBox(height: 12),
+                    Text('No tienes solicitudes pendientes',
+                        style: GoogleFonts.lexend(
+                            color: const Color(0xFF5B4137), fontSize: 14)),
+                  ],
+                ),
+              )
+            : ListView.separated(
+                shrinkWrap: true,
+                itemCount: solicitudes.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(color: Color(0xFFE3BFB1)),
+                itemBuilder: (context, i) {
+                  final sol = solicitudes[i];
+                  final tituloAnuncio =
+                      sol['anuncio']?['titulo'] ?? 'Producto';
+                  final receptor = sol['receptor'];
+                  final nombreReceptor = receptor != null
+                      ? '${receptor['primer_nombre']} ${receptor['primer_apellido']}'
+                      : 'Vendedor';
+                  final objetoOfrecido = sol['objeto_ofrecido'] ?? '';
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: const Color(0xFF245000),
+                              child: Text(
+                                nombreReceptor.isNotEmpty
+                                    ? nombreReceptor[0].toUpperCase()
+                                    : '?',
+                                style: GoogleFonts.lexend(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(tituloAnuncio,
+                                      style: GoogleFonts.lexend(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF1A1A1A)),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  Text('Vendedor: $nombreReceptor',
+                                      style: GoogleFonts.lexend(
+                                          fontSize: 11,
+                                          color: const Color(0xFF5B4137))),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        // Container con fondo verde claro en vez de naranja
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0F7F0),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: const Color(0xFF245000).withOpacity(0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.swap_horiz_rounded,
+                                  size: 14, color: Color(0xFF245000)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(objetoOfrecido,
+                                    style: GoogleFonts.lexend(
+                                        fontSize: 12,
+                                        color: const Color(0xFF1A1A1A)),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => onCancelar(sol['id']),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                  side: const BorderSide(color: Colors.red),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 6),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(8)),
+                                  textStyle: GoogleFonts.lexend(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                child: const Text('Cancelar'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => onEditar(sol),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF245000),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 6),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(8)),
+                                  textStyle: GoogleFonts.lexend(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                child: const Text('Editar'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ),
+    );
+  }
+}
+
+// ─── Función auxiliar para quitar acentos ────────────────────────────────────
 String _quitarAcentos(String texto) {
   var conAcento = 'áéíóúÁÉÍÓÚüÜ';
   var sinAcento = 'aeiouAEIOUuU';

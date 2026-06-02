@@ -5,7 +5,7 @@ import '../theme.dart';
 import '../screens/chat/chat_list_screen.dart';
 import '../urgencia_dialog.dart';
 import '../profile_page.dart';
-import '../public_profile_page.dart'; // Ajusta la ruta si es necesario
+import '../public_profile_page.dart';
 
 // ============================================================
 // DIÁLOGO PRINCIPAL DE DETALLE DE ANUNCIO (REDISEÑADO)
@@ -110,7 +110,6 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
   List<String> get _campusPickup {
     final raw = _modalidades['campus_pickup'];
     if (raw == null) return [];
-    // Artículos viejos guardaron esto como boolean true/false
     if (raw is bool) return [];
     if (raw is List) return raw.whereType<String>().where((s) => s.isNotEmpty).toList();
     return [];
@@ -428,6 +427,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
           ? '${compradorData['primer_nombre']} ${compradorData['primer_apellido']}'
           : 'Un usuario';
 
+      // Notificación al vendedor
       await supabase.from('notificaciones').insert({
         'usuario_id': vendedorId,
         'tipo': 'trueque',
@@ -441,12 +441,93 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
         },
       });
 
+      // Notificación al comprador de que su solicitud fue enviada
+      await supabase.from('notificaciones').insert({
+        'usuario_id': compradorId,
+        'tipo': 'trueque',
+        'titulo': 'Solicitud de trueque enviada',
+        'mensaje':
+            'Tu propuesta por "$titulo" fue enviada. Te avisaremos cuando el vendedor responda.',
+        'leida': false,
+        'datos': {
+          'anuncio_id': anuncioId,
+        },
+      });
+
+     // Dialog de confirmación al comprador — compacto, fondo blanco, con X
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('¡Propuesta enviada! El vendedor te responderá pronto.',
-              style: GoogleFonts.lexend()),
-          backgroundColor: const Color(0xFF245000),
-        ));
+        showDialog(
+          context: context,
+          builder: (ctx) => Dialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+            backgroundColor: Colors.white,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 320),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(ctx),
+                        child: const Icon(Icons.close,
+                            size: 16, color: Color(0xFF5B4137)),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE8F5E9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check_rounded,
+                          color: Color(0xFF245000), size: 22),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '¡Propuesta enviada!',
+                      style: GoogleFonts.lexend(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1A1A1A)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tu propuesta por "$titulo" fue enviada. Te notificaremos cuando el vendedor responda.',
+                      style: GoogleFonts.lexend(
+                          fontSize: 11,
+                          color: const Color(0xFF5B4137),
+                          height: 1.4),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF5B4137),
+                          side: const BorderSide(color: Color(0xFFE3BFB1)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                        ),
+                        child: Text('Cerrar',
+                            style: GoogleFonts.lexend(
+                                fontWeight: FontWeight.w600, fontSize: 12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -920,7 +1001,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
     );
   }
 
-    // ─── Tarjeta de campus/punto de entrega ───────────────────────────────────
+  // ─── Tarjeta de campus/punto de entrega ───────────────────────────────────
   Widget _buildCampusCard(String campus) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
