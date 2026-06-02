@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// ─── AJUSTA ESTE PATH según tu estructura de carpetas ───────────────────────
 import '../widgets/unite_header.dart';
-// ────────────────────────────────────────────────────────────────────────────
+import 'crear_grupos.dart'; 
+
 
 class StudymatchPage extends StatefulWidget {
   const StudymatchPage({super.key});
@@ -203,7 +203,10 @@ class _StudymatchPageState extends State<StudymatchPage> {
   }
 
   void _showCreateDialog() {
-    showDialog(context: context, builder: (_) => const _CrearGrupoDialog());
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CrearGrupoPage()),
+    );
   }
 }
 
