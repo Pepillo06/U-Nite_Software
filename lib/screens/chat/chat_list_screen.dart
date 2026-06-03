@@ -215,6 +215,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
               'id': '2fcd05b9-b3b6-41f2-997b-29b37ee03775',
               'otro_nombre': 'Sofia De Jesus',
               'otro_id': '6e56e4ce-ac95-4fb8-b08a-edc493b13d5b',
+              'foto_otro': '',
               'preview': '¿Podríamos vernos mañana en el campus?',
               'hora': '01:20',
               'unread': 0,
@@ -242,6 +243,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
         final otro = isComprador ? vendedor : comprador;
         final otroNombre =
             '${otro['primer_nombre']} ${otro['primer_apellido']}';
+
+        // Cargar foto de perfil del otro usuario
+        String fotoOtro = '';
+        try {
+          final fotoData = await _supabase
+              .from('usuarios')
+              .select('foto_perfil_url')
+              .eq('id', otro['id'])
+              .maybeSingle();
+          fotoOtro = fotoData?['foto_perfil_url']?.toString() ?? '';
+        } catch (_) {}
 
         final mensajes = await _supabase
             .from('mensajes')
@@ -289,6 +301,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           'id': conv['id'],
           'otro_nombre': otroNombre,
           'otro_id': otro['id'],
+          'foto_otro': fotoOtro, // ← foto de perfil del otro usuario
           'anuncio_id': conv['anuncio_id'],
           'preview': preview,
           'hora': hora,
@@ -452,7 +465,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white, // ← fondo blanco
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -930,6 +943,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final chat = chats[i];
       return _ChatTile(
         nombre: chat['otro_nombre']?.toString() ?? 'Usuario',
+        fotoUrl: chat['foto_otro']?.toString() ?? '', // ← foto de perfil
         preview: chat['preview']?.toString() ?? '',
         hora: chat['hora']?.toString() ?? '',
         isActive: i == _selectedIndex,
@@ -1018,6 +1032,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 // ─── Tile de chat ─────────────────────────────────────────────────────────────
 class _ChatTile extends StatelessWidget {
   final String nombre, preview, hora, searchQuery;
+  final String fotoUrl; // ← foto de perfil del otro usuario
   final String? urgencia;
   final bool isActive, isOnline;
   final int unreadCount;
@@ -1031,6 +1046,7 @@ class _ChatTile extends StatelessWidget {
     required this.isOnline,
     required this.unreadCount,
     required this.onTap,
+    required this.fotoUrl,
     this.urgencia,
     this.searchQuery = '',
   });
@@ -1076,14 +1092,19 @@ class _ChatTile extends StatelessWidget {
           children: [
             Stack(
               children: [
+                // Avatar con foto de perfil o inicial
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: const Color(0xFFF36900),
-                  child: Text(inicial,
-                      style: GoogleFonts.lexend(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16)),
+                  backgroundImage:
+                      fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
+                  child: fotoUrl.isEmpty
+                      ? Text(inicial,
+                          style: GoogleFonts.lexend(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16))
+                      : null,
                 ),
                 if (isOnline)
                   Positioned(
@@ -1186,7 +1207,7 @@ class _DialogSolicitudesEnviadas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: Colors.white, // ← fondo blanco
+      backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
         children: [
