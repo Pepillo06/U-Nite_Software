@@ -470,6 +470,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Botón X para cerrar
                     Align(
                       alignment: Alignment.topRight,
                       child: GestureDetector(
@@ -499,7 +500,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Tu propuesta por "$titulo" fue enviada. Te notificaremos cuando el vendedor responda.',
+                      'Tu propuesta por "$titulo" fue enviada. Si deseas ver, editar o cancelar tus trueques, los encontrarás en la bandeja de Mensajes.',
                       style: GoogleFonts.lexend(
                           fontSize: 11,
                           color: const Color(0xFF5B4137),
@@ -507,6 +508,38 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
+                    // Botón "Ver mis trueques" → navega a ChatListScreen y abre popup directo
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);      // cierra confirmación
+                          Navigator.pop(context);  // cierra detalle anuncio
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ChatListScreen(
+                                abrirMisTrueques: true, // ← abre el popup automáticamente
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.swap_horiz_rounded, size: 15),
+                        label: Text('Ver mis trueques',
+                            style: GoogleFonts.lexend(
+                                fontWeight: FontWeight.w600, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF245000),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Botón "Cerrar"
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(

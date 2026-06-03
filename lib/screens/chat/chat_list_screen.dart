@@ -9,6 +9,7 @@ class ChatListScreen extends StatefulWidget {
   final String? nombreInicial;
   final String? otroUserIdInicial;
   final String? anuncioIdInicial;
+  final bool abrirMisTrueques; // ← nuevo parámetro
 
   const ChatListScreen({
     super.key,
@@ -16,6 +17,7 @@ class ChatListScreen extends StatefulWidget {
     this.nombreInicial,
     this.otroUserIdInicial,
     this.anuncioIdInicial,
+    this.abrirMisTrueques = false, // ← default false
   });
 
   @override
@@ -53,6 +55,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
     super.initState();
     _loadConversaciones();
     _loadSolicitudesTrueque();
+    // Si viene desde "Ver mis trueques", abrir el popup automáticamente
+    if (widget.abrirMisTrueques) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _mostrarSolicitudesEnviadas();
+      });
+    }
   }
 
   Future<void> _loadSolicitudesTrueque() async {
@@ -439,14 +447,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
           await _editarSolicitudTrueque(sol);
         },
         onCancelar: (solId) async {
-          // Primero eliminar, luego cerrar y reabrir
           await _supabase
               .from('solicitudes_trueque')
               .delete()
               .eq('id', solId);
           if (mounted) {
-            Navigator.pop(ctx);
-            _mostrarSolicitudesEnviadas();
+            Navigator.pop(ctx);           // cierra el popup actual
+            _solicitudesDialogAbierto = false; // resetear flag ANTES de reabrir
+            _mostrarSolicitudesEnviadas();     // reabrir con datos actualizados
           }
         },
       ),
@@ -678,7 +686,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           ),
                         )
                       : ChatScreen(
-                          key: ValueKey(_chatsFiltrados[idx]['id']),
+                          key: ValueKey('${_chatsFiltrados[idx]['id']}_${_chatsFiltrados[idx]['anuncio_id'] ?? ''}'),
                           conversacionId: _chatsFiltrados[idx]['id'],
                           nombreOtro: _chatsFiltrados[idx]['otro_nombre'],
                           otroUserId: _chatsFiltrados[idx]['otro_id'],
@@ -943,7 +951,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       final chat = chats[i];
       return _ChatTile(
         nombre: chat['otro_nombre']?.toString() ?? 'Usuario',
-        fotoUrl: chat['foto_otro']?.toString() ?? '', // ← foto de perfil
+        fotoUrl: chat['foto_otro']?.toString() ?? '',
         preview: chat['preview']?.toString() ?? '',
         hora: chat['hora']?.toString() ?? '',
         isActive: i == _selectedIndex,
@@ -1032,7 +1040,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 // ─── Tile de chat ─────────────────────────────────────────────────────────────
 class _ChatTile extends StatelessWidget {
   final String nombre, preview, hora, searchQuery;
-  final String fotoUrl; // ← foto de perfil del otro usuario
+  final String fotoUrl;
   final String? urgencia;
   final bool isActive, isOnline;
   final int unreadCount;
@@ -1330,9 +1338,61 @@ class _DialogSolicitudesEnviadas extends StatelessWidget {
                         const SizedBox(height: 8),
                         Row(
                           children: [
+                            // ─── Botón cancelar con confirmación ─────────
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () => onCancelar(sol['id']),
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (confirmCtx) => AlertDialog(
+                                      backgroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(16)),
+                                      title: Text('¿Cancelar trueque?',
+                                          style: GoogleFonts.lexend(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16)),
+                                      content: Text(
+                                        '¿Estás seguro de que deseas cancelar tu propuesta por "$tituloAnuncio"?',
+                                        style: GoogleFonts.lexend(
+                                            fontSize: 13,
+                                            color: const Color(0xFF5B4137),
+                                            height: 1.4),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(confirmCtx),
+                                          child: Text('No, mantener',
+                                              style: GoogleFonts.lexend(
+                                                  color: const Color(
+                                                      0xFF5B4137))),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            Navigator.pop(
+                                                confirmCtx); // cierra confirmación
+                                            onCancelar(
+                                                sol['id']); // ejecuta cancelar
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                        10)),
+                                          ),
+                                          child: Text('Sí, cancelar',
+                                              style: GoogleFonts.lexend(
+                                                  fontWeight:
+                                                      FontWeight.w600)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.red,
                                   side: const BorderSide(color: Colors.red),
@@ -1345,7 +1405,7 @@ class _DialogSolicitudesEnviadas extends StatelessWidget {
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600),
                                 ),
-                                child: const Text('Cancelar'),
+                                child: const Text('Cancelar trueque'),
                               ),
                             ),
                             const SizedBox(width: 8),

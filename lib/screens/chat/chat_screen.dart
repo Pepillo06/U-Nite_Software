@@ -35,7 +35,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   // Preview del producto en el input (estilo WhatsApp)
   bool _mostrarPreviewProducto = false;
-  // Flag para que el usuario lo haya cerrado manualmente — no vuelve a aparecer
+  // Flag para que el usuario lo haya cerrado manualmente en esta sesión
   bool _previewCerradoPorUsuario = false;
   String _estadoConexion = '';
   Timer? _timerConexion;
@@ -45,7 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMensajesYLuegoAnuncio(); // ← orden garantizado
+    _loadMensajesYLuegoAnuncio();
     _suscribirse();
     _cargarEstadoConexion();
     _cargarFotoOtroUsuario();
@@ -54,40 +54,41 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  // ─── Carga mensajes primero, luego anuncio (para que el flag esté listo) ──
+  // ─── Carga mensajes primero, luego anuncio ────────────────────────────────
   Future<void> _loadMensajesYLuegoAnuncio() async {
-    await _loadMensajes(); // esperar mensajes → activa _previewCerradoPorUsuario si hay producto
-    await _loadAnuncio();  // ahora evalúa el flag correctamente
+    await _loadMensajes();
+    await _loadAnuncio();
   }
-    // ─── Cargar foto de perfil del otro usuario ───────────────────────────────
-    Future<void> _cargarFotoOtroUsuario() async {
-      try {
-        final data = await _supabase
-            .from('usuarios')
-            .select('foto_perfil_url')
-            .eq('id', widget.otroUserId)
-            .maybeSingle();
-        if (mounted && data != null) {
-          setState(() {
-            _fotoOtroUsuario = data['foto_perfil_url']?.toString() ?? '';
-          });
-        }
-      } catch (_) {}
-    }
 
-    // ─── Navegar al perfil del otro usuario ──────────────────────────────────
-    void _irAlPerfilOtroUsuario() {
-      final myId = _supabase.auth.currentUser?.id;
-      if (widget.otroUserId.isEmpty) return;
-      if (myId == widget.otroUserId) {
-        Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const ProfilePage()));
-      } else {
-        Navigator.push(context,
-            MaterialPageRoute(
-                builder: (_) => PublicProfilePage(userId: widget.otroUserId)));
+  // ─── Cargar foto de perfil del otro usuario ───────────────────────────────
+  Future<void> _cargarFotoOtroUsuario() async {
+    try {
+      final data = await _supabase
+          .from('usuarios')
+          .select('foto_perfil_url')
+          .eq('id', widget.otroUserId)
+          .maybeSingle();
+      if (mounted && data != null) {
+        setState(() {
+          _fotoOtroUsuario = data['foto_perfil_url']?.toString() ?? '';
+        });
       }
+    } catch (_) {}
+  }
+
+  // ─── Navegar al perfil del otro usuario ──────────────────────────────────
+  void _irAlPerfilOtroUsuario() {
+    final myId = _supabase.auth.currentUser?.id;
+    if (widget.otroUserId.isEmpty) return;
+    if (myId == widget.otroUserId) {
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const ProfilePage()));
+    } else {
+      Navigator.push(context,
+          MaterialPageRoute(
+              builder: (_) => PublicProfilePage(userId: widget.otroUserId)));
     }
+  }
 
   Future<void> _cargarEstadoConexion() async {
     try {
@@ -133,16 +134,16 @@ class _ChatScreenState extends State<ChatScreen> {
         .order('creado_en', ascending: true);
     final mensajes = List<Map<String, dynamic>>.from(data);
 
-    // Si ya existe un mensaje con el producto en esta conversación,
-    // no mostrar el preview (ya fue enviado antes)
-    final yaEnvioProducto = mensajes.any(
-        (m) => (m['contenido'] as String? ?? '').startsWith('[producto:'));
+    // Si el comprador ya envió al menos un mensaje en esta conversación,
+    // no mostrar el preview del producto — ya estableció contacto
+    final myId = _supabase.auth.currentUser?.id;
+    final yaEnvioMensaje = mensajes.any((m) => m['remitente_id'] == myId);
 
     setState(() {
       _mensajes = mensajes;
       _loading = false;
-      // Si ya envió el producto antes, marcar como cerrado
-      if (yaEnvioProducto) _previewCerradoPorUsuario = true;
+      // Si ya envió cualquier mensaje, ocultar el preview permanentemente
+      if (yaEnvioMensaje) _previewCerradoPorUsuario = true;
     });
     _scrollToBottom();
     await _marcarComoLeidos();
@@ -177,15 +178,14 @@ class _ChatScreenState extends State<ChatScreen> {
     if (data != null && mounted) {
       setState(() {
         _anuncio = data;
-        // Solo mostrar preview si:
-        // 1. El usuario actual NO es el vendedor
-        // 2. El usuario no lo cerró manualmente
-        // 3. No hay ya un mensaje con el producto enviado
+        // Mostrar preview si:
+        // 1. Es comprador (no el vendedor)
+        // 2. No lo cerró/envió en esta sesión
+        // 3. No ha enviado ningún mensaje previo en esta conversación
         final userId = _supabase.auth.currentUser?.id;
         final vendedorId = data['vendedor_id']?.toString() ?? '';
         final esComprador = userId != vendedorId;
-        _mostrarPreviewProducto =
-            esComprador && !_previewCerradoPorUsuario;
+        _mostrarPreviewProducto = esComprador && !_previewCerradoPorUsuario;
       });
     }
   }
@@ -288,7 +288,7 @@ class _ChatScreenState extends State<ChatScreen> {
       contenido = '[producto:$titulo|$precio|$imagen]$text';
       setState(() {
         _mostrarPreviewProducto = false;
-        _previewCerradoPorUsuario = true; // Marcar como enviado — no vuelve
+        _previewCerradoPorUsuario = true; // No vuelve en esta sesión
       });
     }
 
@@ -618,7 +618,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // ─── Preview del producto — X cierra permanentemente ─────────────────────
+  // ─── Preview del producto — X cierra en esta sesión ───────────────────────
   Widget _buildPreviewProducto() {
     if (!_mostrarPreviewProducto || _anuncio == null) return const SizedBox();
     final titulo = _anuncio!['titulo'] ?? '';
@@ -690,12 +690,12 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-          // X — al cerrar, no vuelve a aparecer aunque salgas y vuelvas
+          // X — cierra el preview en esta sesión
           IconButton(
             icon: const Icon(Icons.close, size: 18, color: Color(0xFF5B4137)),
             onPressed: () => setState(() {
               _mostrarPreviewProducto = false;
-              _previewCerradoPorUsuario = true; // Permanente en esta sesión
+              _previewCerradoPorUsuario = true;
             }),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
@@ -850,7 +850,6 @@ class _BurbujaMensaje extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Preview del producto
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
