@@ -259,7 +259,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
     }
   }
 
-  // ─── Diálogo de Trueque (lógica 100% intacta) ────────────────────────────
+  // ─── Diálogo de Trueque — fondo blanco ───────────────────────────────────
   void _mostrarDialogTrueque(BuildContext context) {
     final titulo = widget.anuncio['titulo'] ?? '';
     final ofertaController = TextEditingController();
@@ -267,6 +267,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white, // ← fondo blanco
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -454,7 +455,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
         },
       });
 
-     // Dialog de confirmación al comprador — compacto, fondo blanco, con X
+      // Dialog de confirmación al comprador — compacto, fondo blanco, con X
       if (context.mounted) {
         showDialog(
           context: context,

@@ -33,6 +33,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
   bool _bandejaTruequeExpandida = false;
   bool _navegacionInicialHecha = false;
   String? _conversacionActivaId;
+  // Evitar que el popup de solicitudes se abra doble
+  bool _solicitudesDialogAbierto = false;
 
   void _marcarConversacionLeida(String conversacionId) {
     setState(() {
@@ -371,10 +373,17 @@ class _ChatListScreenState extends State<ChatListScreen> {
     }).toList();
   }
 
-  // ─── Mostrar popup de solicitudes enviadas por el comprador ───────────────
+  // ─── Mostrar popup de solicitudes enviadas — evita doble apertura ─────────
   Future<void> _mostrarSolicitudesEnviadas() async {
+    // Evitar que se abra doble si ya está abierto
+    if (_solicitudesDialogAbierto) return;
+    _solicitudesDialogAbierto = true;
+
     final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      _solicitudesDialogAbierto = false;
+      return;
+    }
 
     // Cargar solicitudes enviadas por el usuario actual
     final data = await _supabase
@@ -403,9 +412,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
       });
     }
 
-    if (!mounted) return;
+    if (!mounted) {
+      _solicitudesDialogAbierto = false;
+      return;
+    }
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => _DialogSolicitudesEnviadas(
         solicitudes: solicitudes,
@@ -414,6 +426,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
           await _editarSolicitudTrueque(sol);
         },
         onCancelar: (solId) async {
+          // Primero eliminar, luego cerrar y reabrir
           await _supabase
               .from('solicitudes_trueque')
               .delete()
@@ -425,9 +438,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
         },
       ),
     );
+
+    // Al cerrar el dialog, resetear el flag
+    _solicitudesDialogAbierto = false;
   }
 
-  // ─── Dialog para editar una solicitud enviada ─────────────────────────────
+  // ─── Dialog para editar una solicitud enviada — fondo blanco ─────────────
   Future<void> _editarSolicitudTrueque(Map<String, dynamic> solicitud) async {
     final tituloAnuncio = solicitud['anuncio']?['titulo'] ?? 'Producto';
     final controller =
@@ -436,6 +452,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white, // ← fondo blanco
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
@@ -1154,7 +1171,7 @@ class _ChatTile extends StatelessWidget {
   }
 }
 
-// ─── Dialog de solicitudes enviadas por el comprador ─────────────────────────
+// ─── Dialog de solicitudes enviadas por el comprador — fondo blanco ──────────
 class _DialogSolicitudesEnviadas extends StatelessWidget {
   final List<Map<String, dynamic>> solicitudes;
   final void Function(Map<String, dynamic>) onEditar;
@@ -1169,7 +1186,7 @@ class _DialogSolicitudesEnviadas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.white, // ← fondo blanco
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
         children: [
@@ -1263,7 +1280,7 @@ class _DialogSolicitudesEnviadas extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        // Container con fondo verde claro en vez de naranja
+                        // Container con fondo verde claro
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 6),
