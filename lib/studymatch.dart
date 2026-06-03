@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'theme.dart';
 
-// ─── AJUSTA ESTE PATH según tu estructura de carpetas ───────────────────────
 import '../widgets/unite_header.dart';
-// ────────────────────────────────────────────────────────────────────────────
+import 'crear_grupos.dart'; 
+
 
 class StudymatchPage extends StatefulWidget {
   const StudymatchPage({super.key});
@@ -18,43 +18,48 @@ class _StudymatchPageState extends State<StudymatchPage> {
   int _selectedTab = 1;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  String? _filtroMateria = 'Matemáticas II';
-  String? _filtroSeccion = 'Sección 2';
+  String? _filtroMateria;
+  String? _filtroSeccion;
 
-  final List<_GrupoData> _grupos = const [
-    _GrupoData(
-      nombre: 'Mate II sección 2',
-      descripcion: 'Matemáticas 2 con Daza, sección 2 los martes y jueves',
-      miembros: 13, max: 29,
-      materia: 'Matemáticas II', seccion: 'Sec 2',
-      icono: Icons.calculate_outlined,
-      iconBg: Color(0xFFFFF3E0), iconColor: Color(0xFFE65100),
-    ),
-    _GrupoData(
-      nombre: 'Estructura de Datos con panas',
-      descripcion: 'Materia con Fernando los lunes y ...',
-      miembros: 2, max: 5,
-      materia: 'Estructura de Datos', seccion: 'Sec 1',
-      icono: Icons.computer_outlined,
-      iconBg: Color(0xFFE3F2FD), iconColor: Color(0xFF1565C0),
-    ),
-    _GrupoData(
-      nombre: 'Química General 1',
-      descripcion: 'Por qué hay química en Ing de Sistemas ??',
-      miembros: 5, max: 8,
-      materia: 'Química General I', seccion: 'Sec 3',
-      icono: Icons.science_outlined,
-      iconBg: Color(0xFFE8F5E9), iconColor: Color(0xFF2E7D32),
-    ),
-    _GrupoData(
-      nombre: 'Física II con Daza',
-      descripcion: 'Sección 1 - martes y jueves 10:30 - 12:00',
-      miembros: 3, max: 4,
-      materia: 'Física II', seccion: 'Sec 1',
-      icono: Icons.bolt_outlined,
-      iconBg: Color(0xFFF3E5F5), iconColor: Color(0xFF6A1B9A),
-    ),
-  ];
+  List<_GrupoData> _grupos = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarGrupos();
+  }
+
+  Future<void> _cargarGrupos() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('grupos_estudio')
+          .select('id, nombre, descripcion, materia, seccion, max_miembros, es_privado, foto_url, creado_por')
+          .eq('es_privado', false);
+
+      final grupos = (response as List).map((row) {
+        return _GrupoData.fromMap(row);
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _grupos = grupos;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFD32F2F),
+            content: Text('Error al cargar grupos: $e'),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -67,8 +72,11 @@ class _StudymatchPageState extends State<StudymatchPage> {
             g.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
             g.descripcion.toLowerCase().contains(_searchQuery.toLowerCase());
         final matchMateria = _filtroMateria == null ||
-            g.materia.contains(_filtroMateria!.split(' ')[0]);
-        return matchSearch && matchMateria;
+            g.materia.toLowerCase().contains(_filtroMateria!.toLowerCase());
+        final matchSeccion = _filtroSeccion == null ||
+            'Sec ${g.seccion}'.toLowerCase().contains(_filtroSeccion!.toLowerCase()) ||
+            g.seccion.toString() == _filtroSeccion;
+        return matchSearch && matchMateria && matchSeccion;
       }).toList();
 
   @override
@@ -195,16 +203,28 @@ class _StudymatchPageState extends State<StudymatchPage> {
         ),
         const SizedBox(height: 20),
         // Grid
-        _GruposGrid(
-            grupos: _gruposFiltrados,
-            columns: gridCols,
-            onCrear: _showCreateDialog),
+        _isLoading
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(48),
+                  child: CircularProgressIndicator(color: Color(0xFFE65100)),
+                ),
+              )
+            : _GruposGrid(
+                grupos: _gruposFiltrados,
+                columns: gridCols,
+                onCrear: _showCreateDialog),
       ],
     );
   }
 
-  void _showCreateDialog() {
-    showDialog(context: context, builder: (_) => const _CrearGrupoDialog());
+  void _showCreateDialog() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const CrearGrupoPage()),
+    );
+    // Recargar grupos al volver por si se creó uno nuevo
+    _cargarGrupos();
   }
 }
 
@@ -701,11 +721,12 @@ class _GruposGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: total,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
+      // 👇 CAMBIAMOS AQUÍ PARA CONTROLAR EL ANCHO HORIZONTAL DE FORMA RESPONSIVE
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: columns == 1 ? double.infinity : 290, // Ancho horizontal fino en PC/Tablet
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: columns == 1 ? 1.7 : 0.72,
+        childAspectRatio: columns == 1 ? 1.7 : 0.85, // Mantiene la proporción estética de la foto
       ),
       itemBuilder: (_, i) {
         if (i == grupos.length) return _CrearCard(onTap: onCrear);
@@ -720,27 +741,77 @@ class _GruposGrid extends StatelessWidget {
 // ═══════════════════════════════════════════════════════════════════════════
 
 class _GrupoData {
+  final String id;
   final String nombre;
   final String descripcion;
   final int miembros;
   final int max;
   final String materia;
-  final String seccion;
-  final IconData icono;
-  final Color iconBg;
-  final Color iconColor;
+  final int seccion;
+  final String? fotoUrl;
 
-  const _GrupoData({
+  _GrupoData({
+    required this.id,
     required this.nombre,
     required this.descripcion,
     required this.miembros,
     required this.max,
     required this.materia,
     required this.seccion,
-    required this.icono,
-    required this.iconBg,
-    required this.iconColor,
+    this.fotoUrl,
   });
+
+  factory _GrupoData.fromMap(Map<String, dynamic> map) {
+    return _GrupoData(
+      id: map['id']?.toString() ?? '',
+      nombre: map['nombre'] ?? 'Sin nombre',
+      descripcion: map['descripcion'] ?? '',
+      miembros: 0, // miembros reales requerirían otra query
+      max: map['max_miembros'] ?? 20,
+      materia: map['materia'] ?? '',
+      seccion: map['seccion'] is int ? map['seccion'] : int.tryParse(map['seccion']?.toString() ?? '1') ?? 1,
+      fotoUrl: map['foto_url'],
+    );
+  }
+
+  // Asigna ícono y colores dinámicamente según la materia
+  IconData get icono {
+    final m = materia.toLowerCase();
+    if (m.contains('mat') || m.contains('cálc') || m.contains('calc')) return Icons.calculate_outlined;
+    if (m.contains('físic') || m.contains('fisic')) return Icons.bolt_outlined;
+    if (m.contains('quím') || m.contains('quim')) return Icons.science_outlined;
+    if (m.contains('dato') || m.contains('progr') || m.contains('comp') || m.contains('sistem')) return Icons.computer_outlined;
+    if (m.contains('bio')) return Icons.biotech_outlined;
+    if (m.contains('hist')) return Icons.history_edu_outlined;
+    if (m.contains('econ') || m.contains('admin')) return Icons.bar_chart_outlined;
+    return Icons.menu_book_outlined;
+  }
+
+  Color get iconBg {
+    final m = materia.toLowerCase();
+    if (m.contains('mat') || m.contains('cálc') || m.contains('calc')) return const Color(0xFFFFF3E0);
+    if (m.contains('físic') || m.contains('fisic')) return const Color(0xFFF3E5F5);
+    if (m.contains('quím') || m.contains('quim')) return const Color(0xFFE8F5E9);
+    if (m.contains('dato') || m.contains('progr') || m.contains('comp') || m.contains('sistem')) return const Color(0xFFE3F2FD);
+    if (m.contains('bio')) return const Color(0xFFE0F7FA);
+    if (m.contains('hist')) return const Color(0xFFFBE9E7);
+    if (m.contains('econ') || m.contains('admin')) return const Color(0xFFF9FBE7);
+    return const Color(0xFFF5F5F5);
+  }
+
+  Color get iconColor {
+    final m = materia.toLowerCase();
+    if (m.contains('mat') || m.contains('cálc') || m.contains('calc')) return const Color(0xFFE65100);
+    if (m.contains('físic') || m.contains('fisic')) return const Color(0xFF6A1B9A);
+    if (m.contains('quím') || m.contains('quim')) return const Color(0xFF2E7D32);
+    if (m.contains('dato') || m.contains('progr') || m.contains('comp') || m.contains('sistem')) return const Color(0xFF1565C0);
+    if (m.contains('bio')) return const Color(0xFF00695C);
+    if (m.contains('hist')) return const Color(0xFFBF360C);
+    if (m.contains('econ') || m.contains('admin')) return const Color(0xFF558B2F);
+    return const Color(0xFF616161);
+  }
+
+  String get seccionLabel => 'Sec $seccion';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -757,12 +828,8 @@ class _GrupoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 3))
-        ],
+        // Se quitó la sombra y se agregó un borde sutil para un look más limpio
+        border: Border.all(color: const Color(0xFFF0EAE6)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -771,12 +838,22 @@ class _GrupoCard extends StatelessWidget {
           children: [
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 55,
+                height: 55,
                 decoration: BoxDecoration(
                     color: grupo.iconBg,
-                    borderRadius: BorderRadius.circular(10)),
-                child: Icon(grupo.icono, color: grupo.iconColor, size: 22),
+                    borderRadius: BorderRadius.circular(16)),
+                child: grupo.fotoUrl != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          grupo.fotoUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Icon(grupo.icono, color: grupo.iconColor, size: 30),
+                        ),
+                      )
+                    : Icon(grupo.icono, color: grupo.iconColor, size: 30),
               ),
               const Spacer(),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -786,7 +863,7 @@ class _GrupoCard extends StatelessWidget {
                     fg: const Color(0xFF2E7D32)),
                 const SizedBox(height: 4),
                 _MiniTag(
-                    label: grupo.seccion,
+                    label: grupo.seccionLabel,
                     bg: const Color(0xFFF5F5F5),
                     fg: const Color(0xFF757575)),
               ]),
@@ -794,7 +871,7 @@ class _GrupoCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(grupo.nombre,
                 style: GoogleFonts.lexend(
-                    fontSize: 15,
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF1A1A1A),
                     height: 1.2),
@@ -824,7 +901,7 @@ class _GrupoCard extends StatelessWidget {
             const SizedBox(height: 8),
             Wrap(spacing: 5, runSpacing: 5, children: [
               _MiniTag(
-                  label: grupo.seccion,
+                  label: grupo.seccionLabel,
                   bg: const Color(0xFFF5F5F5),
                   fg: const Color(0xFF757575)),
               _MiniTag(
@@ -839,14 +916,15 @@ class _GrupoCard extends StatelessWidget {
                 onPressed: () {},
                 style: TextButton.styleFrom(
                   backgroundColor: const Color(0xFF2E5900),
+                  // Botón completamente redondeado tipo "píldora"
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(24)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
                 child: Text('Unirse',
                     style: GoogleFonts.lexend(
                         color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w500,
                         fontSize: 14)),
               ),
             ),
@@ -869,44 +947,83 @@ class _CrearCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: const Color(0xFFF36900).withOpacity(0.35), width: 1.5),
-        ),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-                color: Color(0xFFF5F5F5), shape: BoxShape.circle),
-            child: const Icon(Icons.add_rounded,
-                color: Color(0xFF9E9E9E), size: 24),
+      child: CustomPaint(
+        // Utilizamos un CustomPainter para el borde punteado
+        painter: _DashedRectPainter(color: const Color(0xFFD7CCC8)),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            // Quitamos el Border.all sólido que tenías aquí
           ),
-          const SizedBox(height: 12),
-          Text('Crear un grupo',
-              style: GoogleFonts.lexend(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF212121))),
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              '¿No puedes encontrar un grupo de tu clase? Crea uno e invita a tus amigos.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.lexend(
-                  fontSize: 12,
-                  color: const Color(0xFFAFA49C),
-                  height: 1.45),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                  color: Color(0xFFF5F5F5), shape: BoxShape.circle),
+              child: const Icon(Icons.add_rounded,
+                  color: Color(0xFF9E9E9E), size: 24),
             ),
-          ),
-        ]),
+            const SizedBox(height: 12),
+            Text('Crear un grupo',
+                style: GoogleFonts.lexend(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF212121))),
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                '¿No puedes encontrar un grupo de tu clase? Crea uno e invita a tus amigos.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.lexend(
+                    fontSize: 12,
+                    color: const Color(0xFFAFA49C),
+                    height: 1.45),
+              ),
+            ),
+          ]),
+        ),
       ),
     );
   }
+}
+
+// NUEVO: Agrega esta clase justo debajo de _CrearCard para dibujar el borde punteado
+class _DashedRectPainter extends CustomPainter {
+  final Color color;
+  _DashedRectPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    const dashWidth = 6.0;
+    const dashSpace = 4.0;
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(14));
+
+    final path = Path()..addRRect(rrect);
+    final pathMetrics = path.computeMetrics();
+
+    for (final metric in pathMetrics) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(distance, distance + dashWidth),
+          paint,
+        );
+        distance += dashWidth + dashSpace;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
