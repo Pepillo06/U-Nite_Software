@@ -1,0 +1,1602 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:typed_data';
+import 'home_page.dart';
+import 'edit_post_page.dart';
+import 'theme.dart';
+
+class EditProfilePage extends StatefulWidget {
+  const EditProfilePage({super.key});
+
+  @override
+  State<EditProfilePage> createState() => _EditProfilePageState();
+}
+
+class _EditProfilePageState extends State<EditProfilePage> {
+  // 👇 NUEVOS ESTADOS Y CONTROLADORES PARA FORTALEZAS
+  List<String> _fortalezas = [];
+  final _fortalezaController = TextEditingController();
+  
+  final _supabase = Supabase.instance.client;
+  final _picker = ImagePicker();
+
+  // --- CONTROL DE SCROLL Y NAVEGACIÓN ---
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _personalKey = GlobalKey();
+  final GlobalKey _academicKey = GlobalKey();
+  final GlobalKey _vendedorKey = GlobalKey();
+  final GlobalKey _seguridadKey = GlobalKey();
+  String _activeSection = 'personal';
+
+  // Estados
+  bool _isLoadingData = true;
+  bool _isSaving = false;
+  String? _currentProfileUrl;
+  Uint8List? _newProfileImageBytes;
+  String? _currentBannerUrl;
+  Uint8List? _newBannerImageBytes;
+  String? _userId;
+  List<Map<String, dynamic>> _misAnuncios = [];
+  bool _isLoadingAnuncios = true;
+  bool _esVendedor = false;
+  bool _esEstudiante = false;
+
+  // Controladores
+  final _nombreController = TextEditingController();
+  final _apellidoController = TextEditingController();
+  final _cedulaController = TextEditingController();
+  // final _universidadController = TextEditingController();
+  // final _carreraController = TextEditingController();
+  final _semestreController = TextEditingController(); // Nuevo controlador
+  final _biografiaAcademicaController = TextEditingController();
+  final _biografiaVentasController = TextEditingController();
+  final _fechaNacimientoController = TextEditingController();
+  DateTime? _selectedFechaNacimiento;
+
+  // Dropdowns de universidad y carrera
+  String? _selectedUniversidad;
+  String? _selectedCarrera;
+
+  String? _errorFortaleza;
+
+  final List<String> _universidades = [
+    "No estoy estudiando actualmente",
+    "Universidad Metropolitana",
+    "Universidad Católica Andrés Bello",
+    "Universidad Santa María",
+    "Universidad Central de Venezuela",
+    "Universidad Monteávila",
+    "Universidad Simón Bolívar",
+  ];
+
+  // Universidades que usan trimestre (las demás usan semestre)
+  final Set<String> _universidadesPorTrimestre = {
+    "Universidad Metropolitana",
+    "Universidad Simón Bolívar",
+    "Universidad Monteávila",
+  };
+
+  // Getter que devuelve "Trimestre" o "Semestre" según la universidad seleccionada
+  String get _labelPeriodo {
+    if (_selectedUniversidad != null &&
+        _universidadesPorTrimestre.contains(_selectedUniversidad)) {
+      return "Trimestre";
+    }
+    return "Semestre";
+  }
+
+  final Map<String, List<String>> _carrerasPorUniversidad = {
+    "Universidad Metropolitana": [
+      "Ingeniería de Sistemas", "Ingeniería Eléctrica", "Ingeniería Mecánica",
+      "Ingeniería Civil", "Ingeniería de Producción", "Ingeniería Química",
+      "Administración de Empresas", "Contaduría Pública", "Economía", "Derecho",
+      "Psicología", "Idiomas Modernos", "Estudios Liberales", "Diseño Gráfico", "Educación",
+    ],
+    "Universidad Católica Andrés Bello": [
+      "Ingeniería Civil", "Ingeniería Eléctrica", "Ingeniería de Telecomunicaciones",
+      "Ingeniería Industrial", "Ingeniería Informática", "Administración de Empresas",
+      "Contaduría Pública", "Economía", "Relaciones Industriales", "Comunicación Social",
+      "Derecho", "Psicología", "Educación", "Filosofía", "Teología", "Letras",
+      "Sociología", "Ciencias Políticas", "Trabajo Social", "Arquitectura",
+    ],
+    "Universidad Santa María": [
+      "Ingeniería Civil", "Ingeniería Eléctrica", "Ingeniería Industrial",
+      "Ingeniería de Sistemas", "Ingeniería Mecánica", "Arquitectura",
+      "Administración de Empresas", "Contaduría Pública", "Derecho", "Farmacia", "Odontología",
+    ],
+    "Universidad Central de Venezuela": [
+      "Ingeniería Civil", "Ingeniería Eléctrica", "Ingeniería Mecánica",
+      "Ingeniería Industrial", "Ingeniería Química", "Ingeniería Geológica",
+      "Ingeniería de Computación", "Ingeniería de Petróleo", "Ingeniería Geodésica",
+      "Arquitectura", "Urbanismo", "Administración de Empresas", "Contaduría Pública",
+      "Economía", "Estudios Internacionales", "Trabajo Social", "Sociología",
+      "Antropología", "Geografía", "Historia", "Filosofía", "Letras", "Idiomas Modernos",
+      "Comunicación Social", "Derecho", "Psicología", "Educación", "Medicina", "Farmacia",
+      "Odontología", "Bioanálisis", "Enfermería", "Ciencias Biológicas", "Química",
+      "Matemáticas", "Física", "Computación", "Estadística", "Agronomía", "Veterinaria",
+    ],
+    "Universidad Monteávila": [
+      "Administración de Empresas", "Comunicación Social", "Derecho",
+      "Educación", "Psicología", "Ingeniería Informática", "Filosofía",
+    ],
+    "Universidad Simón Bolívar": [
+      "Ingeniería de Computación", "Ingeniería Eléctrica", "Ingeniería Electrónica",
+      "Ingeniería Mecánica", "Ingeniería Química", "Ingeniería de Materiales",
+      "Ingeniería de Producción", "Ingeniería Geofísica", "Ingeniería Ambiental",
+      "Ingeniería de la Computación (Tecnológica)", "Ingeniería Electrónica (Tecnológica)",
+      "Licenciatura en Ciencias de los Materiales", "Licenciatura en Biología",
+      "Licenciatura en Química", "Licenciatura en Física", "Licenciatura en Matemáticas",
+      "Licenciatura en Computación", "Licenciatura en Estadística", "Arquitectura",
+      "Urbanismo", "Diseño Industrial", "Diseño Gráfico", "Administración del Turismo",
+      "Administración de Aduanas y Comercio Exterior", "Ciencias Ambientales",
+    ],
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+    _loadMisAnuncios();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _nombreController.dispose();
+    _apellidoController.dispose();
+    _cedulaController.dispose();
+    _fechaNacimientoController.dispose();
+    // _universidadController.dispose();
+    // _carreraController.dispose();
+    _semestreController.dispose();
+    _fortalezaController.dispose();
+    _biografiaAcademicaController.dispose();
+    _biografiaVentasController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToSection(GlobalKey key, String sectionId) {
+    setState(() => _activeSection = sectionId);
+    final context = key.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+      _userId = user.id;
+      final data = await _supabase
+          .from('usuarios')
+          .select()
+          .eq('id', _userId!)
+          .single();
+
+      setState(() {
+        _esVendedor = data['es_vendedor'] ?? false;
+        _esEstudiante = data['es_estudiante'] ?? false;
+        _currentProfileUrl = data['foto_perfil_url'];
+        _currentBannerUrl = data['foto_banner_url'];
+        _nombreController.text = data['primer_nombre'] ?? '';
+        _apellidoController.text = data['primer_apellido'] ?? '';
+        _cedulaController.text = data['cedula']?.toString() ?? '';
+        // _universidadController.text = data['universidad'] ?? '';
+        // _carreraController.text = data['carrera'] ?? '';
+        _semestreController.text = data['trimestre_actual']?.toString() ?? '';
+        _biografiaAcademicaController.text = data['biografia_academica'] ?? '';
+        _biografiaVentasController.text = data['biografia_vendedor'] ?? '';
+        _newProfileImageBytes = null;
+        _selectedUniversidad = data['universidad'];
+        _selectedCarrera = data['carrera'];
+
+        _fortalezas = List<String>.from(data['fortalezas'] ?? []);
+
+        if (data['fecha_nac'] != null) {
+          _selectedFechaNacimiento = DateTime.tryParse(data['fecha_nac']);
+          if (_selectedFechaNacimiento != null) {
+            _fechaNacimientoController.text = DateFormat('dd/MM/yyyy').format(_selectedFechaNacimiento!);
+          }
+        } else {
+          _fechaNacimientoController.text = ""; // Por si no tiene fecha registrada
+        }
+        _isLoadingData = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error al cargar datos: $e")));
+      }
+    }
+  }
+
+  Future<void> _loadMisAnuncios() async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+      final data = await _supabase
+          .from('anuncios_marketplace')
+          .select()
+          .eq('vendedor_id', user.id)
+          .eq('disponible', true)
+          .order('fecha_publicacion', ascending: false);
+      setState(() {
+        _misAnuncios = List<Map<String, dynamic>>.from(data);
+        _isLoadingAnuncios = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingAnuncios = false);
+    }
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      // Abrir selector de archivo (funciona en web y móvil)
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      setState(() => _newProfileImageBytes = bytes);
+
+      // Subir al bucket 'avatars'
+      final path = '$_userId/avatar.jpg';
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      // URL determinista + cache-buster para que el browser siempre recargue
+      final baseUrl = _supabase.storage.from('avatars').getPublicUrl(path);
+      final publicUrl = '$baseUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      await _supabase
+          .from('usuarios')
+          .update({'foto_perfil_url': publicUrl})
+          .eq('id', _userId!);
+
+      setState(() => _currentProfileUrl = publicUrl);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Foto de perfil actualizada.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al subir la foto: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadBanner() async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200, // Un poco más ancho para banners
+        maxHeight: 600,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      final bytes = await picked.readAsBytes();
+      setState(() => _newBannerImageBytes = bytes);
+
+      // Subir al bucket 'avatars' (usando subcarpeta banners o un bucket llamado banners)
+      // Nota: Si usas el mismo bucket 'avatars', la ruta 'userId/banner.jpg' funcionará genial.
+      final path = '$_userId/banner.jpg';
+      await _supabase.storage
+          .from('avatars')
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      final baseUrl = _supabase.storage.from('avatars').getPublicUrl(path);
+      final publicUrl = '$baseUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+
+      await _supabase
+          .from('usuarios')
+          .update({'foto_banner_url': publicUrl})
+          .eq('id', _userId!);
+
+      setState(() => _currentBannerUrl = publicUrl);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Banner de perfil actualizado.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al subir el banner: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // --- FUNCIÓN DE ACTUALIZACIÓN EN SUPABASE ---
+  Future<void> _updateUserData() async {
+    setState(() => _isSaving = true);
+    try {
+      await _supabase
+          .from('usuarios')
+          .update({
+            'primer_nombre': _nombreController.text.trim(),
+            'primer_apellido': _apellidoController.text.trim(),
+            // 'universidad': _universidadController.text.trim(),
+            // 'carrera': _carreraController.text.trim(),
+            'biografia_academica': _biografiaAcademicaController.text.trim(),
+            'biografia_vendedor': _biografiaVentasController.text.trim(),
+            'fecha_nac': _selectedFechaNacimiento?.toIso8601String(),
+            'universidad': _selectedUniversidad,
+            'carrera': _selectedCarrera,
+            'trimestre_actual': int.tryParse(_semestreController.text.trim()),
+            'fortalezas': _fortalezas,
+          })
+          .eq('id', _userId!);
+      //Navigator.pop(context, true);  //Esto es lo que hace que se recargue el nombre en el profile_page
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("¡Perfil actualizado con éxito!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error al actualizar: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+  Future<void> _signOut() async {
+    await _supabase.auth.signOut();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomePage()),
+        (route) => false, // Elimina todas las rutas anteriores del stack
+      );
+    }
+  }
+
+  Future<void> _activarRol(String campo) async {
+    setState(() => _isSaving = true);
+    try {
+      await _supabase
+          .from('usuarios')
+          .update({campo: true})
+          .eq('id', _userId!);
+      
+      await _loadUserData(); // Recargamos para refrescar la interfaz
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("¡Perfil actualizado! Ahora puedes editar esta sección."), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error al actualizar rol: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _confirmarBajaRol(String titulo, String mensaje, String campo) async {
+    final bool? confirmar = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(mensaje),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancelar", style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text("Confirmar", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar == true) {
+      _desactivarRol(campo);
+    }
+  }
+
+  Future<void> _desactivarRol(String campo) async {
+    setState(() => _isSaving = true);
+    try {
+      await _supabase
+          .from('usuarios')
+          .update({campo: false})
+          .eq('id', _userId!);
+      
+      await _loadUserData(); // Recargamos la interfaz
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Acción realizada con éxito."), backgroundColor: Colors.black87),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoadingData) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFF05600)),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      // BOTÓN DE ACCIÓN PARA GUARDAR
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _isSaving ? null : _updateUserData,
+        backgroundColor: const Color(0xFFF05600),
+        label: _isSaving
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Text(
+                "Actualizar Datos",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+        icon: _isSaving ? null : const Icon(Icons.save, color: Colors.white),
+      ),
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- COLUMNA IZQUIERDA: MENÚ ---
+          Padding(
+            padding: const EdgeInsets.fromLTRB(40, 30, 20, 30),
+            child: Column(
+              // Envolvemos el Container en una Column
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // BOTÓN DE REGRESAR
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.pop(
+                      context,
+                      true,
+                    ), // O Navigator.push si prefieres recargar
+                    icon: const Icon(Icons.arrow_back, color: Colors.black54),
+                    label: const Text(
+                      "Volver al perfil",
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: 250,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildMenuItem(
+                        Icons.person_outline,
+                        "Información Personal",
+                        "personal",
+                        _personalKey,
+                      ),
+                      _buildMenuItem(
+                        Icons.school_outlined,
+                        "Perfil Académico",
+                        "academico",
+                        _academicKey,
+                      ),
+                      _buildMenuItem(
+                        Icons.storefront_outlined,
+                        "Perfil Vendedor",
+                        "vendedor",
+                        _vendedorKey,
+                      ),
+                      _buildMenuItem(
+                        Icons.lock_outline,
+                        "Privacidad y Seguridad",
+                        "seguridad",
+                        _seguridadKey,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // --- COLUMNA DERECHA: CONTENIDO ---
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(20, 30, 40, 30),
+              child: Column(
+                children: [
+                  _buildCardSection(
+                    key: _personalKey,
+                    title: "Información Personal",
+                    child: Column(
+                      children: [
+                        _buildBannerAvatarEditor(),
+                        const SizedBox(height: 30),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildInputField(
+                                "Nombre",
+                                _nombreController,
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: _buildInputField(
+                                "Apellido",
+                                _apellidoController,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildDateField("Fecha de nacimiento"),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: _buildInputField(
+                                "Cédula de Identidad",
+                                _cedulaController,
+                                enabled: false,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  _buildCardSection(
+                    key: _academicKey,
+                    title: "Perfil Académico",
+                    icon: Icons.school,
+                    iconColor: const Color(0xFF1B5E20),
+                    child: _esEstudiante
+                      ? Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildDropdownField(
+                                  label: "Universidad",
+                                  hint: "Selecciona tu universidad",
+                                  value: _selectedUniversidad,
+                                  items: _universidades,
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _selectedUniversidad = val;
+                                      _selectedCarrera = null; // Resetea la carrera al cambiar universidad
+                                      _semestreController.clear(); // Resetea el periodo al cambiar universidad
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: _buildDropdownField(
+                                  label: "Carrera",
+                                  hint: "Selecciona tu carrera",
+                                  value: _selectedCarrera,
+                                  items: (_selectedUniversidad != null &&
+                                          _selectedUniversidad != "No estoy estudiando actualmente")
+                                      ? (_carrerasPorUniversidad[_selectedUniversidad] ?? [])
+                                      : [],
+                                  onChanged: _selectedUniversidad == null ||
+                                          _selectedUniversidad == "No estoy estudiando actualmente"
+                                      ? null
+                                      : (val) => setState(() => _selectedCarrera = val),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 15),
+                          _buildInputField(
+                            "$_labelPeriodo actual...",
+                            _semestreController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          ),
+                          const SizedBox(height: 15),
+                          _buildInputField(
+                            "Biografía Académica",
+                            _biografiaAcademicaController,
+                            maxLines: 3,
+                          ),
+                          
+                          // 👇 AQUÍ LO INSERTAS
+                          const SizedBox(height: 20),
+                          _buildFortalezasSection(), 
+                          
+                          const SizedBox(height: 30),
+                          const Divider(),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _confirmarBajaRol(
+                                "¿Dejar de ser Estudiante?",
+                                "Tu información académica ya no será visible en tu perfil público.",
+                                "es_estudiante"
+                              ),
+                              icon: const Icon(Icons.no_accounts, size: 18),
+                              label: const Text("Ya no soy estudiante"),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                                side: const BorderSide(color: Colors.redAccent),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                      : _buildJoinSection("estudiante", () => _activarRol('es_estudiante')),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  _buildCardSection(
+                    key: _vendedorKey,
+                    title: "Perfil de Ventas (UniExchange)",
+                    icon: Icons.local_offer,
+                    iconColor: const Color(0xFF1B5E20),
+                    child: _esVendedor 
+                      ? Column(
+                        children: [
+                          _buildInputField(
+                            "Biografía de Perfil de Ventas",
+                            _biografiaVentasController,
+                            maxLines: 3,
+                          ),
+                          const SizedBox(height: 20),
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              "Inventario Activo",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          _isLoadingAnuncios
+                              ? const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFFF05600),
+                                  ),
+                                )
+                              : _misAnuncios.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    "No tienes artículos en venta",
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                )
+                              : GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        crossAxisSpacing: 15,
+                                        mainAxisSpacing: 15,
+                                        childAspectRatio: 1.4,
+                                      ),
+                                  itemCount: _misAnuncios.length,
+                                  itemBuilder: (context, index) {
+                                    final anuncio = _misAnuncios[index];
+                                    final modalidades =
+                                        anuncio['detalles_modalidades']
+                                            as Map<String, dynamic>? ??
+                                        {};
+                                    final imagenes =
+                                        modalidades['imagenes']
+                                            as List<dynamic>? ??
+                                        [];
+                                    final tieneImagen = imagenes.isNotEmpty;
+
+                                    return Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: const Color(0xFFEEEEEE),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.04),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Imagen con badge de categoría
+                                          Stack(
+                                            children: [
+                                              ClipRRect(
+                                                borderRadius:
+                                                    const BorderRadius.vertical(
+                                                      top: Radius.circular(12),
+                                                    ),
+                                                child: tieneImagen
+                                                    ? Image.network(
+                                                        imagenes[0],
+                                                        height: 130,
+                                                        width: double.infinity,
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                    : Container(
+                                                        height: 130,
+                                                        width: double.infinity,
+                                                        color: const Color(
+                                                          0xFFF0F0F0,
+                                                        ),
+                                                        child: const Icon(
+                                                          Icons
+                                                              .image_not_supported,
+                                                          color: Colors.grey,
+                                                          size: 40,
+                                                        ),
+                                                      ),
+                                              ),
+                                              if (anuncio['categoria'] != null)
+                                                Positioned(
+                                                  top: 10,
+                                                  right: 10,
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            20,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      anuncio['categoria'],
+                                                      style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          // Info
+                                          Padding(
+                                            padding: const EdgeInsets.all(12),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  anuncio['titulo'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  anuncio['descripcion'] ?? '',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 10),
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: OutlinedButton(
+                                                    onPressed: () async {
+                                                      final result = await Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                          builder: (_) => EditarArticuloPage(anuncio: anuncio),
+                                                        ),
+                                                      );
+                                                      if (result == true) {
+                                                        _loadMisAnuncios();
+                                                      }
+                                                    },
+                                                    style: OutlinedButton.styleFrom(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            vertical: 6,
+                                                          ),
+                                                      side: const BorderSide(
+                                                        color: Color(0xFFCCCCCC),
+                                                      ),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                      ),
+                                                      textStyle: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    child: const Text(
+                                                      "Editar Artículo",
+                                                      style: TextStyle(
+                                                        color: Colors.black87,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                          const SizedBox(height: 30),
+                          const Divider(),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _confirmarBajaRol(
+                                "¿Cerrar Perfil de Vendedor?",
+                                "Tus artículos activos se ocultarán y tu placa de vendedor desaparecerá.",
+                                "es_vendedor"
+                              ),
+                              icon: const Icon(Icons.remove_shopping_cart, size: 18),
+                              label: const Text("Ya no soy vendedor"),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.redAccent,
+                                side: const BorderSide(color: Colors.redAccent),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                      : _buildJoinSection("vendedor", () => _activarRol('es_vendedor')),
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  _buildCardSection(
+                    key: _seguridadKey,
+                    title: "Privacidad y Seguridad",
+                    child: Column(
+                      children: [
+                        // 👇 NUEVO
+                        _buildActionTile(
+                          Icons.logout_outlined,
+                          "Cerrar Sesión",
+                          "Salir de tu cuenta en este dispositivo",
+                          onTap: _signOut,
+                        ),
+                        const Divider(height: 1),   // 👈 NUEVO
+                        _buildActionTile(
+                          Icons.key_outlined,
+                          "Cambiar Contraseña",
+                          "Actualiza tus credenciales de seguridad",
+                        ),
+                        const Divider(height: 1),
+                        _buildActionTile(
+                          Icons.notifications_none_outlined,
+                          "Preferencias de Notificación",
+                          "Gestiona alertas push y correos",
+                        ),
+                        const Divider(height: 1),
+                        _buildActionTile(
+                          Icons.no_accounts_outlined,
+                          "Desactivar Cuenta",
+                          "Oculta tu perfil temporalmente",
+                          isDestructive: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 120),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGETS DE APOYO ---
+
+  Widget _buildMenuItem(IconData icon, String title, String id, GlobalKey key) {
+    bool isActive = _activeSection == id;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: InkWell(
+        onTap: () => _scrollToSection(key, id),
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFFF05600) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isActive ? Colors.white : Colors.black54,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.black87,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardSection({
+    required GlobalKey key,
+    required String title,
+    required Widget child,
+    IconData? icon,
+    Color? iconColor,
+  }) {
+    return Container(
+      key: key,
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, color: iconColor ?? Colors.black87, size: 24),
+                const SizedBox(width: 10),
+              ],
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 25),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputField(
+    String label,
+    TextEditingController controller, {
+    bool enabled = true,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          style: const TextStyle(fontSize: 14),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: const Color(0xFFF5F5F5),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 15,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField(String label) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: _selectedFechaNacimiento ?? DateTime(2000),
+              firstDate: DateTime(1950),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null) {
+              setState(() {
+                _selectedFechaNacimiento = picked;
+                // 👈 Actualiza el texto en pantalla inmediatamente al seleccionar
+                _fechaNacimientoController.text = DateFormat('dd/MM/yyyy').format(picked);
+              });
+            }
+          },
+          child: IgnorePointer( // Evita que se abra el teclado del sistema en web/móvil
+            child: TextField(
+              controller: _fechaNacimientoController,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFFF5F5F5),
+                hintText: "DD/MM/YYYY",
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 12,
+                ),
+                suffixIcon: const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: Colors.black54,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionTile(
+    IconData icon,
+    String title,
+    String subtitle, {
+    bool isDestructive = false,
+    VoidCallback? onTap,         // 👈 línea nueva
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        icon,
+        color: isDestructive ? Colors.redAccent : Colors.black87,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: isDestructive ? Colors.redAccent : Colors.black87,
+        ),
+      ),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: onTap ?? () {},     // 👈 línea modificada
+    );
+  }
+
+  Widget _buildBannerAvatarEditor() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 60),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          GestureDetector(
+            onTap: _pickAndUploadBanner,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Container(
+                height: 180,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey[300], // Fondo gris por si no hay imagen
+                  image: _newBannerImageBytes != null
+                      ? DecorationImage(
+                          image: MemoryImage(_newBannerImageBytes!),
+                          fit: BoxFit.cover,
+                        )
+                      : (_currentBannerUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(_currentBannerUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : const DecorationImage(
+                              image: NetworkImage(
+                                "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1000",
+                              ),
+                              fit: BoxFit.cover,
+                            )),
+                ),
+                // Un pequeño indicador visual arriba a la derecha para saber que es editable
+                child: Align(
+                  alignment: Alignment.bottomRight,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12), // Espaciado interno desde la esquina
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF05600), // <-- CAMBIADO: Color naranja de tu paleta
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -70,
+            left: 30,
+            child: GestureDetector(
+              onTap: _pickAndUploadAvatar,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Stack(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [ // Opcional: Añadir una sombra para que el círculo grande resalte más
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: CircleAvatar(
+                        radius: 80,
+                        backgroundImage: _newProfileImageBytes != null
+                            ? MemoryImage(_newProfileImageBytes!)
+                            : (_currentProfileUrl != null
+                                  ? NetworkImage(_currentProfileUrl!)
+                                        as ImageProvider
+                                  : null),
+                        backgroundColor: Colors.grey[200],
+                        child:
+                            (_newProfileImageBytes == null &&
+                                _currentProfileUrl == null)
+                            ? const Icon(Icons.person, size: 70)
+                            : null,
+                      ),
+                    ),
+                    // Badge de cámara
+                    Positioned(
+                      bottom: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFF05600),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJoinSection(String tipo, VoidCallback onJoin) {
+    final bool esVenta = tipo == "vendedor";
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            esVenta ? Icons.storefront_outlined : Icons.school_outlined,
+            size: 48,
+            color: Colors.black26,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            "Aún no eres ${esVenta ? 'vendedor' : 'estudiante'} en U-NITE",
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "¿Te gustaría expandir tu perfil para ${esVenta ? 'ofrecer tus artículos' : 'gestionar tu vida académica'}?",
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14, color: Colors.black54),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: onJoin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFF05600),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(
+              "Convertirme en ${esVenta ? 'Vendedor' : 'Estudiante'}",
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildDropdownField({
+    required String label,
+    required String hint,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?>? onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: onChanged == null ? const Color(0xFFF0F0F0) : const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: items.contains(value) ? value : null,
+              hint: Text(hint, style: const TextStyle(fontSize: 14, color: Colors.black38)),
+              isExpanded: true,
+              onChanged: onChanged,
+              items: items.map((String item) {
+                return DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item, style: const TextStyle(fontSize: 14)),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // 👇 WIDGET ACTUALIZADO: BORDE DE ERROR DINÁMICO EN EL INPUT
+  Widget _buildFortalezasSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Mis Fortalezas Académicas",
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.black54,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- COLUMNA IZQUIERDA: INPUT + BOTÓN ---
+            SizedBox(
+              width: 320,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _fortalezaController,
+                      maxLength: 30,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: const Color(0xFFF5F5F5),
+                        hintText: "Ej: Cálculo, Flutter...",
+                        hintStyle: const TextStyle(color: Colors.black38),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        counterText: "",
+                        errorText: _errorFortaleza,
+                        errorStyle: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Colors.redAccent, width: 2.0),
+                        ),
+                      ),
+                      onChanged: (text) {
+                        if (text.length >= 30) {
+                          setState(() {
+                            _errorFortaleza = "Máximo 30 caracteres permitidos";
+                          });
+                        } else if (_errorFortaleza != null) {
+                          setState(() {
+                            _errorFortaleza = null;
+                          });
+                        }
+                      },
+                      onSubmitted: (_) {
+                        final texto = _fortalezaController.text.trim();
+                        if (texto.isNotEmpty && !_fortalezas.contains(texto)) {
+                          setState(() {
+                            _fortalezas.add(texto);
+                            _fortalezaController.clear();
+                            _errorFortaleza = null;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final texto = _fortalezaController.text.trim();
+                      if (texto.isNotEmpty && !_fortalezas.contains(texto)) {
+                        setState(() {
+                          _fortalezas.add(texto);
+                          _fortalezaController.clear();
+                          _errorFortaleza = null;
+                        });
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF05600),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                    child: const Icon(Icons.add, color: Colors.white, size: 20),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 24),
+            // --- COLUMNA DERECHA: APARTADO DE BURBUJAS ---
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: _fortalezas.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          "Las fortalezas añadidas aparecerán aquí.",
+                          style: TextStyle(fontSize: 13, color: Colors.black38, fontStyle: FontStyle.italic),
+                        ),
+                      )
+                    : Wrap(
+                        spacing: 8.0,
+                        runSpacing: 6.0,
+                        children: _fortalezas.map((fortaleza) {
+                          return Chip(
+                            label: Text(
+                              fortaleza,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: Color.fromARGB(255, 13, 70, 26),
+                              ),
+                            ),
+                            backgroundColor: const Color.fromARGB(255, 223, 247, 228),
+                            side: BorderSide.none,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            deleteIcon: const Icon(Icons.cancel, size: 16, color: Color.fromARGB(255, 13, 70, 26)),
+                            onDeleted: () {
+                              setState(() {
+                                _fortalezas.remove(fortaleza);
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
