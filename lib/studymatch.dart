@@ -22,6 +22,8 @@ class _StudymatchPageState extends State<StudymatchPage> {
   String? _filtroMateria;
   String? _filtroSeccion;
 
+  String? _filtroPrivacidad; // null = todos, 'publico' = públicos, 'privado' = privados
+
   List<_GrupoData> _grupos = [];
   bool _isLoading = true;
 
@@ -44,8 +46,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('grupos_estudio')
-          .select('id, nombre, descripcion, materia, seccion, max_miembros, es_privado, foto_url, creado_por')
-          .eq('es_privado', false);
+          .select('id, nombre, descripcion, materia, seccion, max_miembros, es_privado, foto_url, creado_por');
 
       final grupos = (response as List).map((row) {
         return _GrupoData.fromMap(row);
@@ -361,17 +362,29 @@ class _StudymatchPageState extends State<StudymatchPage> {
     super.dispose();
   }
 
-  List<_GrupoData> get _gruposFiltrados => _grupos.where((g) {
-        final matchSearch = _searchQuery.isEmpty ||
-            g.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            g.descripcion.toLowerCase().contains(_searchQuery.toLowerCase());
-        final matchMateria = _filtroMateria == null ||
-            g.materia.toLowerCase().contains(_filtroMateria!.toLowerCase());
-        final matchSeccion = _filtroSeccion == null ||
-            'Sec ${g.seccion}'.toLowerCase().contains(_filtroSeccion!.toLowerCase()) ||
-            g.seccion.toString() == _filtroSeccion;
-        return matchSearch && matchMateria && matchSeccion;
-      }).toList();
+  List<_GrupoData> get _gruposFiltrados {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    return _grupos.where((g) {
+      // Tab 1 = Mis Grupos: solo los creados por el usuario logueado
+      // Tab 2 = Grupos Publicos: los que NO creo el usuario logueado
+      if (_selectedTab == 1 && g.creadoPor != userId) return false;
+      if (_selectedTab == 2 && g.creadoPor == userId) return false;
+
+      final matchSearch = _searchQuery.isEmpty ||
+          g.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          g.descripcion.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchMateria = _filtroMateria == null ||
+          g.materia.toLowerCase().contains(_filtroMateria!.toLowerCase());
+      final matchSeccion = _filtroSeccion == null ||
+          'Sec \${g.seccion}'.toLowerCase().contains(_filtroSeccion!.toLowerCase()) ||
+          g.seccion.toString() == _filtroSeccion;
+      final matchPrivacidad = _filtroPrivacidad == null ||
+          (_filtroPrivacidad == 'privado' ? g.esPrivado : !g.esPrivado);
+
+      return matchSearch && matchMateria && matchSeccion && matchPrivacidad;
+    }).toList();
+  }
 
   bool get _isPersonasTab => _selectedTab >= 3 && _selectedTab <= 5;
 
@@ -528,8 +541,10 @@ class _StudymatchPageState extends State<StudymatchPage> {
         _FiltersRow(
           filtroMateria: _filtroMateria,
           filtroSeccion: _filtroSeccion,
+          filtroPrivacidad: _filtroPrivacidad,
           onClearMateria: () => setState(() => _filtroMateria = null),
           onClearSeccion: () => setState(() => _filtroSeccion = null),
+          onPrivacidadChanged: (v) => setState(() => _filtroPrivacidad = v),
           wrap: isMobile,
         ),
         const SizedBox(height: 20),
@@ -1726,15 +1741,19 @@ class _AgregarButton extends StatelessWidget {
 class _FiltersRow extends StatelessWidget {
   final String? filtroMateria;
   final String? filtroSeccion;
+  final String? filtroPrivacidad;
   final VoidCallback onClearMateria;
   final VoidCallback onClearSeccion;
+  final ValueChanged<String?> onPrivacidadChanged;
   final bool wrap;
 
   const _FiltersRow({
     required this.filtroMateria,
     required this.filtroSeccion,
+    required this.filtroPrivacidad,
     required this.onClearMateria,
     required this.onClearSeccion,
+    required this.onPrivacidadChanged,
     required this.wrap,
   });
 
@@ -1743,10 +1762,29 @@ class _FiltersRow extends StatelessWidget {
     final children = <Widget>[
       _FilterBtn(label: 'Filtrar materias', icon: Icons.tune_rounded),
       _FilterBtn(label: 'Sección', icon: Icons.school_outlined),
+      // Filtro de privacidad
+      _PrivacidadFilterBtn(
+        valor: filtroPrivacidad,
+        onChanged: onPrivacidadChanged,
+      ),
       if (filtroMateria != null)
         _ActiveChip(label: filtroMateria!, onRemove: onClearMateria),
       if (filtroSeccion != null)
         _ActiveChip(label: filtroSeccion!, onRemove: onClearSeccion),
+      if (filtroPrivacidad != null)
+        _ActiveChip(
+          label: filtroPrivacidad == 'privado' ? 'Privados' : 'Públicos',
+          onRemove: () => onPrivacidadChanged(null),
+          color: filtroPrivacidad == 'privado'
+              ? const Color(0xFFFFF3E0)
+              : const Color(0xFFE8F5E9),
+          borderColor: filtroPrivacidad == 'privado'
+              ? const Color(0xFFFFCC80)
+              : const Color(0xFFA5D6A7),
+          textColor: filtroPrivacidad == 'privado'
+              ? const Color(0xFFE65100)
+              : const Color(0xFF2E7D32),
+        ),
     ];
 
     if (wrap) {
@@ -1792,31 +1830,136 @@ class _FilterBtn extends StatelessWidget {
   }
 }
 
+class _PrivacidadFilterBtn extends StatelessWidget {
+  final String? valor;
+  final ValueChanged<String?> onChanged;
+  const _PrivacidadFilterBtn({required this.valor, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = valor != null;
+    return PopupMenuButton<String>(
+      onSelected: (v) => onChanged(v == 'todos' ? null : v),
+      offset: const Offset(0, 38),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'todos',
+          child: Row(children: [
+            Icon(Icons.apps_rounded, size: 16, color: const Color(0xFF757575)),
+            const SizedBox(width: 8),
+            Text('Todos', style: GoogleFonts.lexend(fontSize: 13)),
+          ]),
+        ),
+        PopupMenuItem(
+          value: 'publico',
+          child: Row(children: [
+            Icon(Icons.lock_open_outlined, size: 16, color: const Color(0xFF2E7D32)),
+            const SizedBox(width: 8),
+            Text('Públicos', style: GoogleFonts.lexend(fontSize: 13)),
+          ]),
+        ),
+        PopupMenuItem(
+          value: 'privado',
+          child: Row(children: [
+            Icon(Icons.lock_rounded, size: 16, color: const Color(0xFFE65100)),
+            const SizedBox(width: 8),
+            Text('Privados', style: GoogleFonts.lexend(fontSize: 13)),
+          ]),
+        ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: valor == 'publico'
+              ? const Color(0xFFE8F5E9)
+              : valor == 'privado'
+                  ? const Color(0xFFFFF3E0)
+                  : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: valor == 'publico'
+                ? const Color(0xFFA5D6A7)
+                : valor == 'privado'
+                    ? const Color(0xFFE65100)
+                    : const Color(0xFFE3BFB1),
+          ),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+            valor == 'privado' ? Icons.lock_rounded : Icons.lock_open_outlined,
+            size: 15,
+            color: valor == 'publico'
+                ? const Color(0xFF2E7D32)
+                : valor == 'privado'
+                    ? const Color(0xFFE65100)
+                    : const Color(0xFF757575),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            valor == null
+                ? 'Privacidad'
+                : valor == 'privado'
+                    ? 'Privados'
+                    : 'Públicos',
+            style: GoogleFonts.lexend(
+              fontSize: 13,
+              color: valor == 'publico'
+                  ? const Color(0xFF2E7D32)
+                  : valor == 'privado'
+                      ? const Color(0xFFE65100)
+                      : const Color(0xFF424242),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 15,
+            color: valor == 'publico'
+                ? const Color(0xFF2E7D32)
+                : valor == 'privado'
+                    ? const Color(0xFFE65100)
+                    : const Color(0xFF757575),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 class _ActiveChip extends StatelessWidget {
   final String label;
   final VoidCallback onRemove;
-  const _ActiveChip({required this.label, required this.onRemove});
+  final Color color;
+  final Color borderColor;
+  final Color textColor;
+  const _ActiveChip({
+    required this.label,
+    required this.onRemove,
+    this.color = const Color(0xFFE8F5E9),
+    this.borderColor = const Color(0xFFA5D6A7),
+    this.textColor = const Color(0xFF2E7D32),
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8F5E9),
+        color: color,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFA5D6A7)),
+        border: Border.all(color: borderColor),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Text(label,
             style: GoogleFonts.lexend(
                 fontSize: 12,
-                color: const Color(0xFF2E7D32),
+                color: textColor,
                 fontWeight: FontWeight.w500)),
         const SizedBox(width: 4),
         GestureDetector(
           onTap: onRemove,
-          child: const Icon(Icons.close_rounded,
-              size: 13, color: Color(0xFF2E7D32)),
+          child: Icon(Icons.close_rounded, size: 13, color: textColor),
         ),
       ]),
     );
@@ -1869,6 +2012,8 @@ class _GrupoData {
   final String materia;
   final int seccion;
   final String? fotoUrl;
+  final bool esPrivado;
+  final String? creadoPor;
 
   _GrupoData({
     required this.id,
@@ -1879,6 +2024,8 @@ class _GrupoData {
     required this.materia,
     required this.seccion,
     this.fotoUrl,
+    this.esPrivado = false,
+    this.creadoPor,
   });
 
   factory _GrupoData.fromMap(Map<String, dynamic> map) {
@@ -1893,6 +2040,8 @@ class _GrupoData {
           ? map['seccion']
           : int.tryParse(map['seccion']?.toString() ?? '1') ?? 1,
       fotoUrl: map['foto_url'],
+      esPrivado: map['es_privado'] == true,
+      creadoPor: map['creado_por']?.toString(),
     );
   }
 
@@ -1943,13 +2092,100 @@ class _GrupoCard extends StatelessWidget {
   final _GrupoData grupo;
   const _GrupoCard({required this.grupo});
 
+  Future<void> _manejarUnirse(BuildContext context) async {
+    final supabase = Supabase.instance.client;
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+
+    if (grupo.esPrivado) {
+      // Mostrar diálogo de solicitud
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(children: [
+            const Icon(Icons.lock_rounded, color: Color(0xFFE65100), size: 20),
+            const SizedBox(width: 8),
+            Text('Grupo privado',
+                style: GoogleFonts.lexend(fontWeight: FontWeight.w700, fontSize: 16)),
+          ]),
+          content: Text(
+            'Este grupo requiere aprobación del administrador. ¿Deseas enviar una solicitud para unirte a "${grupo.nombre}"?',
+            style: GoogleFonts.lexend(fontSize: 14, color: const Color(0xFF424242)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Cancelar',
+                  style: GoogleFonts.lexend(color: const Color(0xFF757575))),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.send_rounded, size: 15),
+              label: Text('Solicitar', style: GoogleFonts.lexend(fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE65100),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmar != true) return;
+
+      try {
+        await supabase.from('solicitudes_grupo').insert({
+          'grupo_id': grupo.id,
+          'usuario_id': userId,
+          'estado': 'pendiente',
+        });
+
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFE65100),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            content: Text(
+              'Solicitud enviada. El administrador la revisará pronto.',
+              style: GoogleFonts.lexend(color: Colors.white),
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!context.mounted) return;
+        // Si el error es por duplicado (unique constraint), avisar al usuario
+        final msg = e.toString().contains('duplicate') || e.toString().contains('unique')
+            ? 'Ya tienes una solicitud pendiente para este grupo.'
+            : 'Error al enviar la solicitud: $e';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            content: Text(msg, style: GoogleFonts.lexend(color: Colors.white)),
+          ),
+        );
+      }
+    } else {
+      // Lógica de unirse a grupo público (tu implementación existente)
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF0EAE6)),
+        border: Border.all(
+          color: grupo.esPrivado
+              ? const Color(0xFFFFCC80)
+              : const Color(0xFFF0EAE6),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1977,6 +2213,27 @@ class _GrupoCard extends StatelessWidget {
               ),
               const Spacer(),
               Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                // Badge de privacidad
+                if (grupo.esPrivado)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFFCC80)),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.lock_rounded,
+                          size: 11, color: Color(0xFFE65100)),
+                      const SizedBox(width: 4),
+                      Text('Privado',
+                          style: GoogleFonts.lexend(
+                              fontSize: 11,
+                              color: const Color(0xFFE65100),
+                              fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
                 _MiniTag(
                     label: grupo.materia,
                     bg: const Color(0xFFE8F5E9),
@@ -1989,14 +2246,26 @@ class _GrupoCard extends StatelessWidget {
               ]),
             ]),
             const SizedBox(height: 10),
-            Text(grupo.nombre,
-                style: GoogleFonts.lexend(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1A1A1A),
-                    height: 1.2),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
+            Row(children: [
+              Expanded(
+                child: Text(grupo.nombre,
+                    style: GoogleFonts.lexend(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1A1A1A),
+                        height: 1.2),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              if (grupo.esPrivado) ...[
+                const SizedBox(width: 6),
+                Tooltip(
+                  message: 'Requiere aprobación del administrador',
+                  child: const Icon(Icons.lock_rounded,
+                      size: 16, color: Color(0xFFE65100)),
+                ),
+              ],
+            ]),
             const SizedBox(height: 4),
             Expanded(
               child: Text(grupo.descripcion,
@@ -2032,19 +2301,28 @@ class _GrupoCard extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              child: TextButton(
-                onPressed: () {},
+              child: TextButton.icon(
+                onPressed: () => _manejarUnirse(context),
+                icon: Icon(
+                  grupo.esPrivado ? Icons.send_rounded : Icons.login_rounded,
+                  size: 15,
+                  color: Colors.white,
+                ),
+                label: Text(
+                  grupo.esPrivado ? 'Solicitar unirse' : 'Unirse',
+                  style: GoogleFonts.lexend(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14),
+                ),
                 style: TextButton.styleFrom(
-                  backgroundColor: const Color(0xFF2E5900),
+                  backgroundColor: grupo.esPrivado
+                      ? const Color(0xFFE65100)
+                      : const Color(0xFF2E5900),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                 ),
-                child: Text('Unirse',
-                    style: GoogleFonts.lexend(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14)),
               ),
             ),
           ],

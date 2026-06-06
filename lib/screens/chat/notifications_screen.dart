@@ -31,33 +31,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .from('notificaciones')
           .select()
           .eq('usuario_id', userId)
-          .order('creado_en', ascending: false);
-      List<Map<String, dynamic>> listaNotifs = List<Map<String, dynamic>>.from(data);
-
-      int valorUrgencia(Map<String, dynamic> notif) {
-        final datos = notif['datos'] as Map<String, dynamic>? ?? {};
-        final urg = datos['urgencia'] as String?;
-        if (urg == 'alta') return 3;
-        if (urg == 'media') return 2;
-        if (urg == 'baja') return 1;
-        return 0;
-      }
-
-      listaNotifs.sort((a, b) {
-        final uA = valorUrgencia(a);
-        final uB = valorUrgencia(b);
-        if (uA != uB) return uB.compareTo(uA); 
-        // Si tienen la misma urgencia, prioriza la fecha (más reciente)
-        final dateA = DateTime.parse(a['creado_en'].toString()).toLocal();
-        final dateB = DateTime.parse(b['creado_en'].toString()).toLocal();
-        return dateB.compareTo(dateA);
-      });
-
+          .order('creado_en', ascending: false); // Solo por orden de llegada
       setState(() {
-        _notificaciones = listaNotifs;
+        _notificaciones = List<Map<String, dynamic>>.from(data);
         _loading = false;
       });
-
     } catch (e) {
       setState(() => _loading = false);
     }
@@ -181,6 +159,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (diff.inDays == 1) return 'Ayer';
     return '${dt.day}/${dt.month}/${dt.year}';
   }
+
   String _getEmojiUrgencia(String nivel) {
     switch (nivel.toLowerCase()) {
       case 'alta':
@@ -190,9 +169,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'baja':
         return '🟢';
       default:
-        return ''; 
+        return '';
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final noLeidas = _notificaciones.where((n) => n['leida'] == false).length;
@@ -365,9 +345,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                     color: const Color(
                                                         0xFF1A1A1A),
                                                   ),
-                                                ),                                           
+                                                ),
                                               ),
-                                              if (notif['datos'] != null && notif['datos']['urgencia'] != null)
+                                              if (notif['datos'] != null &&
+                                                  notif['datos']['urgencia'] != null)
                                                 Padding(
                                                   padding: const EdgeInsets.only(right: 6.0),
                                                   child: Text(
@@ -376,8 +357,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                   ),
                                                 ),
                                               Text(
-                                                _formatFecha(notif[
-                                                    'creado_en']),
+                                                _formatFecha(notif['creado_en']),
                                                 style: GoogleFonts.lexend(
                                                     fontSize: 11,
                                                     color: const Color(
@@ -390,8 +370,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                             notif['mensaje'] ?? '',
                                             style: GoogleFonts.lexend(
                                                 fontSize: 13,
-                                                color:
-                                                    const Color(0xFF5B4137),
+                                                color: const Color(0xFF5B4137),
                                                 height: 1.4),
                                           ),
                                           if (!leida) ...[

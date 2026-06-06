@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+import '../../profile_page.dart';
+import '../../public_profile_page.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversacionId;
@@ -33,20 +35,59 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   // Preview del producto en el input (estilo WhatsApp)
   bool _mostrarPreviewProducto = false;
+  // Flag para que el usuario lo haya cerrado manualmente en esta sesión
+  bool _previewCerradoPorUsuario = false;
   String _estadoConexion = '';
   Timer? _timerConexion;
+  // Foto de perfil del otro usuario
+  String _fotoOtroUsuario = '';
 
   @override
   void initState() {
     super.initState();
-    _loadMensajes();
-    _loadAnuncio();
+    _loadMensajesYLuegoAnuncio();
     _suscribirse();
     _cargarEstadoConexion();
-    // Refrescar estado de conexión cada 1 minuto
+    _cargarFotoOtroUsuario();
     _timerConexion = Timer.periodic(const Duration(minutes: 1), (_) {
       _cargarEstadoConexion();
     });
+  }
+
+  // ─── Carga mensajes primero, luego anuncio ────────────────────────────────
+  Future<void> _loadMensajesYLuegoAnuncio() async {
+    await _loadMensajes();
+    await _loadAnuncio();
+  }
+
+  // ─── Cargar foto de perfil del otro usuario ───────────────────────────────
+  Future<void> _cargarFotoOtroUsuario() async {
+    try {
+      final data = await _supabase
+          .from('usuarios')
+          .select('foto_perfil_url')
+          .eq('id', widget.otroUserId)
+          .maybeSingle();
+      if (mounted && data != null) {
+        setState(() {
+          _fotoOtroUsuario = data['foto_perfil_url']?.toString() ?? '';
+        });
+      }
+    } catch (_) {}
+  }
+
+  // ─── Navegar al perfil del otro usuario ──────────────────────────────────
+  void _irAlPerfilOtroUsuario() {
+    final myId = _supabase.auth.currentUser?.id;
+    if (widget.otroUserId.isEmpty) return;
+    if (myId == widget.otroUserId) {
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const ProfilePage()));
+    } else {
+      Navigator.push(context,
+          MaterialPageRoute(
+              builder: (_) => PublicProfilePage(userId: widget.otroUserId)));
+    }
   }
 
   Future<void> _cargarEstadoConexion() async {
@@ -66,7 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final ahora = DateTime.now();
       final diferencia = ahora.difference(ultima);
 
-      if (diferencia.inMinutes  < 0.3) {
+      if (diferencia.inMinutes < 0.3) {
         setState(() => _estadoConexion = 'En línea');
       } else if (diferencia.inHours < 24 && ultima.day == ahora.day) {
         final hora =
@@ -91,9 +132,18 @@ class _ChatScreenState extends State<ChatScreen> {
         .select()
         .eq('conversacion_id', widget.conversacionId)
         .order('creado_en', ascending: true);
+    final mensajes = List<Map<String, dynamic>>.from(data);
+
+    // Si el comprador ya envió al menos un mensaje en esta conversación,
+    // no mostrar el preview del producto — ya estableció contacto
+    final myId = _supabase.auth.currentUser?.id;
+    final yaEnvioMensaje = mensajes.any((m) => m['remitente_id'] == myId);
+
     setState(() {
-      _mensajes = List<Map<String, dynamic>>.from(data);
+      _mensajes = mensajes;
       _loading = false;
+      // Si ya envió cualquier mensaje, ocultar el preview permanentemente
+      if (yaEnvioMensaje) _previewCerradoPorUsuario = true;
     });
     _scrollToBottom();
     await _marcarComoLeidos();
@@ -125,13 +175,17 @@ class _ChatScreenState extends State<ChatScreen> {
         .select('titulo, detalles_modalidades, vendedor_id')
         .eq('id', widget.anuncioId!)
         .maybeSingle();
-    if (data != null) {
+    if (data != null && mounted) {
       setState(() {
         _anuncio = data;
-        // Solo mostrar preview si el usuario actual NO es el vendedor
+        // Mostrar preview si:
+        // 1. Es comprador (no el vendedor)
+        // 2. No lo cerró/envió en esta sesión
+        // 3. No ha enviado ningún mensaje previo en esta conversación
         final userId = _supabase.auth.currentUser?.id;
         final vendedorId = data['vendedor_id']?.toString() ?? '';
-        _mostrarPreviewProducto = userId != vendedorId;
+        final esComprador = userId != vendedorId;
+        _mostrarPreviewProducto = esComprador && !_previewCerradoPorUsuario;
       });
     }
   }
@@ -232,7 +286,10 @@ class _ChatScreenState extends State<ChatScreen> {
       final precio = _getPrecioAnuncio();
       final imagen = _getImagenAnuncio();
       contenido = '[producto:$titulo|$precio|$imagen]$text';
-      setState(() => _mostrarPreviewProducto = false);
+      setState(() {
+        _mostrarPreviewProducto = false;
+        _previewCerradoPorUsuario = true; // No vuelve en esta sesión
+      });
     }
 
     await _supabase.from('mensajes').insert({
@@ -334,12 +391,29 @@ class _ChatScreenState extends State<ChatScreen> {
 
   bool get _estaEnLinea => _estadoConexion == 'En línea';
 
-  @override
-  Widget build(BuildContext context) {
-    final myId = _supabase.auth.currentUser?.id;
+  // ─── Avatar del otro usuario (foto o inicial) ─────────────────────────────
+  Widget _buildAvatar(double radius) {
     final inicial = widget.nombreOtro.isNotEmpty
         ? widget.nombreOtro[0].toUpperCase()
         : '?';
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: const Color(0xFFF36900),
+      backgroundImage:
+          _fotoOtroUsuario.isNotEmpty ? NetworkImage(_fotoOtroUsuario) : null,
+      child: _fotoOtroUsuario.isEmpty
+          ? Text(inicial,
+              style: GoogleFonts.lexend(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: radius * 0.8))
+          : null,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final myId = _supabase.auth.currentUser?.id;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFBF9F9),
@@ -357,12 +431,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     size: 18, color: Color(0xFF1A1A1A)),
                 onPressed: () => Navigator.pop(context),
               ),
-              title: _buildChatHeaderTitle(inicial),
+              title: _buildChatHeaderTitle(),
             )
           : null,
       body: Column(
         children: [
-          if (!widget.showAppBar) _buildDesktopChatHeader(inicial),
+          if (!widget.showAppBar) _buildDesktopChatHeader(),
           _buildDaySeparator(),
           Expanded(
             child: _loading
@@ -423,80 +497,21 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildChatHeaderTitle(String inicial) {
-    return Row(
-      children: [
-        Stack(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: const Color(0xFFF36900),
-              child: Text(inicial,
-                  style: GoogleFonts.lexend(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14)),
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: _estaEnLinea
-                      ? const Color(0xFF306B18)
-                      : const Color(0xFF9E9E9E),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.nombreOtro,
-                style: GoogleFonts.lexend(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF1A1A1A))),
-            _buildEstadoConexionWidget(),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // Header desktop SIN el card del producto
-  Widget _buildDesktopChatHeader(String inicial) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE3BFB1))),
-      ),
+  // ─── Header móvil ─────────────────────────────────────────────────────────
+  Widget _buildChatHeaderTitle() {
+    return GestureDetector(
+      onTap: _irAlPerfilOtroUsuario,
       child: Row(
         children: [
           Stack(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: const Color(0xFFF36900),
-                child: Text(inicial,
-                    style: GoogleFonts.lexend(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15)),
-              ),
+              _buildAvatar(18),
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: Container(
-                  width: 11,
-                  height: 11,
+                  width: 10,
+                  height: 10,
                   decoration: BoxDecoration(
                     color: _estaEnLinea
                         ? const Color(0xFF306B18)
@@ -508,7 +523,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ],
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -521,6 +536,56 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // ─── Header desktop SIN card del producto ─────────────────────────────────
+  Widget _buildDesktopChatHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Color(0xFFE3BFB1))),
+      ),
+      child: GestureDetector(
+        onTap: _irAlPerfilOtroUsuario,
+        child: Row(
+          children: [
+            Stack(
+              children: [
+                _buildAvatar(20),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: _estaEnLinea
+                          ? const Color(0xFF306B18)
+                          : const Color(0xFF9E9E9E),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.nombreOtro,
+                    style: GoogleFonts.lexend(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1A1A1A))),
+                _buildEstadoConexionWidget(),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -553,7 +618,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // Preview del producto estilo WhatsApp encima del input
+  // ─── Preview del producto — X cierra en esta sesión ───────────────────────
   Widget _buildPreviewProducto() {
     if (!_mostrarPreviewProducto || _anuncio == null) return const SizedBox();
     final titulo = _anuncio!['titulo'] ?? '';
@@ -625,9 +690,13 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
+          // X — cierra el preview en esta sesión
           IconButton(
             icon: const Icon(Icons.close, size: 18, color: Color(0xFF5B4137)),
-            onPressed: () => setState(() => _mostrarPreviewProducto = false),
+            onPressed: () => setState(() {
+              _mostrarPreviewProducto = false;
+              _previewCerradoPorUsuario = true;
+            }),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
           ),
@@ -781,7 +850,6 @@ class _BurbujaMensaje extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Preview del producto
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
