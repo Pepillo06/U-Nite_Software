@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-// Asegúrate de importar tu UniteHeader
+import 'package:file_picker/file_picker.dart'; // IMPORTANTE PARA ARCHIVOS
+// Asegúrate de importar tu UniteHeader correcto según tu estructura
 import '../widgets/unite_header.dart';
 
 class StudymatchChatPage extends StatefulWidget {
@@ -12,13 +13,256 @@ class StudymatchChatPage extends StatefulWidget {
 
 class _StudymatchChatPageState extends State<StudymatchChatPage> {
   int _selectedTab = 0; // 0: Mis Grupos
-  int _selectedChat = 0; // 0: Cálculo II
+  int _selectedChat = 0; // 0: Cálculo II, 1: Design Systems, 2: CS 50
+
+  // SIMULACIÓN DE DATOS DE MENSAJES (Para probar el estado vacío)
+  final Map<int, List<Map<String, dynamic>>> _chatMessages = {
+    0: [
+      {'type': 'system', 'text': 'Hoy, 10:30 AM'},
+      {'type': 'system', 'text': 'María se ha unido al grupo'},
+      {
+        'type': 'incoming',
+        'name': 'Carlos',
+        'text':
+            '¿Alguien pudo resolver el ejercicio 4 de la guía? Me da un resultado súper raro con la integral.',
+        'time': '10:42 AM',
+      },
+      {
+        'type': 'outgoing',
+        'text':
+            'Sí, me dio 4π. Creo que el truco estaba en usar coordenadas polares desde el principio. Te paso foto de mi desarrollo en un rato.',
+        'time': '10:45 AM',
+      },
+    ],
+    1: [], // CHAT VACÍO PARA MOSTRAR EL MENSAJE DE "AÚN NO HAY MENSAJES"
+    2: [
+      {'type': 'system', 'text': '12 de Marzo'},
+      {
+        'type': 'outgoing',
+        'text': 'Perfecto, nos vemos a las 3 en la biblioteca.',
+        'time': '02:15 PM',
+      },
+    ],
+  };
+
+  // LÓGICA 1: ABRIR EXPLORADOR DE ARCHIVOS con manejo seguro
+  Future<void> _abrirExploradorArchivos() async {
+    // Permite al usuario seleccionar un archivo; si cancela, simplemente retorna sin error
+    FilePickerResult? result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'png', 'pdf', 'doc', 'docx'],
+    );
+
+    // Si el usuario canceló la selección, result será null
+    if (result == null || result.files.isEmpty) {
+      return; // No hacer nada y evitar excepciones
+    }
+
+    // Obtenemos el nombre del primer archivo seleccionado
+    String fileName = result.files.first.name;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF2E5900),
+        content: Text('Archivo seleccionado: $fileName preparado para enviar.'),
+      ),
+    );
+  }
+
+  // LÓGICA 2: MOSTRAR INFORMACIÓN DEL GRUPO (REPORTAR/BLOQUEAR)
+  void _mostrarInfoGrupo() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Información del Grupo',
+            style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+          ),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Cálculo II - Sec 3',
+                  style: GoogleFonts.lexend(
+                    fontSize: 18,
+                    color: const Color(0xFFE65100),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Materia: Cálculo II\nSección: 3\nDescripción: Grupo de estudio para apoyarnos con las guías del profesor Silva.',
+                  style: GoogleFonts.lexend(
+                    fontSize: 13,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const Divider(height: 30),
+                Text(
+                  'Miembros (8)',
+                  style: GoogleFonts.lexend(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  // Lista de miembros simulada
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: 4,
+                    itemBuilder: (context, index) {
+                      List<String> nombres = [
+                        'Tú (Admin)',
+                        'Carlos',
+                        'María',
+                        'Pedro',
+                      ];
+                      bool esElUsuarioActual = index == 0;
+
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.grey[300],
+                          backgroundImage: NetworkImage(
+                            'https://randomuser.me/api/portraits/${index % 2 == 0 ? 'men' : 'women'}/${30 + index}.jpg',
+                          ),
+                        ),
+                        title: Text(
+                          nombres[index],
+                          style: GoogleFonts.lexend(fontSize: 14),
+                        ),
+                        trailing: esElUsuarioActual
+                            ? null
+                            : PopupMenuButton<String>(
+                                icon: const Icon(
+                                  Icons.more_vert,
+                                  size: 20,
+                                  color: Colors.grey,
+                                ),
+                                color: Colors.white,
+                                onSelected: (value) {
+                                  if (value == 'reportar') {
+                                    _accionMiembro('Reportado', nombres[index]);
+                                  }
+                                  if (value == 'bloquear') {
+                                    _accionMiembro('Bloqueado', nombres[index]);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'perfil',
+                                    child: Text('Ver perfil'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'reportar',
+                                    child: Text('Reportar usuario'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'bloquear',
+                                    child: Text(
+                                      'Bloquear del grupo',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cerrar',
+                style: GoogleFonts.lexend(color: const Color(0xFF757575)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _accionMiembro(String accion, String nombre) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Usuario $nombre ha sido $accion.'),
+        backgroundColor: accion == 'Bloqueado'
+            ? Colors.red
+            : const Color(0xFFE65100),
+      ),
+    );
+  }
+
+  // LÓGICA 3: MANTENER PRESIONADO UN MENSAJE
+  void _mostrarOpcionesMensaje(String textoMensaje, bool esMio) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.copy, color: Colors.grey),
+              title: Text(
+                'Copiar texto',
+                style: GoogleFonts.lexend(fontSize: 14),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Texto copiado al portapapeles'),
+                  ),
+                );
+              },
+            ),
+            if (!esMio) // Solo se reportan mensajes de otros
+              ListTile(
+                leading: const Icon(
+                  Icons.report_problem_outlined,
+                  color: Colors.red,
+                ),
+                title: Text(
+                  'Reportar mensaje',
+                  style: GoogleFonts.lexend(fontSize: 14, color: Colors.red),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Mensaje reportado a los administradores'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    List<Map<String, dynamic>> mensajesActuales =
+        _chatMessages[_selectedChat] ?? [];
+
     return Scaffold(
-      backgroundColor: const Color(0xFFFDFBF9), // Color de fondo general base
-      appBar: const UniteHeader(currentIndex: 4), // Studymatch activo
+      backgroundColor: const Color(0xFFFDFBF9),
+      appBar: const UniteHeader(currentIndex: 4),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -51,8 +295,8 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                   onTap: () => setState(() => _selectedTab = 2),
                 ),
 
-                const Spacer(), // Empuja los iconos a la derecha
-                // Iconos de agregar/eliminar personas
+                const Spacer(),
+
                 IconButton(
                   tooltip: 'Agregar a grupo',
                   icon: const Icon(Icons.person_add_alt_1_outlined),
@@ -94,7 +338,6 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                       ),
                       child: Column(
                         children: [
-                          // Buscador y Botón
                           Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Column(
@@ -161,7 +404,6 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                           ),
                           const Divider(height: 1, color: Color(0xFFE3BFB1)),
 
-                          // Lista de chats
                           Expanded(
                             child: ListView(
                               children: [
@@ -180,7 +422,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                                   icon: Icons.design_services,
                                   iconBg: const Color(0xFFAED581),
                                   title: 'Design Systems 101',
-                                  subtitle: 'Ana compartió un archivo',
+                                  subtitle: 'Grupo creado. ¡Rompe el hielo!',
                                   time: 'Ayer',
                                   isActive: _selectedChat == 1,
                                   onTap: () =>
@@ -227,11 +469,19 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF2196F3),
+                                    color: _selectedChat == 0
+                                        ? const Color(0xFF2196F3)
+                                        : _selectedChat == 1
+                                        ? const Color(0xFFAED581)
+                                        : const Color(0xFFBCAAA4),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(
-                                    Icons.functions,
+                                  child: Icon(
+                                    _selectedChat == 0
+                                        ? Icons.functions
+                                        : _selectedChat == 1
+                                        ? Icons.design_services
+                                        : Icons.code,
                                     color: Colors.white,
                                     size: 24,
                                   ),
@@ -243,7 +493,11 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Cálculo II - Sec 3',
+                                        _selectedChat == 0
+                                            ? 'Cálculo II - Sec 3'
+                                            : _selectedChat == 1
+                                            ? 'Design Systems 101'
+                                            : 'CS 50 Prep',
                                         style: GoogleFonts.lexend(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
@@ -267,73 +521,165 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                                   color: Color(0xFF757575),
                                   size: 22,
                                 ),
-                                const SizedBox(width: 16),
-                                const Icon(
-                                  Icons.more_vert,
-                                  color: Color(0xFF757575),
-                                  size: 22,
+                                const SizedBox(width: 5),
+
+                                // ─── MENU DE OPCIONES DE GRUPO (3 PUNTITOS) ───
+                                PopupMenuButton<String>(
+                                  icon: const Icon(
+                                    Icons.more_vert,
+                                    color: Color(0xFF757575),
+                                    size: 22,
+                                  ),
+                                  color: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  onSelected: (String result) {
+                                    if (result == 'info') {
+                                      _mostrarInfoGrupo();
+                                    } else if (result == 'archivos') {
+                                      // TODO: Navegar a vista de archivos
+                                    } else if (result == 'salir') {
+                                      // TODO: Lógica para abandonar
+                                    }
+                                  },
+                                  itemBuilder: (BuildContext context) =>
+                                      <PopupMenuEntry<String>>[
+                                        const PopupMenuItem<String>(
+                                          value: 'info',
+                                          child: Text('Información del grupo'),
+                                        ),
+                                        const PopupMenuItem<String>(
+                                          value: 'archivos',
+                                          child: Text('Archivos y enlaces'),
+                                        ),
+                                        const PopupMenuDivider(),
+                                        const PopupMenuItem<String>(
+                                          value: 'salir',
+                                          child: Text(
+                                            'Abandonar grupo',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
                                 ),
                               ],
                             ),
                           ),
 
-                          // Área de Mensajes
+                          // ─── ÁREA DE MENSAJES (Manejo de estado vacío) ───
                           Expanded(
-                            child: ListView(
-                              padding: const EdgeInsets.all(24),
-                              children: [
-                                Center(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 4,
+                            child: mensajesActuales.isEmpty
+                                ? Center(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(20),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF5F5F5),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.chat_bubble_outline,
+                                            size: 50,
+                                            color: Color(0xFFBDBDBD),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Aún no hay mensajes en este grupo.',
+                                          style: GoogleFonts.lexend(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: const Color(0xFF616161),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '¡Rompe el hielo y di hola!',
+                                          style: GoogleFonts.lexend(
+                                            fontSize: 13,
+                                            color: const Color(0xFF9E9E9E),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF5F5F5),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      'Hoy, 10:30 AM',
-                                      style: GoogleFonts.lexend(
-                                        fontSize: 11,
-                                        color: const Color(0xFF757575),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Center(
-                                  child: Text(
-                                    'María se ha unido al grupo',
-                                    style: GoogleFonts.lexend(
-                                      fontSize: 12,
-                                      color: const Color(0xFF9E9E9E),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.all(24),
+                                    itemCount: mensajesActuales.length,
+                                    itemBuilder: (context, index) {
+                                      var msj = mensajesActuales[index];
 
-                                // Mensaje de otro usuario
-                                _IncomingMessage(
-                                  name: 'Carlos',
-                                  text:
-                                      '¿Alguien pudo resolver el ejercicio 4 de la guía? Me da un resultado súper raro con la integral.',
-                                  time: '10:42 AM',
-                                ),
-                                const SizedBox(height: 20),
-
-                                // Mensaje propio
-                                _OutgoingMessage(
-                                  text:
-                                      'Sí, me dio 4π. Creo que el truco estaba en usar coordenadas polares desde el principio. Te paso foto de mi desarrollo en un rato.',
-                                  time: '10:45 AM',
-                                ),
-                              ],
-                            ),
+                                      if (msj['type'] == 'system') {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 16,
+                                          ),
+                                          child: Center(
+                                            child: Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFF5F5F5),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                msj['text'],
+                                                style: GoogleFonts.lexend(
+                                                  fontSize: 11,
+                                                  color: const Color(
+                                                    0xFF757575,
+                                                  ),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      } else if (msj['type'] == 'incoming') {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 20,
+                                          ),
+                                          child: _IncomingMessage(
+                                            name: msj['name'],
+                                            text: msj['text'],
+                                            time: msj['time'],
+                                            onLongPress: () =>
+                                                _mostrarOpcionesMensaje(
+                                                  msj['text'],
+                                                  false,
+                                                ),
+                                          ),
+                                        );
+                                      } else {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 20,
+                                          ),
+                                          child: _OutgoingMessage(
+                                            text: msj['text'],
+                                            time: msj['time'],
+                                            onLongPress: () =>
+                                                _mostrarOpcionesMensaje(
+                                                  msj['text'],
+                                                  true,
+                                                ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
                           ),
 
-                          // Barra de Input
+                          // ─── BARRA DE INPUT ───
                           Padding(
                             padding: const EdgeInsets.all(20.0),
                             child: Container(
@@ -347,12 +693,13 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                               ),
                               child: Row(
                                 children: [
+                                  // ─── ICONO PARA ABRIR ARCHIVOS ───
                                   IconButton(
                                     icon: const Icon(
                                       Icons.attach_file,
                                       color: Color(0xFF757575),
                                     ),
-                                    onPressed: () {},
+                                    onPressed: _abrirExploradorArchivos,
                                   ),
                                   Expanded(
                                     child: TextField(
@@ -568,11 +915,13 @@ class _IncomingMessage extends StatelessWidget {
   final String name;
   final String text;
   final String time;
+  final VoidCallback onLongPress; // <-- AÑADIDO
 
   const _IncomingMessage({
     required this.name,
     required this.text,
     required this.time,
+    required this.onLongPress,
   });
 
   @override
@@ -600,23 +949,27 @@ class _IncomingMessage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: const BorderRadius.only(
-                    topRight: Radius.circular(12),
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
+              GestureDetector(
+                // <-- AÑADIDO GESTURE DETECTOR
+                onLongPress: onLongPress,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topRight: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
+                    ),
+                    border: Border.all(color: const Color(0xFFE3BFB1)),
                   ),
-                  border: Border.all(color: const Color(0xFFE3BFB1)),
-                ),
-                child: Text(
-                  text,
-                  style: GoogleFonts.lexend(
-                    fontSize: 14,
-                    color: const Color(0xFF212121),
-                    height: 1.4,
+                  child: Text(
+                    text,
+                    style: GoogleFonts.lexend(
+                      fontSize: 14,
+                      color: const Color(0xFF212121),
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ),
@@ -640,8 +993,13 @@ class _IncomingMessage extends StatelessWidget {
 class _OutgoingMessage extends StatelessWidget {
   final String text;
   final String time;
+  final VoidCallback onLongPress; // <-- AÑADIDO
 
-  const _OutgoingMessage({required this.text, required this.time});
+  const _OutgoingMessage({
+    required this.text,
+    required this.time,
+    required this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -654,23 +1012,27 @@ class _OutgoingMessage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAEFE9),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(12),
-                    bottomLeft: Radius.circular(12),
-                    bottomRight: Radius.circular(12),
+              GestureDetector(
+                // <-- AÑADIDO GESTURE DETECTOR
+                onLongPress: onLongPress,
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFAEFE9),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                      bottomRight: Radius.circular(12),
+                    ),
+                    border: Border.all(color: const Color(0xFFF3D8C9)),
                   ),
-                  border: Border.all(color: const Color(0xFFF3D8C9)),
-                ),
-                child: Text(
-                  text,
-                  style: GoogleFonts.lexend(
-                    fontSize: 14,
-                    color: const Color(0xFF212121),
-                    height: 1.4,
+                  child: Text(
+                    text,
+                    style: GoogleFonts.lexend(
+                      fontSize: 14,
+                      color: const Color(0xFF212121),
+                      height: 1.4,
+                    ),
                   ),
                 ),
               ),
