@@ -657,7 +657,7 @@ class _PersonasContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gridCols = isMobile ? 1 : isTablet ? 2 : 3;
+    final gridCols = isMobile ? 1 : isTablet ? 2 : 4;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -859,16 +859,26 @@ class _AmigosView extends StatelessWidget {
               ),
             ),
           )
+        else if (gridCols == 1)
+          Column(
+            children: [
+              ...amigosFiltrados.map((p) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _PersonaCard(persona: p, esAmigo: true),
+                  )),
+              _InvitarAmigosCard(),
+            ],
+          )
         else
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: amigosFiltrados.length + 1,
-            gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: gridCols == 1 ? double.infinity : 290,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: gridCols,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: gridCols == 1 ? 2.6 : 1.35,
+              mainAxisExtent: 240,
             ),
             itemBuilder: (_, i) {
               if (i == amigosFiltrados.length) return _InvitarAmigosCard();
@@ -917,15 +927,30 @@ class _EstudiantesView extends StatelessWidget {
       );
     }
 
+    if (gridCols == 1) {
+      return Column(
+        children: filtrados
+            .map((p) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _PersonaCard(
+                    persona: p,
+                    esAmigo: false,
+                    onAgregar: onAgregar,
+                  ),
+                ))
+            .toList(),
+      );
+    }
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: filtrados.length,
-      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: gridCols == 1 ? double.infinity : 290,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: gridCols,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: gridCols == 1 ? 2.6 : 1.35,
+        mainAxisExtent: 240,
       ),
       itemBuilder: (_, i) => _PersonaCard(
         persona: filtrados[i],
@@ -963,7 +988,7 @@ class _SolicitudCardState extends State<_SolicitudCard> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(50),
         border: Border.all(color: const Color(0xFFF0EAE6)),
       ),
       child: Row(
@@ -1056,9 +1081,79 @@ class _PersonaCardState extends State<_PersonaCard> {
   bool _enviado = false;
   bool _loading = false;
 
+  Widget _buildButton() {
+    final p = widget.persona;
+    if (widget.esAmigo) {
+      return TextButton.icon(
+        onPressed: () {},
+        icon: const Icon(Icons.send_rounded, size: 15, color: Colors.white),
+        label: Text('Enviar Mensaje',
+            style: GoogleFonts.lexend(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+                fontSize: 13)),
+        style: TextButton.styleFrom(
+          backgroundColor: const Color(0xFF2E5900),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24)),
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+        ),
+      );
+    }
+    if (_enviado) {
+      return Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Text('Solicitud enviada',
+            style: GoogleFonts.lexend(
+                fontSize: 13, color: const Color(0xFF9E9E9E))),
+      );
+    }
+    return TextButton.icon(
+      onPressed: _loading
+          ? null
+          : () async {
+              setState(() => _loading = true);
+              await widget.onAgregar!(p.id);
+              if (mounted) {
+                setState(() {
+                  _loading = false;
+                  _enviado = true;
+                });
+              }
+            },
+      icon: _loading
+          ? const SizedBox(
+              width: 13,
+              height: 13,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white),
+            )
+          : const Icon(Icons.person_add_rounded,
+              size: 15, color: Colors.white),
+      label: Text('Agregar',
+          style: GoogleFonts.lexend(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+              fontSize: 13)),
+      style: TextButton.styleFrom(
+        backgroundColor: const Color(0xFFE65100),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24)),
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.persona;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -1067,152 +1162,151 @@ class _PersonaCardState extends State<_PersonaCard> {
         ),
       ),
       child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF0EAE6)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Avatar + menú
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Avatar(url: p.fotoPerfil, nombre: p.nombreCompleto, radius: 28),
-                const Spacer(),
-                if (widget.esAmigo)
-                  Icon(Icons.more_vert_rounded,
-                      size: 20, color: const Color(0xFFAFA49C)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            // Nombre
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                p.nombreCompleto,
-                style: GoogleFonts.lexend(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1A1A1A),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if ((p.carrera ?? '').isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  p.carrera!,
-                  style: GoogleFonts.lexend(
-                    fontSize: 12,
-                    color: const Color(0xFFE65100),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-            if (p.amigosEnComun > 0) ...[
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFF0EAE6)),
+        ),
+        child: isMobile
+            // ── MÓVIL: layout horizontal ──────────────────────────────────
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.people_outlined,
-                        size: 13, color: Color(0xFF9E9E9E)),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${p.amigosEnComun} AMIGOS EN COMÚN',
-                      style: GoogleFonts.lexend(
-                        fontSize: 10,
-                        color: const Color(0xFF9E9E9E),
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.3,
+                    _Avatar(
+                        url: p.fotoPerfil,
+                        nombre: p.nombreCompleto,
+                        radius: 26),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            p.nombreCompleto,
+                            style: GoogleFonts.lexend(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1A1A1A),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if ((p.carrera ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              p.carrera!,
+                              style: GoogleFonts.lexend(
+                                fontSize: 11,
+                                color: const Color(0xFFE65100),
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          if (p.amigosEnComun > 0) ...[
+                            const SizedBox(height: 3),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.people_outlined,
+                                    size: 12, color: Color(0xFF9E9E9E)),
+                                const SizedBox(width: 3),
+                                Flexible(
+                                  child: Text(
+                                    '${p.amigosEnComun} en común',
+                                    style: GoogleFonts.lexend(
+                                      fontSize: 10,
+                                      color: const Color(0xFF9E9E9E),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Botón pegado a la derecha
+                    _buildButton(),
+                  ],
+                ),
+              )
+            // ── GRID (tablet/desktop): layout vertical ────────────────────
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    // Avatar
+                    _Avatar(
+                        url: p.fotoPerfil,
+                        nombre: p.nombreCompleto,
+                        radius: 24),
+                    const SizedBox(height: 8),
+                    // Nombre
+                    Text(
+                      p.nombreCompleto,
+                      style: GoogleFonts.lexend(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1A1A1A),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if ((p.carrera ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        p.carrera!,
+                        style: GoogleFonts.lexend(
+                          fontSize: 12,
+                          color: const Color(0xFFA53C00),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (p.amigosEnComun > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.people_outlined,
+                              size: 13, color: Color(0xFF9E9E9E)),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '${p.amigosEnComun} AMIGOS EN COMÚN',
+                              style: GoogleFonts.lexend(
+                                fontSize: 10,
+                                color: const Color(0xFF9E9E9E),
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.3,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    // Empuja el botón hacia abajo
+                    const Spacer(),
+                    // Botón pegado al fondo
+                    SizedBox(
+                      width: double.infinity,
+                      child: _buildButton(),
                     ),
                   ],
                 ),
               ),
-            ],
-            const Spacer(),
-            // Botón
-            SizedBox(
-              width: double.infinity,
-              child: widget.esAmigo
-                  ? TextButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.send_rounded,
-                          size: 15, color: Colors.white),
-                      label: Text('Enviar Mensaje',
-                          style: GoogleFonts.lexend(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13)),
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFF2E5900),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24)),
-                        padding: const EdgeInsets.symmetric(vertical: 9),
-                      ),
-                    )
-                  : _enviado
-                      ? Container(
-                          alignment: Alignment.center,
-                          padding: const EdgeInsets.symmetric(vertical: 9),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF5F5F5),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: Text('Solicitud enviada',
-                              style: GoogleFonts.lexend(
-                                  fontSize: 13,
-                                  color: const Color(0xFF9E9E9E))),
-                        )
-                      : TextButton.icon(
-                          onPressed: _loading
-                              ? null
-                              : () async {
-                                  setState(() => _loading = true);
-                                  await widget.onAgregar!(p.id);
-                                  if (mounted) {
-                                    setState(() {
-                                      _loading = false;
-                                      _enviado = true;
-                                    });
-                                  }
-                                },
-                          icon: _loading
-                              ? const SizedBox(
-                                  width: 13,
-                                  height: 13,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Icon(Icons.person_add_rounded,
-                                  size: 15, color: Colors.white),
-                          label: Text('Agregar',
-                              style: GoogleFonts.lexend(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 13)),
-                          style: TextButton.styleFrom(
-                            backgroundColor: const Color(0xFFE65100),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24)),
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                          ),
-                        ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1223,41 +1317,81 @@ class _PersonaCardState extends State<_PersonaCard> {
 class _InvitarAmigosCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return CustomPaint(
       painter: _DashedRectPainter(color: const Color(0xFFD7CCC8)),
       child: Container(
+        height: isMobile ? 72 : null,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-                color: Color(0xFFF5F5F5), shape: BoxShape.circle),
-            child: const Icon(Icons.person_add_alt_1_rounded,
-                color: Color(0xFF9E9E9E), size: 22),
-          ),
-          const SizedBox(height: 12),
-          Text('Invitar amigos',
-              style: GoogleFonts.lexend(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF212121))),
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Comparte U-NITE con tus compañeros de curso.',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.lexend(
-                  fontSize: 12,
-                  color: const Color(0xFFAFA49C),
-                  height: 1.45),
-            ),
-          ),
-        ]),
+        child: isMobile
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(
+                          color: Color(0xFFF5F5F5), shape: BoxShape.circle),
+                      child: const Icon(Icons.person_add_alt_1_rounded,
+                          color: Color(0xFF9E9E9E), size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Invitar amigos',
+                              style: GoogleFonts.lexend(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFF212121))),
+                          Text(
+                            'Comparte U-NITE con tus compañeros.',
+                            style: GoogleFonts.lexend(
+                                fontSize: 11,
+                                color: const Color(0xFFAFA49C)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: const BoxDecoration(
+                      color: Color(0xFFF5F5F5), shape: BoxShape.circle),
+                  child: const Icon(Icons.person_add_alt_1_rounded,
+                      color: Color(0xFF9E9E9E), size: 22),
+                ),
+                const SizedBox(height: 12),
+                Text('Invitar amigos',
+                    style: GoogleFonts.lexend(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF212121))),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    'Comparte U-NITE con tus compañeros de curso.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.lexend(
+                        fontSize: 12,
+                        color: const Color(0xFFAFA49C),
+                        height: 1.45),
+                  ),
+                ),
+              ]),
       ),
     );
   }
@@ -1384,7 +1518,7 @@ class _HeroBannerPersonas extends StatelessWidget {
       width: double.infinity,
       child: Stack(fit: StackFit.expand, children: [
         Image.asset(
-          'assets/amigos.jpg',
+          'assets/amigos.png',
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => Container(
             decoration: const BoxDecoration(
@@ -1401,7 +1535,7 @@ class _HeroBannerPersonas extends StatelessWidget {
               end: Alignment.centerRight,
               stops: const [0.0, 0.55, 1.0],
               colors: [
-                const Color(0xFF1B5E20).withOpacity(0.88),
+                const Color.fromARGB(255, 91, 52, 11).withOpacity(0.88),
                 const Color(0xFF3E2723).withOpacity(0.60),
                 Colors.transparent,
               ],
