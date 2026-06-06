@@ -11,7 +11,7 @@ class StudymatchChatPage extends StatefulWidget {
 }
 
 class _StudymatchChatPageState extends State<StudymatchChatPage> {
-  int _selectedSidebar = 0; // 0: Mis Grupos
+  int _selectedTab = 0; // 0: Mis Grupos
   int _selectedChat = 0; // 0: Cálculo II
 
   @override
@@ -19,44 +19,60 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFFDFBF9), // Color de fondo general base
       appBar: const UniteHeader(currentIndex: 4), // Studymatch activo
-      body: Row(
+      body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ─── COLUMNA 1: SIDEBAR IZQUIERDO ───
+          // ─── NUEVA FILA SUPERIOR (PESTAÑAS Y ACCIONES) ───
           Container(
-            width: 220,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: const BoxDecoration(
               color: Color(0xFFFDFBF9),
               border: Border(
-                right: BorderSide(color: Color(0xFFF0EAE6), width: 1.5),
+                bottom: BorderSide(color: Color(0xFFF0EAE6), width: 1.5),
               ),
             ),
-            padding: const EdgeInsets.only(top: 24, left: 16, right: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                _SidebarItem(
+                _TopTabItem(
                   label: 'Mis Grupos',
-                  isActive: _selectedSidebar == 0,
-                  onTap: () => setState(() => _selectedSidebar = 0),
+                  isActive: _selectedTab == 0,
+                  onTap: () => setState(() => _selectedTab = 0),
                 ),
-                const SizedBox(height: 12),
-                _SidebarItem(
+                const SizedBox(width: 8),
+                _TopTabItem(
                   label: 'Grupos Públicos',
-                  isActive: _selectedSidebar == 1,
-                  onTap: () => setState(() => _selectedSidebar = 1),
+                  isActive: _selectedTab == 1,
+                  onTap: () => setState(() => _selectedTab = 1),
                 ),
-                const SizedBox(height: 12),
-                _SidebarItem(
+                const SizedBox(width: 8),
+                _TopTabItem(
                   label: 'Amigos',
-                  isActive: _selectedSidebar == 2,
-                  onTap: () => setState(() => _selectedSidebar = 2),
+                  isActive: _selectedTab == 2,
+                  onTap: () => setState(() => _selectedTab = 2),
+                ),
+
+                const Spacer(), // Empuja los iconos a la derecha
+                // Iconos de agregar/eliminar personas
+                IconButton(
+                  tooltip: 'Agregar a grupo',
+                  icon: const Icon(Icons.person_add_alt_1_outlined),
+                  color: const Color(0xFF757575),
+                  hoverColor: const Color(0xFFFFF3E0),
+                  onPressed: () {},
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Eliminar de grupo',
+                  icon: const Icon(Icons.person_remove_alt_1_outlined),
+                  color: const Color(0xFF757575),
+                  hoverColor: const Color(0xFFFFF3E0),
+                  onPressed: () {},
                 ),
               ],
             ),
           ),
 
-          // ─── COLUMNA 2 Y 3: CONTENEDOR PRINCIPAL ───
+          // ─── CONTENEDOR PRINCIPAL DE CHATS ───
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -68,7 +84,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                 ),
                 child: Row(
                   children: [
-                    // ─── COLUMNA 2: LISTA DE CHATS ───
+                    // ─── COLUMNA IZQUIERDA: LISTA DE CHATS ───
                     Container(
                       width: 320,
                       decoration: const BoxDecoration(
@@ -187,7 +203,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                       ),
                     ),
 
-                    // ─── COLUMNA 3: ÁREA DE CHAT ACTIVO ───
+                    // ─── COLUMNA DERECHA: ÁREA DE CHAT ACTIVO ───
                     Expanded(
                       child: Column(
                         children: [
@@ -391,12 +407,12 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 // WIDGETS AUXILIARES REUTILIZABLES
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _SidebarItem extends StatelessWidget {
+class _TopTabItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _SidebarItem({
+  const _TopTabItem({
     required this.label,
     required this.isActive,
     required this.onTap,
@@ -407,11 +423,10 @@ class _SidebarItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
           color: isActive ? const Color(0xFFFFF3E0) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           label,
@@ -454,9 +469,7 @@ class _ChatListItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isActive
-              ? const Color(0xFFEBE5DF)
-              : Colors.transparent, // Color beige claro para activo
+          color: isActive ? const Color(0xFFEBE5DF) : Colors.transparent,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -618,7 +631,7 @@ class _IncomingMessage extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 80), // Margen para que no ocupe toda la pantalla
+        const SizedBox(width: 80),
       ],
     );
   }
@@ -636,7 +649,7 @@ class _OutgoingMessage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        const SizedBox(width: 80), // Margen para que no ocupe toda la pantalla
+        const SizedBox(width: 80),
         Flexible(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -644,7 +657,7 @@ class _OutgoingMessage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFAEFE9), // Color naranja muy claro
+                  color: const Color(0xFFFAEFE9),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(12),
                     bottomLeft: Radius.circular(12),
