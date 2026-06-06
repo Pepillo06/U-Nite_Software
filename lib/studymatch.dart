@@ -5,7 +5,7 @@ import 'theme.dart';
 
 import '../widgets/unite_header.dart';
 import 'crear_grupos.dart'; 
-
+import 'screens/chat/chat_grupo_screen.dart';
 
 class StudymatchPage extends StatefulWidget {
   const StudymatchPage({super.key});
@@ -22,6 +22,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
   String? _filtroSeccion;
 
   List<_GrupoData> _grupos = [];
+  Set<String> _misGruposIds = {};
   bool _isLoading = true;
 
   @override
@@ -33,18 +34,48 @@ class _StudymatchPageState extends State<StudymatchPage> {
   Future<void> _cargarGrupos() async {
     try {
       final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+
+      // Obtener los grupos públicos
       final response = await supabase
           .from('grupos_estudio')
           .select('id, nombre, descripcion, materia, seccion, max_miembros, es_privado, foto_url, creado_por')
           .eq('es_privado', false);
 
+      // Obtener el conteo real de miembros por grupo
+      final miembrosCountResponse = await supabase
+          .from('miembros_grupo')
+          .select('grupo_id');
+
+      final Map<String, int> conteoMiembros = {};
+      for (final item in miembrosCountResponse as List) {
+        final gId = item['grupo_id'].toString();
+        conteoMiembros[gId] = (conteoMiembros[gId] ?? 0) + 1;
+      }
+
+      // Obtener los IDs de grupos a los que pertenece el usuario logueado
+      final Set<String> misGrupos = {};
+      if (userId != null) {
+        final membresias = await supabase
+            .from('miembros_grupo')
+            .select('grupo_id')
+            .eq('usuario_id', userId);
+        for (final m in membresias as List) {
+          misGrupos.add(m['grupo_id'].toString());
+        }
+      }
+
       final grupos = (response as List).map((row) {
-        return _GrupoData.fromMap(row);
+        final gData = _GrupoData.fromMap(row);
+        return gData.copyWith(
+          miembros: conteoMiembros[gData.id] ?? 1,
+        );
       }).toList();
 
       if (mounted) {
         setState(() {
           _grupos = grupos;
+          _misGruposIds = misGrupos;
           _isLoading = false;
         });
       }
@@ -760,6 +791,28 @@ class _GrupoData {
     required this.seccion,
     this.fotoUrl,
   });
+
+  _GrupoData copyWith({
+    String? id,
+    String? nombre,
+    String? descripcion,
+    int? miembros,
+    int? max,
+    String? materia,
+    int? seccion,
+    String? fotoUrl,
+  }) {
+    return _GrupoData(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      descripcion: descripcion ?? this.descripcion,
+      miembros: miembros ?? this.miembros,
+      max: max ?? this.max,
+      materia: materia ?? this.materia,
+      seccion: seccion ?? this.seccion,
+      fotoUrl: fotoUrl ?? this.fotoUrl,
+    );
+  }
 
   factory _GrupoData.fromMap(Map<String, dynamic> map) {
     return _GrupoData(

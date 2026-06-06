@@ -87,7 +87,7 @@ class _CrearGrupoPageState extends State<CrearGrupoPage>
         }
 
         // Insertamos los datos en tu tabla 'grupos_estudio'
-        await supabase.from('grupos_estudio').insert({
+        final nuevoGrupo = await supabase.from('grupos_estudio').insert({
           'nombre': _nombreCtrl.text.trim(),
           'descripcion': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
           'materia': _materiaCtrl.text.trim(),
@@ -96,6 +96,13 @@ class _CrearGrupoPageState extends State<CrearGrupoPage>
           'es_privado': _esPrivado,
           'creado_por': userId,
           if (fotoUrl != null) 'foto_url': fotoUrl,
+        }).select('id').single();
+
+        // Agregamos al creador a la tabla 'miembros_grupo'
+        await supabase.from('miembros_grupo').insert({
+          'grupo_id': nuevoGrupo['id'],
+          'usuario_id': userId,
+          'rol': 'creador'
         });
 
         if (!mounted) return;
