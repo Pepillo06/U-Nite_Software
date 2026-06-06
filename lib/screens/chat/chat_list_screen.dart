@@ -9,7 +9,7 @@ class ChatListScreen extends StatefulWidget {
   final String? nombreInicial;
   final String? otroUserIdInicial;
   final String? anuncioIdInicial;
-  final bool abrirMisTrueques; // ← nuevo parámetro
+  final bool abrirMisTrueques;
 
   const ChatListScreen({
     super.key,
@@ -17,7 +17,7 @@ class ChatListScreen extends StatefulWidget {
     this.nombreInicial,
     this.otroUserIdInicial,
     this.anuncioIdInicial,
-    this.abrirMisTrueques = false, // ← default false
+    this.abrirMisTrueques = false,
   });
 
   @override
@@ -35,17 +35,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
   bool _bandejaTruequeExpandida = false;
   bool _navegacionInicialHecha = false;
   String? _conversacionActivaId;
-  // Evitar que el popup de solicitudes se abra doble
   bool _solicitudesDialogAbierto = false;
+  RealtimeChannel? _canalTrueques;
 
   void _marcarConversacionLeida(String conversacionId) {
     setState(() {
       final idx = _conversaciones.indexWhere((c) => c['id'] == conversacionId);
       if (idx != -1) {
-        _conversaciones[idx] = {
-          ..._conversaciones[idx],
-          'unread': 0,
-        };
+        _conversaciones[idx] = {..._conversaciones[idx], 'unread': 0};
       }
     });
   }
@@ -55,12 +52,47 @@ class _ChatListScreenState extends State<ChatListScreen> {
     super.initState();
     _loadConversaciones();
     _loadSolicitudesTrueque();
-    // Si viene desde "Ver mis trueques", abrir el popup automáticamente
+    _suscribirseATrueques();
     if (widget.abrirMisTrueques) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _mostrarSolicitudesEnviadas();
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    if (_canalTrueques != null) _supabase.removeChannel(_canalTrueques!);
+    super.dispose();
+  }
+
+  // ─── Suscripción realtime a solicitudes de trueque ────────────────────────
+  // Canal con nombre estable para recibir INSERT, UPDATE y DELETE
+  void _suscribirseATrueques() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    _canalTrueques = _supabase
+        .channel('chat_trueques_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'solicitudes_trueque',
+          callback: (_) => _loadSolicitudesTrueque(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'solicitudes_trueque',
+          callback: (_) => _loadSolicitudesTrueque(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'solicitudes_trueque',
+          callback: (_) => _loadSolicitudesTrueque(),
+        );
+    _canalTrueques!.subscribe();
   }
 
   Future<void> _loadSolicitudesTrueque() async {
@@ -95,7 +127,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         });
       }
 
-      setState(() => _solicitudesTrueque = resultado);
+      if (mounted) setState(() => _solicitudesTrueque = resultado);
     } catch (e) {
       debugPrint('Error cargando solicitudes trueque: $e');
     }
@@ -177,7 +209,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
             ? '${solicitanteData['primer_nombre']} ${solicitanteData['primer_apellido']}'
             : 'Usuario';
 
-        await _loadSolicitudesTrueque();
+        // Actualizar localmente de inmediato
+        if (mounted) {
+          setState(() {
+            _solicitudesTrueque.removeWhere((s) => s['id'] == solicitudId);
+          });
+        }
         await _loadConversaciones();
 
         if (mounted) {
@@ -193,7 +230,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
           );
         }
       } else {
-        await _loadSolicitudesTrueque();
+        // Actualizar localmente de inmediato
+        if (mounted) {
+          setState(() {
+            _solicitudesTrueque.removeWhere((s) => s['id'] == solicitudId);
+          });
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -329,8 +371,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
       resultado.sort((a, b) {
         final uA = valorUrgencia(a['urgencia'] as String?);
         final uB = valorUrgencia(b['urgencia'] as String?);
-        if (uA != uB) return uB.compareTo(uA); // Prioriza el número mayor (alta)
-        return 0; // Si tienen igual urgencia, mantiene el orden de fecha
+        if (uA != uB) return uB.compareTo(uA);
+        return 0;
       });
 
       // Ordenar por último mensaje de más reciente a más antiguo
@@ -340,21 +382,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
         return tb.compareTo(ta);
       });
 
-      setState(() {
-        _conversaciones = resultado;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _conversaciones = resultado;
+          _loading = false;
+        });
+      }
 
       // Si hay una conversación seleccionada manualmente, mantenerla
       if (_conversacionActivaId != null) {
         final idx = resultado.indexWhere((c) => c['id'] == _conversacionActivaId);
-        if (idx != -1) setState(() => _selectedIndex = idx);
+        if (idx != -1 && mounted) setState(() => _selectedIndex = idx);
       } else if (widget.conversacionInicial != null) {
         final idx = resultado.indexWhere((c) => c['id'] == widget.conversacionInicial);
-        if (idx != -1) setState(() => _selectedIndex = idx);
+        if (idx != -1 && mounted) setState(() => _selectedIndex = idx);
       }
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -396,7 +440,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   // ─── Mostrar popup de solicitudes enviadas — evita doble apertura ─────────
   Future<void> _mostrarSolicitudesEnviadas() async {
-    // Evitar que se abra doble si ya está abierto
     if (_solicitudesDialogAbierto) return;
     _solicitudesDialogAbierto = true;
 
@@ -406,7 +449,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       return;
     }
 
-    // Cargar solicitudes enviadas por el usuario actual
+    // Cargar solicitudes enviadas — receptor_id incluido explícitamente
     final data = await _supabase
         .from('solicitudes_trueque')
         .select('id, objeto_ofrecido, estado, creado_en, anuncio_id, receptor_id')
@@ -427,7 +470,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
           .eq('id', sol['receptor_id'])
           .maybeSingle();
       solicitudes.add({
-        ...sol,
+        'id': sol['id'],
+        'objeto_ofrecido': sol['objeto_ofrecido'],
+        'estado': sol['estado'],
+        'creado_en': sol['creado_en'],
+        'anuncio_id': sol['anuncio_id'],
+        'receptor_id': sol['receptor_id'], // ← explícito para editar/cancelar
         'anuncio': anuncioData,
         'receptor': receptorData,
       });
@@ -447,26 +495,72 @@ class _ChatListScreenState extends State<ChatListScreen> {
           await _editarSolicitudTrueque(sol);
         },
         onCancelar: (solId) async {
+          final solData = solicitudes.firstWhere(
+            (s) => s['id'] == solId,
+            orElse: () => {},
+          );
+          final receptorId = solData['receptor_id']?.toString() ?? '';
+          final tituloAnuncio = solData['anuncio']?['titulo'] ?? 'Producto';
+
+          // Eliminar la solicitud en Supabase
           await _supabase
               .from('solicitudes_trueque')
               .delete()
               .eq('id', solId);
+
+          // Actualizar localmente de inmediato — el vendedor ve la solicitud desaparecer
           if (mounted) {
-            Navigator.pop(ctx);           // cierra el popup actual
-            _solicitudesDialogAbierto = false; // resetear flag ANTES de reabrir
+            setState(() {
+              _solicitudesTrueque.removeWhere((s) => s['id'] == solId);
+            });
+          }
+
+          // Notificar al vendedor
+          if (receptorId.isNotEmpty) {
+            try {
+              final compradorData = await _supabase
+                  .from('usuarios')
+                  .select('primer_nombre, primer_apellido')
+                  .eq('id', _supabase.auth.currentUser!.id)
+                  .maybeSingle();
+              final nombreComprador = compradorData != null
+                  ? '${compradorData['primer_nombre']} ${compradorData['primer_apellido']}'
+                  : 'El comprador';
+              await _supabase.from('notificaciones').insert({
+                'usuario_id': receptorId,
+                'tipo': 'trueque',
+                'titulo': 'Propuesta de trueque cancelada',
+                'mensaje':
+                    '$nombreComprador canceló su propuesta por "$tituloAnuncio"',
+                'leida': false,
+                'datos': {
+                  'anuncio_id': solData['anuncio_id'],
+                  'solicitante_id': _supabase.auth.currentUser!.id,
+                  'nombre_otro': nombreComprador,
+                },
+              });
+            } catch (e) {
+              debugPrint('Error notificando cancelación: $e');
+            }
+          }
+
+          if (mounted) {
+            Navigator.pop(ctx);
+            _solicitudesDialogAbierto = false; // resetear ANTES de reabrir
             _mostrarSolicitudesEnviadas();     // reabrir con datos actualizados
           }
         },
       ),
     );
 
-    // Al cerrar el dialog, resetear el flag
     _solicitudesDialogAbierto = false;
   }
 
-  // ─── Dialog para editar una solicitud enviada — fondo blanco ─────────────
+  // ─── Dialog para editar — notifica al vendedor ────────────────────────────
   Future<void> _editarSolicitudTrueque(Map<String, dynamic> solicitud) async {
     final tituloAnuncio = solicitud['anuncio']?['titulo'] ?? 'Producto';
+    // receptor_id viene explícitamente del mapa de solicitudes
+    final receptorId = solicitud['receptor_id']?.toString() ?? '';
     final controller =
         TextEditingController(text: solicitud['objeto_ofrecido'] ?? '');
 
@@ -530,10 +624,42 @@ class _ChatListScreenState extends State<ChatListScreen> {
             onPressed: () async {
               final nueva = controller.text.trim();
               if (nueva.isEmpty) return;
+
+              // Actualizar la propuesta en Supabase
               await _supabase
                   .from('solicitudes_trueque')
                   .update({'objeto_ofrecido': nueva})
                   .eq('id', solicitud['id']);
+
+              // Notificar al vendedor que la propuesta fue modificada
+              if (receptorId.isNotEmpty) {
+                try {
+                  final compradorData = await _supabase
+                      .from('usuarios')
+                      .select('primer_nombre, primer_apellido')
+                      .eq('id', _supabase.auth.currentUser!.id)
+                      .maybeSingle();
+                  final nombreComprador = compradorData != null
+                      ? '${compradorData['primer_nombre']} ${compradorData['primer_apellido']}'
+                      : 'El comprador';
+                  await _supabase.from('notificaciones').insert({
+                    'usuario_id': receptorId,
+                    'tipo': 'trueque',
+                    'titulo': 'Propuesta de trueque modificada',
+                    'mensaje':
+                        '$nombreComprador modificó su propuesta por "$tituloAnuncio"',
+                    'leida': false,
+                    'datos': {
+                      'anuncio_id': solicitud['anuncio_id'],
+                      'solicitante_id': _supabase.auth.currentUser!.id,
+                      'nombre_otro': nombreComprador,
+                    },
+                  });
+                } catch (e) {
+                  debugPrint('Error notificando edición: $e');
+                }
+              }
+
               if (ctx.mounted) Navigator.pop(ctx);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -555,12 +681,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
@@ -686,7 +806,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           ),
                         )
                       : ChatScreen(
-                          key: ValueKey('${_chatsFiltrados[idx]['id']}_${_chatsFiltrados[idx]['anuncio_id'] ?? ''}'),
+                          key: ValueKey(
+                              '${_chatsFiltrados[idx]['id']}_${_chatsFiltrados[idx]['anuncio_id'] ?? ''}'),
                           conversacionId: _chatsFiltrados[idx]['id'],
                           nombreOtro: _chatsFiltrados[idx]['otro_nombre'],
                           otroUserId: _chatsFiltrados[idx]['otro_id'],
@@ -866,16 +987,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
                               'rechazado', solicitanteId, tituloAnuncio),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFF5B4137),
-                            side: const BorderSide(
-                                color: Color(0xFF5B4137)),
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 8),
+                            side: const BorderSide(color: Color(0xFF5B4137)),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                             textStyle: GoogleFonts.lexend(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600),
+                                fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                           child: const Text('Rechazar'),
                         ),
@@ -888,14 +1006,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF245000),
                             foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                             textStyle: GoogleFonts.lexend(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600),
+                                fontSize: 12, fontWeight: FontWeight.w600),
                           ),
                           child: const Text('Aceptar'),
                         ),
@@ -1040,7 +1156,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 // ─── Tile de chat ─────────────────────────────────────────────────────────────
 class _ChatTile extends StatelessWidget {
   final String nombre, preview, hora, searchQuery;
-  final String fotoUrl;
+  final String fotoUrl; // ← foto de perfil del otro usuario
   final String? urgencia;
   final bool isActive, isOnline;
   final int unreadCount;
@@ -1317,7 +1433,8 @@ class _DialogSolicitudesEnviadas extends StatelessWidget {
                             color: const Color(0xFFF0F7F0),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                                color: const Color(0xFF245000).withOpacity(0.2)),
+                                color: const Color(0xFF245000)
+                                    .withOpacity(0.2)),
                           ),
                           child: Row(
                             children: [
@@ -1371,10 +1488,8 @@ class _DialogSolicitudesEnviadas extends StatelessWidget {
                                         ),
                                         ElevatedButton(
                                           onPressed: () {
-                                            Navigator.pop(
-                                                confirmCtx); // cierra confirmación
-                                            onCancelar(
-                                                sol['id']); // ejecuta cancelar
+                                            Navigator.pop(confirmCtx);
+                                            onCancelar(sol['id']);
                                           },
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor: Colors.red,

@@ -7,7 +7,7 @@ import '../profile_page.dart';
 import '../home_page.dart';
 import '../screens/chat/chat_list_screen.dart';
 import '../screens/chat/notifications_screen.dart';
-import '../studymatch.dart'; 
+import '../studymatch.dart';
 
 class UniteHeader extends StatefulWidget implements PreferredSizeWidget {
   final int currentIndex;
@@ -30,6 +30,8 @@ class _UniteHeaderState extends State<UniteHeader> {
   String? _fotoPerfilUrl;
   int _mensajesPendientes = 0;
   int _notificacionesPendientes = 0;
+  RealtimeChannel? _canalMensajes;
+  RealtimeChannel? _canalNotifs;
 
   @override
   void initState() {
@@ -39,6 +41,13 @@ class _UniteHeaderState extends State<UniteHeader> {
     _cargarNotificacionesPendientes();
     _suscribirseAMensajes();
     _suscribirseANotificaciones();
+  }
+
+  @override
+  void dispose() {
+    if (_canalMensajes != null) _supabase.removeChannel(_canalMensajes!);
+    if (_canalNotifs != null) _supabase.removeChannel(_canalNotifs!);
+    super.dispose();
   }
 
   Future<void> _cargarUsuario() async {
@@ -69,7 +78,7 @@ class _UniteHeaderState extends State<UniteHeader> {
     try {
       final result = await _supabase
           .rpc('mensajes_pendientes', params: {'user_id': userId});
-      setState(() => _mensajesPendientes = result ?? 0);
+      if (mounted) setState(() => _mensajesPendientes = result ?? 0);
     } catch (e) {
       debugPrint('Error mensajes pendientes: $e');
     }
@@ -84,15 +93,16 @@ class _UniteHeaderState extends State<UniteHeader> {
           .select('id')
           .eq('usuario_id', userId)
           .eq('leida', false);
-      setState(() => _notificacionesPendientes = data.length);
+      if (mounted) setState(() => _notificacionesPendientes = data.length);
     } catch (_) {}
   }
 
   void _suscribirseAMensajes() {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
-    _supabase
-        .channel('header_mensajes_$userId')
+    // Canal único para mensajes del header
+    _canalMensajes = _supabase
+        .channel('header_msg_$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -104,15 +114,16 @@ class _UniteHeaderState extends State<UniteHeader> {
           schema: 'public',
           table: 'mensajes',
           callback: (_) => _cargarMensajesPendientes(),
-        )
-        .subscribe();
+        );
+    _canalMensajes!.subscribe();
   }
 
   void _suscribirseANotificaciones() {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
-    _supabase
-        .channel('header_notif_$userId')
+    // Canal único para notificaciones del header — escucha insert, update y delete
+    _canalNotifs = _supabase
+        .channel('header_notif_badge_$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -125,7 +136,13 @@ class _UniteHeaderState extends State<UniteHeader> {
           table: 'notificaciones',
           callback: (_) => _cargarNotificacionesPendientes(),
         )
-        .subscribe();
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'notificaciones',
+          callback: (_) => _cargarNotificacionesPendientes(),
+        );
+    _canalNotifs!.subscribe();
   }
 
   bool _verificarAutenticacion() {
@@ -223,7 +240,7 @@ class _UniteHeaderState extends State<UniteHeader> {
           // Íconos y acciones
           Row(
             children: [
-              // Notificaciones con badge y subrayado naranja
+              // ─── Notificaciones con badge más grande ──────────────────────
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -259,21 +276,23 @@ class _UniteHeaderState extends State<UniteHeader> {
                   ),
                   if (_notificacionesPendientes > 0)
                     Positioned(
-                      top: 6,
-                      right: 6,
+                      top: 4,
+                      right: 4,
                       child: Container(
-                        width: 14,
-                        height: 14,
+                        width: 18,   // ← más grande
+                        height: 18,  // ← más grande
                         decoration: const BoxDecoration(
                           color: Color(0xFFFF6100),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: Text(
-                            '$_notificacionesPendientes',
+                            _notificacionesPendientes > 9
+                                ? '9+'
+                                : '$_notificacionesPendientes',
                             style: GoogleFonts.lexend(
                               color: Colors.white,
-                              fontSize: 8,
+                              fontSize: 9,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -283,7 +302,7 @@ class _UniteHeaderState extends State<UniteHeader> {
                 ],
               ),
 
-              // Mensajes con badge
+              // ─── Mensajes con badge más grande ───────────────────────────
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -319,21 +338,23 @@ class _UniteHeaderState extends State<UniteHeader> {
                   ),
                   if (_mensajesPendientes > 0)
                     Positioned(
-                      top: 6,
-                      right: 6,
+                      top: 4,
+                      right: 4,
                       child: Container(
-                        width: 14,
-                        height: 14,
+                        width: 18,   // ← más grande
+                        height: 18,  // ← más grande
                         decoration: const BoxDecoration(
                           color: Color(0xFFFF6100),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: Text(
-                            '$_mensajesPendientes',
+                            _mensajesPendientes > 9
+                                ? '9+'
+                                : '$_mensajesPendientes',
                             style: GoogleFonts.lexend(
                               color: Colors.white,
-                              fontSize: 8,
+                              fontSize: 9,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -375,7 +396,8 @@ class _UniteHeaderState extends State<UniteHeader> {
                     value: 'perfil',
                     child: Row(
                       children: [
-                        const Icon(Icons.person_outline, size: 18, color: Color(0xFF4A4A4A)),
+                        const Icon(Icons.person_outline,
+                            size: 18, color: Color(0xFF4A4A4A)),
                         const SizedBox(width: 10),
                         Text(
                           'Ver perfil',
@@ -392,7 +414,8 @@ class _UniteHeaderState extends State<UniteHeader> {
                     value: 'cerrar_sesion',
                     child: Row(
                       children: [
-                        const Icon(Icons.logout_outlined, size: 18, color: Colors.redAccent),
+                        const Icon(Icons.logout_outlined,
+                            size: 18, color: Colors.redAccent),
                         const SizedBox(width: 10),
                         Text(
                           'Cerrar sesión',

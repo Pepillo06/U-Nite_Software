@@ -15,12 +15,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _notificaciones = [];
   bool _loading = true;
+  RealtimeChannel? _canal;
 
   @override
   void initState() {
     super.initState();
     _loadNotificaciones();
     _suscribirse();
+  }
+
+  @override
+  void dispose() {
+    if (_canal != null) _supabase.removeChannel(_canal!);
+    super.dispose();
   }
 
   Future<void> _loadNotificaciones() async {
@@ -31,21 +38,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .from('notificaciones')
           .select()
           .eq('usuario_id', userId)
-          .order('creado_en', ascending: false); // Solo por orden de llegada
-      setState(() {
-        _notificaciones = List<Map<String, dynamic>>.from(data);
-        _loading = false;
-      });
+          .order('creado_en', ascending: false);
+      if (mounted) {
+        setState(() {
+          _notificaciones = List<Map<String, dynamic>>.from(data);
+          _loading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   void _suscribirse() {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
-    _supabase
-        .channel('notificaciones_$userId')
+    // Canal único — nombre estable para no colisionar con header
+    _canal = _supabase
+        .channel('notif_screen_$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -58,45 +68,94 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           table: 'notificaciones',
           callback: (_) => _loadNotificaciones(),
         )
-        .subscribe();
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'notificaciones',
+          callback: (_) => _loadNotificaciones(),
+        );
+    _canal!.subscribe();
   }
 
+  // ─── Actualización optimista local + sync con Supabase ───────────────────
   Future<void> _marcarComoLeida(String id) async {
-    await _supabase
-        .from('notificaciones')
-        .update({'leida': true})
-        .eq('id', id);
-    _loadNotificaciones();
+    // 1. Actualizar localmente de inmediato — respuesta visual instantánea
+    if (mounted) {
+      setState(() {
+        final idx = _notificaciones.indexWhere((n) => n['id'] == id);
+        if (idx != -1) {
+          _notificaciones[idx] = {..._notificaciones[idx], 'leida': true};
+        }
+      });
+    }
+    // 2. Sincronizar con Supabase en segundo plano
+    try {
+      await _supabase
+          .from('notificaciones')
+          .update({'leida': true})
+          .eq('id', id);
+    } catch (e) {
+      // Si falla, recargar para mantener consistencia
+      _loadNotificaciones();
+    }
   }
 
   Future<void> _marcarTodasLeidas() async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
-    await _supabase
-        .from('notificaciones')
-        .update({'leida': true})
-        .eq('usuario_id', userId)
-        .eq('leida', false);
-    _loadNotificaciones();
+    // 1. Actualizar localmente de inmediato
+    if (mounted) {
+      setState(() {
+        _notificaciones = _notificaciones
+            .map((n) => {...n, 'leida': true})
+            .toList();
+      });
+    }
+    // 2. Sincronizar con Supabase en segundo plano
+    try {
+      await _supabase
+          .from('notificaciones')
+          .update({'leida': true})
+          .eq('usuario_id', userId)
+          .eq('leida', false);
+    } catch (e) {
+      _loadNotificaciones();
+    }
   }
 
   Future<void> _eliminarNotificacion(String id) async {
-    await _supabase.from('notificaciones').delete().eq('id', id);
-    _loadNotificaciones();
+    // 1. Actualizar localmente de inmediato
+    if (mounted) {
+      setState(() => _notificaciones.removeWhere((n) => n['id'] == id));
+    }
+    // 2. Sincronizar con Supabase en segundo plano
+    try {
+      await _supabase.from('notificaciones').delete().eq('id', id);
+    } catch (e) {
+      _loadNotificaciones();
+    }
   }
 
   Future<void> _limpiarTodas() async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return;
-    await _supabase
-        .from('notificaciones')
-        .delete()
-        .eq('usuario_id', userId);
-    _loadNotificaciones();
+    // 1. Actualizar localmente de inmediato
+    if (mounted) setState(() => _notificaciones = []);
+    // 2. Sincronizar con Supabase en segundo plano
+    try {
+      await _supabase
+          .from('notificaciones')
+          .delete()
+          .eq('usuario_id', userId);
+    } catch (e) {
+      _loadNotificaciones();
+    }
   }
 
   void _onTapNotificacion(Map<String, dynamic> notif) async {
+    // Marcar como leída localmente antes de navegar
     await _marcarComoLeida(notif['id']);
+
     final datos = notif['datos'] as Map<String, dynamic>? ?? {};
     final tipo = notif['tipo'] as String? ?? '';
 
@@ -219,6 +278,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       showDialog(
                         context: context,
                         builder: (_) => AlertDialog(
+                          backgroundColor: Colors.white,
                           title: Text('Limpiar notificaciones',
                               style: GoogleFonts.lexend(
                                   fontWeight: FontWeight.w700)),
@@ -348,16 +408,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                                 ),
                                               ),
                                               if (notif['datos'] != null &&
-                                                  notif['datos']['urgencia'] != null)
+                                                  notif['datos']
+                                                          ['urgencia'] !=
+                                                      null)
                                                 Padding(
-                                                  padding: const EdgeInsets.only(right: 6.0),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          right: 6.0),
                                                   child: Text(
-                                                    _getEmojiUrgencia(notif['datos']['urgencia'].toString()),
-                                                    style: const TextStyle(fontSize: 10),
+                                                    _getEmojiUrgencia(
+                                                        notif['datos']
+                                                                ['urgencia']
+                                                            .toString()),
+                                                    style: const TextStyle(
+                                                        fontSize: 10),
                                                   ),
                                                 ),
                                               Text(
-                                                _formatFecha(notif['creado_en']),
+                                                _formatFecha(
+                                                    notif['creado_en']),
                                                 style: GoogleFonts.lexend(
                                                     fontSize: 11,
                                                     color: const Color(
@@ -370,7 +439,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                             notif['mensaje'] ?? '',
                                             style: GoogleFonts.lexend(
                                                 fontSize: 13,
-                                                color: const Color(0xFF5B4137),
+                                                color: const Color(
+                                                    0xFF5B4137),
                                                 height: 1.4),
                                           ),
                                           if (!leida) ...[
@@ -378,7 +448,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                             Container(
                                               width: 8,
                                               height: 8,
-                                              decoration: const BoxDecoration(
+                                              decoration:
+                                                  const BoxDecoration(
                                                 color: Color(0xFFF36900),
                                                 shape: BoxShape.circle,
                                               ),
