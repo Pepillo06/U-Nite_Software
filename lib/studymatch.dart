@@ -26,6 +26,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
 
   List<_GrupoData> _grupos = [];
   bool _isLoading = true;
+  String? _miUniversidad;
 
   // ─── PERSONAS ────────────────────────────────────────────────────────────
   List<_PersonaData> _estudiantes = [];
@@ -44,13 +45,40 @@ class _StudymatchPageState extends State<StudymatchPage> {
   Future<void> _cargarGrupos() async {
     try {
       final supabase = Supabase.instance.client;
-      final response = await supabase
-          .from('grupos_estudio')
-          .select('id, nombre, descripcion, materia, seccion, max_miembros, es_privado, foto_url, creado_por');
+      final userId = supabase.auth.currentUser?.id;
 
-      final grupos = (response as List).map((row) {
-        return _GrupoData.fromMap(row);
-      }).toList();
+      // 1. Obtener la universidad del usuario actual (se cachea en _miUniversidad)
+      if (userId != null && _miUniversidad == null) {
+        final userData = await supabase
+            .from('usuarios')
+            .select('universidad')
+            .eq('id', userId)
+            .single();
+        _miUniversidad = userData['universidad'] as String?;
+      }
+
+      // 2. Obtener los IDs de todos los usuarios de la misma universidad
+      List<String> idsCreadores = [];
+      if (_miUniversidad != null) {
+        final usuariosResp = await supabase
+            .from('usuarios')
+            .select('id')
+            .eq('universidad', _miUniversidad!);
+        idsCreadores = (usuariosResp as List)
+            .map((u) => u['id'].toString())
+            .toList();
+      }
+
+      // 3. Traer solo los grupos creados por usuarios de esa universidad
+      List<_GrupoData> grupos = [];
+      if (idsCreadores.isNotEmpty) {
+        final response = await supabase
+            .from('grupos_estudio')
+            .select('id, nombre, descripcion, materia, seccion, max_miembros, es_privado, foto_url, creado_por')
+            .inFilter('creado_por', idsCreadores);
+
+        grupos = (response as List).map((row) => _GrupoData.fromMap(row)).toList();
+      }
 
       if (mounted) {
         setState(() {
