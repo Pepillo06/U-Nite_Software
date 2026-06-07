@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'theme.dart';
-
 import '../widgets/unite_header.dart';
 import 'crear_grupos.dart';
-import 'studymatch_chat.dart'; // <-- IMPORTACIÓN DE LA PANTALLA DE CHAT AÑADIDA
+import 'studymatch_chat.dart';
 
 class StudymatchPage extends StatefulWidget {
-  const StudymatchPage({super.key});
+  final String? grupoInicialId;
+
+  const StudymatchPage({super.key, this.grupoInicialId});
 
   @override
   State<StudymatchPage> createState() => _StudymatchPageState();
@@ -89,7 +89,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
           g.materia.toLowerCase().contains(_filtroMateria!.toLowerCase());
       final matchSeccion =
           _filtroSeccion == null ||
-          'Sec ${g.seccion}'.toLowerCase().contains(
+          'Sec \${g.seccion}'.toLowerCase().contains(
             _filtroSeccion!.toLowerCase(),
           ) ||
           g.seccion.toString() == _filtroSeccion;
@@ -214,7 +214,8 @@ class _StudymatchPageState extends State<StudymatchPage> {
               )
             : Row(
                 children: [
-                  const Spacer(),
+                  const Spacer(), // 👈 PRIMER SPACER: Empuja el buscador desde la izquierda
+                  // Tu barra de búsqueda con el ancho fijo que definiste
                   SizedBox(
                     width: 600,
                     child: _SearchBar(
@@ -222,12 +223,15 @@ class _StudymatchPageState extends State<StudymatchPage> {
                       onChanged: (v) => setState(() => _searchQuery = v),
                     ),
                   ),
-                  const Spacer(),
+
+                  const Spacer(), // 👈 SEGUNDO SPACER: Garantiza el mismo espacio exacto a la derecha
+                  // El botón se mantiene pegado al extremo derecho del contenedor
                   _CreateButton(onTap: _showCreateDialog),
                 ],
               ),
-        const SizedBox(height: 24),
-
+        const SizedBox(
+          height: 24,
+        ), // Un poco más de espacio de separación con los filtros
         // Filtros
         _FiltersRow(
           filtroMateria: _filtroMateria,
@@ -261,6 +265,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
       context,
       MaterialPageRoute(builder: (_) => const CrearGrupoPage()),
     );
+    // Recargar grupos al volver por si se creó uno nuevo
     _cargarGrupos();
   }
 }
@@ -354,6 +359,14 @@ class _HeroBanner extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SIDEBAR (MODIFICADO)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SIDEBAR (CON ANIMACIÓN FLUIDA)
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -374,13 +387,16 @@ class _Sidebar extends StatelessWidget {
     _SI(icon: Icons.grid_view_rounded, label: 'Grupos', isHeader: true),
     _SI(icon: null, label: 'Mis Grupos', isHeader: false),
     _SI(icon: null, label: 'Grupos Públicos', isHeader: false),
+    // ─── NUEVA SUBDIVISIÓN DE PERSONAS ──────────────────────────────────────
     _SI(icon: Icons.people_alt_outlined, label: 'Personas', isHeader: true),
     _SI(icon: null, label: 'Amigos', isHeader: false),
     _SI(icon: null, label: 'Estudiantes', isHeader: false),
+    // ────────────────────────────────────────────────────────────────────────
   ];
 
   @override
   Widget build(BuildContext context) {
+    // Detectamos si el tab seleccionado pertenece al bloque de Grupos o al de Personas
     final bool showGruposSubItems = (selected >= 0 && selected <= 2);
     final bool showPersonasSubItems = (selected >= 3 && selected <= 5);
 
@@ -393,6 +409,7 @@ class _Sidebar extends StatelessWidget {
       final item = _items[i];
       final isSubItem = !item.isHeader;
 
+      // Lógica de activación visual:
       final bool isActive = (i == 0)
           ? showGruposSubItems
           : (i == 3)
@@ -401,16 +418,18 @@ class _Sidebar extends StatelessWidget {
 
       final tile = GestureDetector(
         onTap: () {
+          // ─── PRIMER CAMBIO: COLAPSAR SI YA ESTÁ ABIERTA LA SECCIÓN ───
           if (i == 0 && showGruposSubItems) {
-            onSelect(-1);
+            onSelect(-1); // Cierra grupos si vuelves a clickear el header
           } else if (i == 3 && showPersonasSubItems) {
-            onSelect(-1);
+            onSelect(-1); // Cierra personas si vuelves a clickear el header
           } else {
-            onSelect(i);
+            onSelect(i); // Navegación/Apertura normal
           }
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
+          // ─── SEGUNDO CAMBIO: RESPONSIVE (En web/vertical mantiene 160, en móvil se adapta) ───
           width: horizontal ? null : 160,
           padding: horizontal
               ? EdgeInsets.symmetric(
@@ -458,7 +477,9 @@ class _Sidebar extends StatelessWidget {
               Text(
                 item.label,
                 style: GoogleFonts.lexend(
-                  fontSize: compact ? 12 : 14,
+                  fontSize: compact
+                      ? 12
+                      : 14, // Un punto menos en móvil para evitar saltos de línea rústicos
                   fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                   color: isActive
                       ? const Color(0xFFE65100)
@@ -472,19 +493,24 @@ class _Sidebar extends StatelessWidget {
 
       final tileWithPadding = Padding(
         padding: horizontal
-            ? const EdgeInsets.only(right: 8)
+            ? const EdgeInsets.only(
+                right: 8,
+              ) // Separación un poco más amplia en el Row horizontal
             : const EdgeInsets.only(bottom: 2),
         child: tile,
       );
 
+      // Clasificamos cada botón según su nuevo índice en la lista
       if (i == 0) gruposTile = tileWithPadding;
       if (i == 1 || i == 2) gruposSubTiles.add(tileWithPadding);
       if (i == 3) personasTile = tileWithPadding;
       if (i == 4 || i == 5) personasSubTiles.add(tileWithPadding);
     }
 
+    // --- CONSTRUCCIÓN DEL MENÚ CON ANIMACIÓN ---
     final List<Widget> tiles = [];
 
+    // 1. Bloque de Grupos
     if (gruposTile != null) tiles.add(gruposTile);
     tiles.add(
       AnimatedSize(
@@ -508,8 +534,10 @@ class _Sidebar extends StatelessWidget {
       ),
     );
 
+    // Espaciado sutil entre bloques si es vertical
     if (!horizontal) tiles.add(const SizedBox(height: 6));
 
+    // 2. Bloque de Personas
     if (personasTile != null) tiles.add(personasTile);
     tiles.add(
       AnimatedSize(
@@ -533,6 +561,7 @@ class _Sidebar extends StatelessWidget {
       ),
     );
 
+    // Retorno estructural final
     if (horizontal) {
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -620,7 +649,8 @@ class _CreateButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height:
+          44, // 👈 LE PASAMOS LOS MISMOS 44 PIXELS DE ALTO QUE TIENE TU BUSCADOR
       child: ElevatedButton.icon(
         onPressed: onTap,
         icon: const Icon(Icons.add, size: 18, color: Colors.white),
@@ -634,6 +664,7 @@ class _CreateButton extends StatelessWidget {
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFE65100),
+          // Cambiamos a solo horizontal para que Flutter autocentre el texto verticalmente en los 44px
           padding: const EdgeInsets.symmetric(horizontal: 20),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
@@ -673,6 +704,7 @@ class _FiltersRow extends StatelessWidget {
     final children = <Widget>[
       _FilterBtn(label: 'Filtrar materias', icon: Icons.tune_rounded),
       _FilterBtn(label: 'Sección', icon: Icons.school_outlined),
+      // Filtro de privacidad
       _PrivacidadFilterBtn(
         valor: filtroPrivacidad,
         onChanged: onPrivacidadChanged,
@@ -759,6 +791,7 @@ class _PrivacidadFilterBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isActive = valor != null;
     return PopupMenuButton<String>(
       onSelected: (v) => onChanged(v == 'todos' ? null : v),
       offset: const Offset(0, 38),
@@ -933,7 +966,9 @@ class _GruposGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = grupos.length + 1;
+    // 🌟 CAMBIO 1: Quitamos el "+ 1" para que no cuente una tarjeta extra
+    final total = grupos.length;
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -945,7 +980,8 @@ class _GruposGrid extends StatelessWidget {
         childAspectRatio: columns == 1 ? 1.7 : 0.85,
       ),
       itemBuilder: (_, i) {
-        if (i == grupos.length) return _CrearCard(onTap: onCrear);
+        // 🌟 CAMBIO 2: Borramos el "if" que dibujaba la tarjeta de CrearCard.
+        // Ahora solo dibuja las tarjetas reales de los grupos.
         return _GrupoCard(grupo: grupos[i]);
       },
     );
@@ -986,7 +1022,7 @@ class _GrupoData {
       id: map['id']?.toString() ?? '',
       nombre: map['nombre'] ?? 'Sin nombre',
       descripcion: map['descripcion'] ?? '',
-      miembros: 0,
+      miembros: 0, // miembros reales requerirían otra query
       max: map['max_miembros'] ?? 20,
       materia: map['materia'] ?? '',
       seccion: map['seccion'] is int
@@ -998,6 +1034,7 @@ class _GrupoData {
     );
   }
 
+  // Asigna ícono y colores dinámicamente según la materia
   IconData get icono {
     final m = materia.toLowerCase();
     if (m.contains('mat') || m.contains('cálc') || m.contains('calc'))
@@ -1157,6 +1194,7 @@ class _GrupoCard extends StatelessWidget {
         );
       } catch (e) {
         if (!context.mounted) return;
+        // Si el error es por duplicado (unique constraint), avisar al usuario
         final msg =
             e.toString().contains('duplicate') ||
                 e.toString().contains('unique')
@@ -1174,25 +1212,16 @@ class _GrupoCard extends StatelessWidget {
         );
       }
     } else {
-      // ─── LÓGICA DE CHAT EN GRUPO PÚBLICO ───
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: const Color(0xFF2E5900),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          content: Text(
-            'Abriendo chat de ${grupo.nombre}...',
-            style: GoogleFonts.lexend(color: Colors.white),
-          ),
-        ),
-      );
-
-      // NAVEGACIÓN A LA PANTALLA DE CHAT ACTIVADA AQUÍ
+      // Lógica de unirse a grupo público (tu implementación existente)
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const StudymatchChatPage()),
+        MaterialPageRoute(
+          builder: (context) => StudymatchChatPage(
+            grupoInicialId: grupo.id.toString(),
+            nombreGrupo:
+                grupo.nombre, // 🌟 Le pasamos el nombre real del grupo aquí
+          ),
+        ),
       );
     }
   }
@@ -1243,6 +1272,7 @@ class _GrupoCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    // Badge de privacidad
                     if (grupo.esPrivado)
                       Container(
                         margin: const EdgeInsets.only(bottom: 4),
@@ -1308,9 +1338,9 @@ class _GrupoCard extends StatelessWidget {
                 ),
                 if (grupo.esPrivado) ...[
                   const SizedBox(width: 6),
-                  const Tooltip(
+                  Tooltip(
                     message: 'Requiere aprobación del administrador',
-                    child: Icon(
+                    child: const Icon(
                       Icons.lock_rounded,
                       size: 16,
                       color: Color(0xFFE65100),
@@ -1369,19 +1399,16 @@ class _GrupoCard extends StatelessWidget {
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
+              height: 36,
               child: TextButton.icon(
                 onPressed: () => _manejarUnirse(context),
                 icon: Icon(
-                  // ─── ÍCONO DE CHAT PARA GRUPOS PÚBLICOS ───
-                  grupo.esPrivado
-                      ? Icons.send_rounded
-                      : Icons.chat_bubble_rounded,
+                  grupo.esPrivado ? Icons.send_rounded : Icons.login_rounded,
                   size: 15,
                   color: Colors.white,
                 ),
                 label: Text(
-                  // ─── TEXTO "CHAT" PARA GRUPOS PÚBLICOS ───
-                  grupo.esPrivado ? 'Solicitar unirse' : 'Chat',
+                  grupo.esPrivado ? 'Solicitar unirse' : 'Unirse',
                   style: GoogleFonts.lexend(
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
@@ -1419,11 +1446,13 @@ class _CrearCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: CustomPaint(
+        // Utilizamos un CustomPainter para el borde punteado
         painter: _DashedRectPainter(color: const Color(0xFFD7CCC8)),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
+            // Quitamos el Border.all sólido que tenías aquí
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1471,6 +1500,7 @@ class _CrearCard extends StatelessWidget {
   }
 }
 
+// NUEVO: Agrega esta clase justo debajo de _CrearCard para dibujar el borde punteado
 class _DashedRectPainter extends CustomPainter {
   final Color color;
   _DashedRectPainter({required this.color});
@@ -1571,6 +1601,163 @@ class _MiniTag extends StatelessWidget {
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DIÁLOGO CREAR GRUPO
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _CrearGrupoDialog extends StatefulWidget {
+  const _CrearGrupoDialog();
+
+  @override
+  State<_CrearGrupoDialog> createState() => _CrearGrupoDialogState();
+}
+
+class _CrearGrupoDialogState extends State<_CrearGrupoDialog> {
+  final _nombreCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _maxCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _descCtrl.dispose();
+    _maxCtrl.dispose();
+    super.dispose();
+  }
+
+  InputDecoration _dec(String label, {IconData? icon}) => InputDecoration(
+    labelText: label,
+    labelStyle: GoogleFonts.lexend(fontSize: 14),
+    prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: Color(0xFFE0D8D2)),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: Color(0xFFE0D8D2)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: Color(0xFFE65100), width: 1.5),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 40,
+        vertical: 24,
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Crear nuevo grupo',
+                      style: GoogleFonts.lexend(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF1A1A1A),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _nombreCtrl,
+                style: GoogleFonts.lexend(fontSize: 14),
+                decoration: _dec(
+                  'Nombre del grupo',
+                  icon: Icons.group_outlined,
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _descCtrl,
+                maxLines: 3,
+                style: GoogleFonts.lexend(fontSize: 14),
+                decoration: _dec('Descripción'),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _maxCtrl,
+                keyboardType: TextInputType.number,
+                style: GoogleFonts.lexend(fontSize: 14),
+                decoration: _dec(
+                  'Máximo de miembros',
+                  icon: Icons.people_outline,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFE0D8D2)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text(
+                        'Cancelar',
+                        style: GoogleFonts.lexend(
+                          color: const Color(0xFF616161),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE65100),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text(
+                        'Crear grupo',
+                        style: GoogleFonts.lexend(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
