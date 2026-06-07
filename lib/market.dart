@@ -376,90 +376,314 @@ class _FiltrosCategorias extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            // BOTÓN DE FILTROS DE BÚSQUEDA ADICIONADO AL LADO IZQUIERDO
+            // BOTÓN DE FILTROS CON ANIMACIÓN HOVER
             Padding(
               padding: const EdgeInsets.only(right: 16.0),
-              child: InkWell(
+              child: _BotonFiltroAnimado(
+                activo: filtrosVisibles,
                 onTap: onToggleFiltros,
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: filtrosVisibles ? UColors.orange : const Color(0xFFF5F3F3),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: filtrosVisibles ? UColors.orange : const Color(0xFFE3BFB1),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.tune_rounded,
-                        size: 20,
-                        color: filtrosVisibles ? Colors.white : UColors.orange,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Filtros',
-                        style: TextStyle(
-                          color: filtrosVisibles ? Colors.white : UColors.orange,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                icono: Icons.tune_rounded,
+                label: 'Filtros',
+                colorActivo: UColors.orange,
+                colorInactivo: const Color(0xFFF5F3F3),
+                borderColorInactivo: const Color(0xFFE3BFB1),
               ),
             ),
-            // CATEGORÍAS ORIGINALES
+            // CATEGORÍAS ORIGINALES CON ANIMACIÓN HOVER
             ...List.generate(categorias.length, (index) {
               final nombre = categorias[index]['nombre'] as String;
               final esSeleccionado = categoriaActual == nombre;
-              final esBotonTodos = index == 0; 
+              final esBotonTodos = index == 0;
 
               return Padding(
                 padding: const EdgeInsets.only(right: 12.0),
-                child: InkWell(
+                child: _BotonCategoriaAnimado(
+                  nombre: nombre,
+                  icono: categorias[index]['icono'] as IconData,
+                  esSeleccionado: esSeleccionado,
+                  esBotonTodos: esBotonTodos,
                   onTap: () => onChanged(nombre),
-                  borderRadius: BorderRadius.circular(24),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: esSeleccionado 
-                          ? UColors.orange 
-                          : (esBotonTodos ? const Color.fromARGB(255, 221, 220, 220) : UColors.footerBg),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                        categorias[index]['icono'] as IconData,
-                        size: 20,
-                        color: esSeleccionado ? Colors.white : UColors.textGray,
-                        ),
-                        const SizedBox(width: 8),
-                        
-                        Text(
-                          nombre,
-                          style: TextStyle(
-                            color: esSeleccionado
-                                ? Colors.white
-                                : (esBotonTodos ? UColors.textDark : UColors.textDark), // Texto naranja si es "Todos"
-                            fontWeight: esSeleccionado || esBotonTodos
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               );
             }),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------
+// BOTÓN "FILTROS" CON ANIMACIÓN HOVER
+// ------------------------------------------
+class _BotonFiltroAnimado extends StatefulWidget {
+  final bool activo;
+  final VoidCallback onTap;
+  final IconData icono;
+  final String label;
+  final Color colorActivo;
+  final Color colorInactivo;
+  final Color borderColorInactivo;
+
+  const _BotonFiltroAnimado({
+    required this.activo,
+    required this.onTap,
+    required this.icono,
+    required this.label,
+    required this.colorActivo,
+    required this.colorInactivo,
+    required this.borderColorInactivo,
+  });
+
+  @override
+  State<_BotonFiltroAnimado> createState() => _BotonFiltroAnimadoState();
+}
+
+class _BotonFiltroAnimadoState extends State<_BotonFiltroAnimado>
+    with SingleTickerProviderStateMixin {
+  bool _hovering = false;
+  late AnimationController _controller;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _elevationAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 1.06).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _elevationAnim = Tween<double>(begin: 0.0, end: 6.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onHover(bool hovering) {
+    setState(() => _hovering = hovering);
+    if (hovering) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final esActivo = widget.activo;
+    return MouseRegion(
+      onEnter: (_) => _onHover(true),
+      onExit: (_) => _onHover(false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnim.value,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: esActivo
+                      ? UColors.orange
+                      : (_hovering
+                          ? UColors.orange.withOpacity(0.12)
+                          : widget.colorInactivo),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: esActivo
+                        ? UColors.orange
+                        : (_hovering ? UColors.orange : widget.borderColorInactivo),
+                    width: _hovering && !esActivo ? 1.5 : 1,
+                  ),
+                  boxShadow: _hovering
+                      ? [
+                          BoxShadow(
+                            color: UColors.orange.withOpacity(0.25),
+                            blurRadius: _elevationAnim.value * 2,
+                            offset: Offset(0, _elevationAnim.value / 2),
+                          )
+                        ]
+                      : [],
+                ),
+                child: Row(
+                  children: [
+                    AnimatedRotation(
+                      turns: _hovering ? 0.05 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        widget.icono,
+                        size: 20,
+                        color: esActivo ? Colors.white : UColors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.label,
+                      style: TextStyle(
+                        color: esActivo ? Colors.white : UColors.orange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------
+// BOTÓN DE CATEGORÍA CON ANIMACIÓN HOVER
+// ------------------------------------------
+class _BotonCategoriaAnimado extends StatefulWidget {
+  final String nombre;
+  final IconData icono;
+  final bool esSeleccionado;
+  final bool esBotonTodos;
+  final VoidCallback onTap;
+
+  const _BotonCategoriaAnimado({
+    required this.nombre,
+    required this.icono,
+    required this.esSeleccionado,
+    required this.esBotonTodos,
+    required this.onTap,
+  });
+
+  @override
+  State<_BotonCategoriaAnimado> createState() => _BotonCategoriaAnimadoState();
+}
+
+class _BotonCategoriaAnimadoState extends State<_BotonCategoriaAnimado>
+    with SingleTickerProviderStateMixin {
+  bool _hovering = false;
+  late AnimationController _controller;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _iconSlideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 1.07).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _iconSlideAnim = Tween<double>(begin: 0.0, end: -2.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onHover(bool hovering) {
+    setState(() => _hovering = hovering);
+    if (hovering) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final esSeleccionado = widget.esSeleccionado;
+    final esBotonTodos = widget.esBotonTodos;
+
+    Color colorFondo;
+    if (esSeleccionado) {
+      colorFondo = UColors.orange;
+    } else if (_hovering) {
+      colorFondo = UColors.orange.withOpacity(0.10);
+    } else if (esBotonTodos) {
+      colorFondo = const Color.fromARGB(255, 221, 220, 220);
+    } else {
+      colorFondo = UColors.footerBg;
+    }
+
+    return MouseRegion(
+      onEnter: (_) => _onHover(true),
+      onExit: (_) => _onHover(false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnim.value,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: colorFondo,
+                  borderRadius: BorderRadius.circular(24),
+                  border: _hovering && !esSeleccionado
+                      ? Border.all(color: UColors.orange.withOpacity(0.5), width: 1.5)
+                      : null,
+                  boxShadow: _hovering
+                      ? [
+                          BoxShadow(
+                            color: UColors.orange.withOpacity(esSeleccionado ? 0.35 : 0.18),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          )
+                        ]
+                      : [],
+                ),
+                child: Row(
+                  children: [
+                    Transform.translate(
+                      offset: Offset(0, _iconSlideAnim.value),
+                      child: Icon(
+                        widget.icono,
+                        size: 20,
+                        color: esSeleccionado
+                            ? Colors.white
+                            : (_hovering ? UColors.orange : UColors.textGray),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      widget.nombre,
+                      style: TextStyle(
+                        color: esSeleccionado
+                            ? Colors.white
+                            : (_hovering ? UColors.orange : UColors.textDark),
+                        fontWeight: esSeleccionado || esBotonTodos
+                            ? FontWeight.bold
+                            : FontWeight.w500,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -760,6 +984,28 @@ class _TarjetaAnuncio extends StatelessWidget {
     return estado[0].toUpperCase() + estado.substring(1);
   }
 
+  // Abreviaturas para nombres largos de universidades
+  String _abreviarUniversidad(String nombre) {
+    const abreviaturas = {
+      'Universidad Metropolitana': 'UNIMET',
+      'Universidad Católica Andrés Bello': 'UCAB',
+      'Universidad Santa María': 'USM',
+      'Universidad Central de Venezuela': 'UCV',
+      'Universidad Monteávila': 'UMA',
+      'Universidad Simón Bolívar': 'USB',
+    };
+    return abreviaturas[nombre] ?? nombre;
+  }
+
+  String _getCampus() {
+    final modalidades = anuncio['detalles_modalidades'] as Map<String, dynamic>? ?? {};
+    final campus = modalidades['campus_pickup'];
+    if (campus == null || campus is bool || campus is! List) return '';
+    final lista = (campus as List).whereType<String>().toList();
+    if (lista.isEmpty) return '';
+    return lista.map(_abreviarUniversidad).join(' · ');
+  }
+
   // --- 2. MÉTODO BUILD (La interfaz visual) ---
 
   @override
@@ -841,14 +1087,27 @@ class _TarjetaAnuncio extends StatelessWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: UColors.white,
-                        borderRadius: BorderRadius.circular(12),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFE8622A), Color(0xFFC8440E)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color(0xFFE8622A),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Text(
                         _getEstadoBadge(), // Se llama a la función aquí
                         style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
@@ -889,12 +1148,12 @@ class _TarjetaAnuncio extends StatelessWidget {
                       Icon(
                         Icons.location_on_outlined,
                         size: 16,
-                        color: Colors.grey.shade600,
+                        color: UColors.orange,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          anuncio['categoria'] ?? '',
+                          _getCampus().isNotEmpty ? _getCampus() : (anuncio['categoria'] ?? ''),
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 12,
