@@ -107,6 +107,16 @@ class _StudymatchPageState extends State<StudymatchPage> {
       final supabase = Supabase.instance.client;
       final miId = supabase.auth.currentUser?.id;
 
+      // Obtener la universidad del usuario actual si aún no está cacheada
+      if (miId != null && _miUniversidad == null) {
+        final userData = await supabase
+            .from('usuarios')
+            .select('universidad')
+            .eq('id', miId)
+            .single();
+        _miUniversidad = userData['universidad'] as String?;
+      }
+
       // Si _misAmigosIds aún está vacío (no se cargaron amigos antes), los obtenemos primero
       Set<String> idsAmigos = _misAmigosIds;
       if (idsAmigos.isEmpty && miId != null) {
@@ -130,11 +140,16 @@ class _StudymatchPageState extends State<StudymatchPage> {
         }
       }
 
-      final response = await supabase
+      // Traer solo estudiantes de la misma universidad, excluyendo al usuario actual
+      var query = supabase
           .from('usuarios')
           .select('id, primer_nombre, primer_apellido, foto_perfil_url, carrera, universidad')
           .neq('id', miId ?? '')
           .eq('es_estudiante', true);
+
+      final response = _miUniversidad != null
+          ? await query.eq('universidad', _miUniversidad!)
+          : await query;
 
       // Filtrar amigos y calcular amigos en común
       final List<_PersonaData> lista = [];
