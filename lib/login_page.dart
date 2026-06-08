@@ -199,21 +199,21 @@ class _LoginPageState extends State<LoginPage> {
                                       ),
                                     ),
                                     const Spacer(),
-                                    TextButton(
-                                      onPressed: () {},
-                                      style: TextButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: const Size(50, 20),
-                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                                      child: const Text(
-                                        "¿Olvidaste tu contraseña?",
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: UColors.orangeDark,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
+                                    // TextButton(
+                                    //   onPressed: () {},
+                                    //   style: TextButton.styleFrom(
+                                    //       padding: EdgeInsets.zero,
+                                    //       minimumSize: const Size(50, 20),
+                                    //       tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                                    //   child: const Text(
+                                    //     "¿Olvidaste tu contraseña?",
+                                    //     style: TextStyle(
+                                    //       fontSize: 11,
+                                    //       color: UColors.orangeDark,
+                                    //       fontWeight: FontWeight.w600,
+                                    //     ),
+                                    //   ),
+                                    // ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),

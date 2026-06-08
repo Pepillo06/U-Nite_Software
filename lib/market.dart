@@ -1126,7 +1126,7 @@ class _TarjetaAnuncio extends StatelessWidget {
                     anuncio['titulo'] ?? '',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14, 
+                      fontSize: 17, 
                     ),
                     maxLines: 1, 
                     overflow: TextOverflow.ellipsis, 
