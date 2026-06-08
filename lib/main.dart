@@ -47,7 +47,7 @@ class UNITEApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'U-Nite Software',
+      title: 'U-Nite',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: UColors.orange),
         textTheme: GoogleFonts.lexendTextTheme(),
