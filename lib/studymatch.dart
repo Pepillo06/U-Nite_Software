@@ -7,6 +7,53 @@ import '../widgets/unite_header.dart';
 import 'crear_grupos.dart';
 import 'public_profile_page.dart';
 
+String normalizarTexto(String texto) {
+  if (texto.isEmpty) return '';
+
+  // 1. Forzar a mayúsculas y quitar espacios al inicio/final
+  String t = texto.trim().toUpperCase();
+
+  // 2. Limpiar TODAS las variaciones de vocales con tildes usando RegExp
+  t = t.replaceAll(RegExp(r'[ÁÀÂÄ]'), 'A')
+       .replaceAll(RegExp(r'[ÉÈÊË]'), 'E')
+       .replaceAll(RegExp(r'[ÍÌÎÏ]'), 'I')
+       .replaceAll(RegExp(r'[ÓÒÔÖ]'), 'O')
+       .replaceAll(RegExp(r'[ÚÙÛÜ]'), 'U');
+
+  // 3. Limpiar espacios múltiples o saltos de línea intermedios
+  t = t.replaceAll(RegExp(r'\s+'), ' ');
+
+  // 4. Diccionario extendido (incluye errores comunes como "ll" en vez de "II")
+  final equivalencias = {
+    ' VIII': ' 8', 
+    ' VII': ' 7', 
+    ' III': ' 3', 
+    ' LLL': ' 3', // Error de tipeo común (L minúscula)
+    ' II': ' 2', 
+    ' LL': ' 2',  // Error de tipeo común (L minúscula)
+    ' IV': ' 4',
+    ' VI': ' 6', 
+    ' IX': ' 9', 
+    ' I': ' 1', 
+    ' L': ' 1',   // Error de tipeo común (L minúscula)
+    ' V': ' 5', 
+    ' X': ' 10',
+    ' CUATRO': ' 4', 
+    ' TRES': ' 3', 
+    ' DOS': ' 2', 
+    ' UNO': ' 1'
+  };
+
+  // 5. Reemplazo seguro exacto al final del texto
+  for (var entrada in equivalencias.entries) {
+    if (t.endsWith(entrada.key)) {
+      t = t.substring(0, t.length - entrada.key.length) + entrada.value;
+      break;
+    }
+  }
+
+  return t;
+}
 
 class StudymatchPage extends StatefulWidget {
   const StudymatchPage({super.key});
@@ -21,6 +68,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
   String _searchQuery = '';
   String? _filtroMateria;
   String? _filtroSeccion;
+  String? _filtroTipo; // null = todos, 'mis_grupos', 'grupos_publicos'
 
   String? _filtroPrivacidad; // null = todos, 'publico' = públicos, 'privado' = privados
 
@@ -70,6 +118,17 @@ class _StudymatchPageState extends State<StudymatchPage> {
       }
     }
   }
+
+  void _restablecerFiltros() {
+  setState(() {
+    _searchCtrl.clear();
+    _searchQuery = '';
+    _filtroMateria = null;
+    _filtroSeccion = null;
+    _filtroPrivacidad = null;
+    _filtroTipo = null; 
+  });
+}
 
   // ─── CARGA DE PERSONAS ───────────────────────────────────────────────────
   Future<void> _cargarEstudiantes() async {
@@ -361,29 +420,148 @@ class _StudymatchPageState extends State<StudymatchPage> {
     _searchCtrl.dispose();
     super.dispose();
   }
-
-  List<_GrupoData> get _gruposFiltrados {
+List<_GrupoData> get _gruposFiltrados {
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
     return _grupos.where((g) {
-      // Tab 1 = Mis Grupos: solo los creados por el usuario logueado
-      // Tab 2 = Grupos Publicos: los que NO creo el usuario logueado
+      // Reglas de pestañas (Mis grupos vs Públicos)
+      // Comenta estas dos líneas temporalmente si quieres ver tus propios grupos en la pestaña pública
       if (_selectedTab == 1 && g.creadoPor != userId) return false;
       if (_selectedTab == 2 && g.creadoPor == userId) return false;
 
+      // 1. Búsqueda por texto en Nombre o Descripción
       final matchSearch = _searchQuery.isEmpty ||
           g.nombre.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           g.descripcion.toLowerCase().contains(_searchQuery.toLowerCase());
+
+      // 2. Filtro de Materia (Ya viene normalizada desde la base de datos)
       final matchMateria = _filtroMateria == null ||
-          g.materia.toLowerCase().contains(_filtroMateria!.toLowerCase());
+          g.materia == _filtroMateria;
+
+      // 3. Filtro de Sección (Ya viene normalizada desde la base de datos)
       final matchSeccion = _filtroSeccion == null ||
-          'Sec \${g.seccion}'.toLowerCase().contains(_filtroSeccion!.toLowerCase()) ||
           g.seccion.toString() == _filtroSeccion;
+
+      // 4. Filtro de Privacidad
       final matchPrivacidad = _filtroPrivacidad == null ||
           (_filtroPrivacidad == 'privado' ? g.esPrivado : !g.esPrivado);
 
       return matchSearch && matchMateria && matchSeccion && matchPrivacidad;
     }).toList();
+  }
+  
+ Widget _buildContent({required bool isMobile, required bool isTablet}) {
+    // ─── TABS DE PERSONAS ────────────────────────────────────────────────
+    if (_selectedTab == 4) {
+      return _PersonasContent(
+        isMobile: isMobile,
+        isTablet: isTablet,
+        searchCtrl: _searchCtrl,
+        searchQuery: _searchQuery,
+        onSearchChanged: (v) => setState(() => _searchQuery = v),
+        isLoading: _isLoadingPersonas,
+        amigos: _amigos,
+        solicitudesPendientes: _solicitudesPendientes,
+        onAceptar: _aceptarSolicitud,
+        onRechazar: _rechazarSolicitud,
+        subTab: 'amigos',
+      );
+    }
+    if (_selectedTab == 5) {
+      return _PersonasContent(
+        isMobile: isMobile,
+        isTablet: isTablet,
+        searchCtrl: _searchCtrl,
+        searchQuery: _searchQuery,
+        onSearchChanged: (v) => setState(() => _searchQuery = v),
+        isLoading: _isLoadingPersonas,
+        estudiantes: _estudiantes,
+        onAgregar: _enviarSolicitud,
+        subTab: 'estudiantes',
+      );
+    }
+    // ────────────────────────────────────────────────────────────────────
+
+    final gridCols = isMobile ? 1 : isTablet ? 2 : 3;
+
+    // 🔥 AQUÍ SE CORRIGE LA EXTRACCIÓN DE MATERIAS Y SECCIONES:
+    final List<String> materiasUnicas = _grupos
+        .map((g) => g.materia) // Extraemos solo el String de la materia
+        .where((m) => m.isNotEmpty) // Filtramos textos vacíos por seguridad
+        .toSet() // Eliminamos duplicados
+        .toList()
+      ..sort(); // Ordenamos alfabéticamente
+
+    final List<String> seccionesUnicas = _grupos
+        .map((g) => g.seccion.toString()) // Extraemos solo la sección como String
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        isMobile
+            ? Column(
+                children: [
+                  _SearchBar(
+                      hintText: 'Buscar grupos',
+                      controller: _searchCtrl,
+                      onChanged: (v) => setState(() => _searchQuery = v)),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                      width: double.infinity,
+                      child: _CreateButton(onTap: _showCreateDialog)),
+                ],
+              )
+            : Row(
+                children: [
+                  const Spacer(),
+                  SizedBox(
+                    width: 600,
+                    child: _SearchBar(
+                        hintText: 'Buscar grupos',
+                        controller: _searchCtrl,
+                        onChanged: (v) => setState(() => _searchQuery = v)),
+                  ),
+                  const Spacer(),
+                  _CreateButton(onTap: _showCreateDialog),
+                ],
+              ),
+        const SizedBox(height: 24),
+        
+        // ─── FILTROS ───────────────────────────────────────────────────────
+        _FiltersRow(
+          filtroMateria: _filtroMateria,
+          filtroSeccion: _filtroSeccion,
+          filtroPrivacidad: _filtroPrivacidad,
+          filtroTipo: _filtroTipo,
+          listaMaterias: materiasUnicas,
+          listaSecciones: seccionesUnicas,
+          onClearMateria: () => setState(() => _filtroMateria = null),
+          onClearSeccion: () => setState(() => _filtroSeccion = null),
+          onPrivacidadChanged: (v) => setState(() => _filtroPrivacidad = v),
+          onTipoChanged: (v) => setState(() => _filtroTipo = v),
+          onMateriaChanged: (v) => setState(() => _filtroMateria = v),
+          onSeccionChanged: (v) => setState(() => _filtroSeccion = v),
+          onRestablecer: _restablecerFiltros,
+          wrap: isMobile,
+        ),
+        const SizedBox(height: 20),
+        _isLoading
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(48),
+                  child: CircularProgressIndicator(color: Color(0xFFE65100)),
+                ),
+              )
+            : _GruposGrid(
+                grupos: _gruposFiltrados,
+                columns: gridCols,
+                onCrear: _showCreateDialog),
+      ],
+    );
   }
 
   bool get _isPersonasTab => _selectedTab >= 3 && _selectedTab <= 5;
@@ -474,95 +652,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
     if (tab == 5) _cargarEstudiantes();
   }
 
-  Widget _buildContent({required bool isMobile, required bool isTablet}) {
-    // ─── TABS DE PERSONAS ────────────────────────────────────────────────
-    if (_selectedTab == 4) {
-      return _PersonasContent(
-        isMobile: isMobile,
-        isTablet: isTablet,
-        searchCtrl: _searchCtrl,
-        searchQuery: _searchQuery,
-        onSearchChanged: (v) => setState(() => _searchQuery = v),
-        isLoading: _isLoadingPersonas,
-        amigos: _amigos,
-        solicitudesPendientes: _solicitudesPendientes,
-        onAceptar: _aceptarSolicitud,
-        onRechazar: _rechazarSolicitud,
-        subTab: 'amigos',
-      );
-    }
-    if (_selectedTab == 5) {
-      return _PersonasContent(
-        isMobile: isMobile,
-        isTablet: isTablet,
-        searchCtrl: _searchCtrl,
-        searchQuery: _searchQuery,
-        onSearchChanged: (v) => setState(() => _searchQuery = v),
-        isLoading: _isLoadingPersonas,
-        estudiantes: _estudiantes,
-        onAgregar: _enviarSolicitud,
-        subTab: 'estudiantes',
-      );
-    }
-    // ────────────────────────────────────────────────────────────────────
-
-    final gridCols = isMobile ? 1 : isTablet ? 2 : 3;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        isMobile
-            ? Column(
-                children: [
-                  _SearchBar(
-                      hintText: 'Buscar grupos',
-                      controller: _searchCtrl,
-                      onChanged: (v) => setState(() => _searchQuery = v)),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                      width: double.infinity,
-                      child: _CreateButton(onTap: _showCreateDialog)),
-                ],
-              )
-            : Row(
-                children: [
-                  const Spacer(),
-                  SizedBox(
-                    width: 600,
-                    child: _SearchBar(
-                        hintText: 'Buscar grupos',
-                        controller: _searchCtrl,
-                        onChanged: (v) => setState(() => _searchQuery = v)),
-                  ),
-                  const Spacer(),
-                  _CreateButton(onTap: _showCreateDialog),
-                ],
-              ),
-        const SizedBox(height: 24),
-        _FiltersRow(
-          filtroMateria: _filtroMateria,
-          filtroSeccion: _filtroSeccion,
-          filtroPrivacidad: _filtroPrivacidad,
-          onClearMateria: () => setState(() => _filtroMateria = null),
-          onClearSeccion: () => setState(() => _filtroSeccion = null),
-          onPrivacidadChanged: (v) => setState(() => _filtroPrivacidad = v),
-          wrap: isMobile,
-        ),
-        const SizedBox(height: 20),
-        _isLoading
-            ? const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(48),
-                  child: CircularProgressIndicator(color: Color(0xFFE65100)),
-                ),
-              )
-            : _GruposGrid(
-                grupos: _gruposFiltrados,
-                columns: gridCols,
-                onCrear: _showCreateDialog),
-      ],
-    );
-  }
-
+  
   void _showCreateDialog() async {
     await Navigator.push(
       context,
@@ -1872,53 +1962,76 @@ class _AgregarButton extends StatelessWidget {
 // FILTROS
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// FILTROS
+// ═══════════════════════════════════════════════════════════════════════════
 class _FiltersRow extends StatelessWidget {
   final String? filtroMateria;
   final String? filtroSeccion;
   final String? filtroPrivacidad;
+  final String? filtroTipo;
+  final List<String> listaMaterias;
+  final List<String> listaSecciones;
   final VoidCallback onClearMateria;
   final VoidCallback onClearSeccion;
   final ValueChanged<String?> onPrivacidadChanged;
+  final ValueChanged<String?> onTipoChanged;
+  final ValueChanged<String?> onMateriaChanged;
+  final ValueChanged<String?> onSeccionChanged;
+  final VoidCallback onRestablecer;
   final bool wrap;
 
   const _FiltersRow({
     required this.filtroMateria,
     required this.filtroSeccion,
     required this.filtroPrivacidad,
+    required this.filtroTipo,
+    required this.listaMaterias,
+    required this.listaSecciones,
     required this.onClearMateria,
     required this.onClearSeccion,
     required this.onPrivacidadChanged,
+    required this.onTipoChanged,
+    required this.onMateriaChanged,
+    required this.onSeccionChanged,
+    required this.onRestablecer,
     required this.wrap,
   });
 
   @override
   Widget build(BuildContext context) {
     final children = <Widget>[
-      _FilterBtn(label: 'Filtrar materias', icon: Icons.tune_rounded),
-      _FilterBtn(label: 'Sección', icon: Icons.school_outlined),
-      // Filtro de privacidad
+      IconButton.filledTonal(
+        icon: const Icon(Icons.refresh_rounded, color: Color(0xFFE65100)),
+        tooltip: 'Restablecer todos los filtros',
+        onPressed: onRestablecer,
+        style: IconButton.styleFrom(backgroundColor: const Color(0xFFFFF3E0)),
+      ),
+
+      // 📚 BOTÓN SEPARADO E INDEPENDIENTE PARA MATERIAS
+      _MateriaFilterBtn(
+        valor: filtroMateria,
+        opciones: listaMaterias,
+        onChanged: onMateriaChanged,
+      ),
+
+      // 🏫 BOTÓN SEPARADO E INDEPENDIENTE PARA SECCIONES
+      _SeccionFilterBtn(
+        valor: filtroSeccion,
+        opciones: listaSecciones,
+        onChanged: onSeccionChanged,
+      ),
+      
       _PrivacidadFilterBtn(
         valor: filtroPrivacidad,
         onChanged: onPrivacidadChanged,
       ),
+
+    
       if (filtroMateria != null)
         _ActiveChip(label: filtroMateria!, onRemove: onClearMateria),
       if (filtroSeccion != null)
-        _ActiveChip(label: filtroSeccion!, onRemove: onClearSeccion),
-      if (filtroPrivacidad != null)
-        _ActiveChip(
-          label: filtroPrivacidad == 'privado' ? 'Privados' : 'Públicos',
-          onRemove: () => onPrivacidadChanged(null),
-          color: filtroPrivacidad == 'privado'
-              ? const Color(0xFFFFF3E0)
-              : const Color(0xFFE8F5E9),
-          borderColor: filtroPrivacidad == 'privado'
-              ? const Color(0xFFFFCC80)
-              : const Color(0xFFA5D6A7),
-          textColor: filtroPrivacidad == 'privado'
-              ? const Color(0xFFE65100)
-              : const Color(0xFF2E7D32),
-        ),
+        _ActiveChip(label: 'Sec. $filtroSeccion', onRemove: onClearSeccion),
     ];
 
     if (wrap) {
@@ -1928,14 +2041,158 @@ class _FiltersRow extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: children
-            .map((c) =>
-                Padding(padding: const EdgeInsets.only(right: 8), child: c))
+            .map((c) => Padding(padding: const EdgeInsets.only(right: 8), child: c))
             .toList(),
       ),
     );
   }
 }
 
+// 📚 COMPONENTE DESPLEGABLE: MATERIAS
+class _MateriaFilterBtn extends StatelessWidget {
+  final String? valor;
+  final List<String> opciones;
+  final ValueChanged<String?> onChanged;
+
+  const _MateriaFilterBtn({
+    required this.valor,
+    required this.opciones,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = valor != null;
+
+    return PopupMenuButton<String>(
+      onSelected: (v) => onChanged(v == 'todos' ? null : v),
+      offset: const Offset(0, 38),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'todos',
+          child: Row(children: [
+            Icon(Icons.apps_rounded, size: 16, color: const Color(0xFF757575)),
+            const SizedBox(width: 8),
+            Text('Todas las materias', style: GoogleFonts.lexend(fontSize: 13)),
+          ]),
+        ),
+        ...opciones.map((materia) => PopupMenuItem(
+              value: materia,
+              child: Row(children: [
+                Icon(Icons.menu_book_rounded, size: 16, color: const Color(0xFF1565C0)),
+                const SizedBox(width: 8),
+                Text(materia, style: GoogleFonts.lexend(fontSize: 13)),
+              ]),
+            )),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFE3F2FD) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? const Color(0xFF90CAF9) : const Color(0xFFE3BFB1),
+          ),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+            Icons.tune_rounded,
+            size: 15,
+            color: isActive ? const Color(0xFF1565C0) : const Color(0xFF757575),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            valor ?? 'Filtrar materias',
+            style: GoogleFonts.lexend(
+              fontSize: 13,
+              color: isActive ? const Color(0xFF1565C0) : const Color(0xFF424242),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 15,
+            color: isActive ? const Color(0xFF1565C0) : const Color(0xFF757575),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// 🏫 COMPONENTE DESPLEGABLE: SECCIONES
+class _SeccionFilterBtn extends StatelessWidget {
+  final String? valor;
+  final List<String> opciones;
+  final ValueChanged<String?> onChanged;
+
+  const _SeccionFilterBtn({
+    required this.valor,
+    required this.opciones,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = valor != null;
+
+    return PopupMenuButton<String>(
+      onSelected: (v) => onChanged(v == 'todos' ? null : v),
+      offset: const Offset(0, 38),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'todos',
+          child: Row(children: [
+            Icon(Icons.apps_rounded, size: 16, color: const Color(0xFF757575)),
+            const SizedBox(width: 8),
+            Text('Todas las secciones', style: GoogleFonts.lexend(fontSize: 13)),
+          ]),
+        ),
+        ...opciones.map((seccion) => PopupMenuItem(
+              value: seccion,
+              child: Row(children: [
+                Icon(Icons.school_outlined, size: 16, color: const Color(0xFF00695C)),
+                const SizedBox(width: 8),
+                Text('Sección $seccion', style: GoogleFonts.lexend(fontSize: 13)),
+              ]),
+            )),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFE8F5E9) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? const Color(0xFFA5D6A7) : const Color(0xFFE3BFB1),
+          ),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(
+            Icons.school_outlined,
+            size: 15,
+            color: isActive ? const Color(0xFF2E7D32) : const Color(0xFF757575),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            valor != null ? 'Sección $valor' : 'Sección',
+            style: GoogleFonts.lexend(
+              fontSize: 13,
+              color: isActive ? const Color(0xFF2E7D32) : const Color(0xFF424242),
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 15,
+            color: isActive ? const Color(0xFF2E7D32) : const Color(0xFF757575),
+          ),
+        ]),
+      ),
+    );
+  }
+}
 class _FilterBtn extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -2060,7 +2317,136 @@ class _PrivacidadFilterBtn extends StatelessWidget {
     );
   }
 }
+class _MateriaSeccionFilterBtn extends StatelessWidget {
+  final String? materiaSeleccionada;
+  final String? seccionSeleccionada;
+  final ValueChanged<String?> onMateriaChanged;
+  final ValueChanged<String?> onSeccionChanged;
+  final List<String> listaMaterias;
+  final List<String> listaSecciones;
 
+  const _MateriaSeccionFilterBtn({
+    required this.materiaSeleccionada,
+    required this.seccionSeleccionada,
+    required this.onMateriaChanged,
+    required this.onSeccionChanged,
+    required this.listaMaterias,
+    required this.listaSecciones,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // El botón se ilumina en azul si hay cualquier filtro activo
+    final isActive = materiaSeleccionada != null || seccionSeleccionada != null;
+
+    // Cambia dinámicamente el texto del botón según lo seleccionado
+    String label = 'Materia / Sección';
+    if (materiaSeleccionada != null && seccionSeleccionada != null) {
+      label = '$materiaSeleccionada (Sec. $seccionSeleccionada)';
+    } else if (materiaSeleccionada != null) {
+      label = materiaSeleccionada!;
+    } else if (seccionSeleccionada != null) {
+      label = 'Sección $seccionSeleccionada';
+    }
+
+    return MenuAnchor(
+      builder: (BuildContext context, MenuController controller, Widget? child) {
+        return GestureDetector(
+          onTap: () {
+            if (controller.isOpen) {
+              controller.close();
+            } else {
+              controller.open();
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isActive ? const Color(0xFFE3F2FD) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isActive ? const Color(0xFF90CAF9) : const Color(0xFFE3BFB1),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.filter_alt_rounded,
+                  size: 15,
+                  color: isActive ? const Color(0xFF1565C0) : const Color(0xFF757575),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: GoogleFonts.lexend(
+                    fontSize: 13,
+                    color: isActive ? const Color(0xFF1565C0) : const Color(0xFF424242),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 15,
+                  color: isActive ? const Color(0xFF1565C0) : const Color(0xFF757575),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+      menuChildren: [
+        // 📚 SUBMENÚ: MATERIAS
+        SubmenuButton(
+          menuChildren: listaMaterias.isEmpty
+              ? [
+                  MenuItemButton(
+                    onPressed: null,
+                    child: Text('No hay materias disponibles', style: GoogleFonts.lexend(fontSize: 13, color: Colors.grey)),
+                  )
+                ]
+              : listaMaterias.map((materia) {
+                  return MenuItemButton(
+                    onPressed: () => onMateriaChanged(materia),
+                    child: Text(materia, style: GoogleFonts.lexend(fontSize: 13)),
+                  );
+                }).toList(),
+          child: Row(
+            children: [
+              Icon(Icons.menu_book_rounded, size: 16, color: const Color(0xFF1565C0)),
+              const SizedBox(width: 8),
+              Text('Materia', style: GoogleFonts.lexend(fontSize: 13)),
+            ],
+          ),
+        ),
+        
+        // 🏫 SUBMENÚ: SECCIONES
+        SubmenuButton(
+          menuChildren: listaSecciones.isEmpty
+              ? [
+                  MenuItemButton(
+                    onPressed: null,
+                    child: Text('No hay secciones disponibles', style: GoogleFonts.lexend(fontSize: 13, color: Colors.grey)),
+                  )
+                ]
+              : listaSecciones.map((seccion) {
+                  return MenuItemButton(
+                    onPressed: () => onSeccionChanged(seccion),
+                    child: Text('Sección $seccion', style: GoogleFonts.lexend(fontSize: 13)),
+                  );
+                }).toList(),
+          child: Row(
+            children: [
+              Icon(Icons.school_outlined, size: 16, color: const Color(0xFF00695C)),
+              const SizedBox(width: 8),
+              Text('Sección', style: GoogleFonts.lexend(fontSize: 13)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
 class _ActiveChip extends StatelessWidget {
   final String label;
   final VoidCallback onRemove;
@@ -2169,7 +2555,7 @@ class _GrupoData {
       descripcion: map['descripcion'] ?? '',
       miembros: 0,
       max: map['max_miembros'] ?? 20,
-      materia: map['materia'] ?? '',
+      materia: normalizarTexto(map['materia'] ?? ''),
       seccion: map['seccion'] is int
           ? map['seccion']
           : int.tryParse(map['seccion']?.toString() ?? '1') ?? 1,
@@ -2740,6 +3126,8 @@ class _CrearGrupoDialogState extends State<_CrearGrupoDialog> {
     );
   }
 }
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FOOTER
