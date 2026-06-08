@@ -1587,6 +1587,132 @@ class _HeroBannerPersonas extends StatelessWidget {
 // SIDEBAR
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SIDEBAR NAV ITEM CON HOVER
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _SidebarNavItem extends StatefulWidget {
+  final _SI item;
+  final int index;
+  final bool isActive;
+  final bool horizontal;
+  final bool compact;
+  final VoidCallback onTap;
+
+  const _SidebarNavItem({
+    required this.item,
+    required this.index,
+    required this.isActive,
+    required this.horizontal,
+    required this.compact,
+    required this.onTap,
+  });
+
+  @override
+  State<_SidebarNavItem> createState() => _SidebarNavItemState();
+}
+
+class _SidebarNavItemState extends State<_SidebarNavItem> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final isActive = widget.isActive;
+    final horizontal = widget.horizontal;
+    final compact = widget.compact;
+    final isSubItem = !item.isHeader;
+
+    // Colores según estado
+    final Color textColor = isActive
+        ? const Color(0xFFE65100)
+        : _hovering
+            ? const Color(0xFFE65100)
+            : const Color(0xFF424242);
+
+    final Color iconColor = isActive
+        ? const Color(0xFFE65100)
+        : _hovering
+            ? const Color(0xFFE65100)
+            : const Color(0xFF757575);
+
+    final Color barColor = isActive
+        ? const Color(0xFFE65100)
+        : _hovering
+            ? const Color(0xFFE65100).withOpacity(0.5)
+            : const Color(0xFFD0C4BB);
+
+    Color bgColor = Colors.transparent;
+    if (isActive && !item.isHeader) {
+      bgColor = const Color(0xFFEFE0D0);
+    } else if (_hovering && !item.isHeader) {
+      bgColor = const Color(0xFFEFE0D0).withOpacity(0.5);
+    }
+
+    Border? border;
+    if (isActive && item.isHeader) {
+      border = Border.all(color: const Color(0xFFE65100), width: 1.0);
+    } else if (_hovering && item.isHeader) {
+      border = Border.all(color: const Color(0xFFE65100).withOpacity(0.4), width: 1.0);
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          width: horizontal ? null : 160,
+          padding: horizontal
+              ? EdgeInsets.symmetric(
+                  horizontal: compact ? 12 : 14, vertical: compact ? 7 : 9)
+              : EdgeInsets.symmetric(
+                  horizontal: isSubItem ? 12 : 10, vertical: 9),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(50),
+            border: border,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isSubItem && !horizontal) ...[
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 3,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: barColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ] else if (item.icon != null) ...[
+                Icon(item.icon,
+                    size: compact ? 15 : 17,
+                    color: iconColor),
+                const SizedBox(width: 6),
+              ],
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 180),
+                style: GoogleFonts.lexend(
+                  fontSize: compact ? 12 : 14,
+                  fontWeight: isActive || _hovering ? FontWeight.w600 : FontWeight.w400,
+                  color: textColor,
+                ),
+                child: Text(item.label),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Sidebar extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelect;
@@ -1629,7 +1755,12 @@ class _Sidebar extends StatelessWidget {
               ? showPersonasSubItems
               : (selected == i);
 
-      final tile = GestureDetector(
+      final tile = _SidebarNavItem(
+        item: item,
+        index: i,
+        isActive: isActive,
+        horizontal: horizontal,
+        compact: compact,
         onTap: () {
           if (i == 0 && showGruposSubItems) {
             onSelect(-1);
@@ -1639,57 +1770,6 @@ class _Sidebar extends StatelessWidget {
             onSelect(i);
           }
         },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: horizontal ? null : 160,
-          padding: horizontal
-              ? EdgeInsets.symmetric(
-                  horizontal: compact ? 12 : 14, vertical: compact ? 7 : 9)
-              : EdgeInsets.symmetric(
-                  horizontal: isSubItem ? 12 : 10, vertical: 9),
-          decoration: BoxDecoration(
-            color: (isActive && !item.isHeader) ? const Color(0xFFEFE0D0) : Colors.transparent,
-            borderRadius: BorderRadius.circular(50),
-            border: (isActive && item.isHeader)
-                ? Border.all(color: const Color(0xFFE65100), width: 1.0)
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (isSubItem && !horizontal) ...[
-                Container(
-                  width: 3,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? const Color(0xFFE65100)
-                        : const Color(0xFFD0C4BB),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ] else if (item.icon != null) ...[
-                Icon(item.icon,
-                    size: compact ? 15 : 17,
-                    color: isActive
-                        ? const Color(0xFFE65100)
-                        : const Color(0xFF757575)),
-                const SizedBox(width: 6),
-              ],
-              Text(
-                item.label,
-                style: GoogleFonts.lexend(
-                  fontSize: compact ? 12 : 14,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  color: isActive
-                      ? const Color(0xFFE65100)
-                      : const Color(0xFF424242),
-                ),
-              ),
-            ],
-          ),
-        ),
       );
 
       final tileWithPadding = Padding(
@@ -2222,16 +2302,90 @@ class _GrupoData {
 // TARJETA GRUPO
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _GrupoCard extends StatelessWidget {
+class _GrupoCard extends StatefulWidget {
   final _GrupoData grupo;
   const _GrupoCard({required this.grupo});
 
-  Future<void> _manejarUnirse(BuildContext context) async {
+  @override
+  State<_GrupoCard> createState() => _GrupoCardState();
+}
+
+class _GrupoCardState extends State<_GrupoCard> {
+  bool _solicitudEnviada = false;
+
+  _GrupoData get grupo => widget.grupo;
+
+  @override
+  void initState() {
+    super.initState();
+    _verificarSolicitudExistente();
+  }
+
+  Future<void> _verificarSolicitudExistente() async {
+    final supabase = Supabase.instance.client;
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null || !grupo.esPrivado) return;
+    try {
+      final result = await supabase
+          .from('solicitudes_grupo')
+          .select('id, estado')
+          .eq('grupo_id', grupo.id)
+          .eq('usuario_id', userId)
+          .inFilter('estado', ['pendiente', 'aceptado'])
+          .maybeSingle();
+      if (!mounted) return;
+      if (result != null) setState(() => _solicitudEnviada = true);
+    } catch (e) {
+      debugPrint('Error verificando solicitud existente: $e');
+    }
+  }
+
+  Future<void> _manejarUnirse() async {
     final supabase = Supabase.instance.client;
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
 
     if (grupo.esPrivado) {
+      // ── Verificar solicitud pendiente o membresía activa ──────────────────
+      try {
+        final solicitudExistente = await supabase
+            .from('solicitudes_grupo')
+            .select('id, estado')
+            .eq('grupo_id', grupo.id)
+            .eq('usuario_id', userId)
+            .inFilter('estado', ['pendiente', 'aceptado'])
+            .maybeSingle();
+
+        if (solicitudExistente != null) {
+          final estado = solicitudExistente['estado']?.toString() ?? '';
+          final mensaje = estado == 'pendiente'
+              ? 'Ya tienes una solicitud pendiente para este grupo.'
+              : 'Ya eres miembro activo de este grupo.';
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: const Color(0xFF5D4037),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              content: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.white, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(mensaje, style: GoogleFonts.lexend(color: Colors.white)),
+                  ),
+                ],
+              ),
+            ),
+          );
+          return;
+        }
+      } catch (e) {
+        // Si falla la verificación, dejamos continuar para no bloquear al usuario
+        debugPrint('Error verificando membresía previa: $e');
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       // Mostrar diálogo de solicitud
       final confirmar = await showDialog<bool>(
         context: context,
@@ -2277,7 +2431,8 @@ class _GrupoCard extends StatelessWidget {
           'estado': 'pendiente',
         });
 
-        if (!context.mounted) return;
+        if (!mounted) return;
+        setState(() => _solicitudEnviada = true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: const Color(0xFFE65100),
@@ -2290,7 +2445,7 @@ class _GrupoCard extends StatelessWidget {
           ),
         );
       } catch (e) {
-        if (!context.mounted) return;
+        if (!mounted) return;
         // Si el error es por duplicado (unique constraint), avisar al usuario
         final msg = e.toString().contains('duplicate') || e.toString().contains('unique')
             ? 'Ya tienes una solicitud pendiente para este grupo.'
@@ -2436,23 +2591,29 @@ class _GrupoCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: TextButton.icon(
-                onPressed: () => _manejarUnirse(context),
+                onPressed: _solicitudEnviada ? null : () => _manejarUnirse(),
                 icon: Icon(
-                  grupo.esPrivado ? Icons.send_rounded : Icons.login_rounded,
+                  _solicitudEnviada
+                      ? Icons.hourglass_top_rounded
+                      : (grupo.esPrivado ? Icons.send_rounded : Icons.login_rounded),
                   size: 15,
                   color: Colors.white,
                 ),
                 label: Text(
-                  grupo.esPrivado ? 'Solicitar unirse' : 'Unirse',
+                  _solicitudEnviada
+                      ? 'Pendiente'
+                      : (grupo.esPrivado ? 'Solicitar unirse' : 'Unirse'),
                   style: GoogleFonts.lexend(
                       color: Colors.white,
                       fontWeight: FontWeight.w500,
                       fontSize: 14),
                 ),
                 style: TextButton.styleFrom(
-                  backgroundColor: grupo.esPrivado
-                      ? const Color(0xFFE65100)
-                      : const Color(0xFF2E5900),
+                  backgroundColor: _solicitudEnviada
+                      ? const Color(0xFF9E9E9E)
+                      : (grupo.esPrivado
+                          ? const Color(0xFFE65100)
+                          : const Color(0xFF2E5900)),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24)),
                   padding: const EdgeInsets.symmetric(vertical: 10),
