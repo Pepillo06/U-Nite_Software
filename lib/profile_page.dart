@@ -269,23 +269,27 @@ class _ProfilePageState extends State<ProfilePage> {
 
                                     const SizedBox(height: 40),
 
-                                    // --- INVENTARIO ACTIVO ---
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        const Text(
-                                          "Inventario Activo",
-                                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
-                                        ),
-                                        TextButton(
-                                          onPressed: () {},
-                                          child: const Text("Ver todos →", style: TextStyle(color: Color(0xFF388E3C), fontWeight: FontWeight.w600)),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 20),
-                                    _buildInventoryGrid(),
-                                    const SizedBox(height: 60),
+                                    // --- INVENTARIO ACTIVO (solo visible en modo vendedor) ---
+                                    if (esVendedor && (!esEstudiante || _isVendedorMode)) ...[
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            "Inventario Activo",
+                                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+                                          ),
+                                          TextButton(
+                                            onPressed: () {},
+                                            child: const Text("Ver todos →", style: TextStyle(color: Color(0xFF388E3C), fontWeight: FontWeight.w600)),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 20),
+                                      _buildInventoryGrid(),
+                                      const SizedBox(height: 60),
+                                    ] else ...[
+                                      const SizedBox(height: 20),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -571,16 +575,24 @@ class _ProfilePageState extends State<ProfilePage> {
                         color: const Color(0xFFFFD5B8),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.location_on, size: 14, color: Color(0xFFBF360C)),
-                          const SizedBox(width: 5),
-                          Text(
-                            lugar,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
-                          ),
-                        ],
+                      child: Tooltip(
+                        message: lugar,
+                        preferBelow: false,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on, size: 14, color: Color(0xFFBF360C)),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                lugar,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }).toList(),
