@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,6 +22,8 @@ class StudymatchChatPage extends StatefulWidget {
 
 class _StudymatchChatPageState extends State<StudymatchChatPage> {
   final TextEditingController _messageCtrl = TextEditingController();
+  final TextEditingController _searchGroupCtrl = TextEditingController();
+  final TextEditingController _searchMessageCtrl = TextEditingController();
   final _supabase = Supabase.instance.client;
 
   late String _currentSalaId;
@@ -27,6 +31,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
   late Stream<List<Map<String, dynamic>>> _mensajesStream;
   late Future<List<Map<String, dynamic>>> _salasFuture;
+  late Future<List<Map<String, dynamic>>> _salasPublicasFuture;
 
   final Map<String, String> _nombresUsuarios = {};
 
@@ -37,8 +42,22 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
   // Toggle para mostrar/ocultar panel derecho
   bool _mostrarPanelDerecho = false;
 
+  // Tab seleccionada en navegación izquierda
+  int _selectedNavTab = 0;
+
+  // Búsqueda de grupos y mensajes
+  String _searchGroupQuery = '';
+  String _searchMessageQuery = '';
+  bool _isSearchingMessages = false;
+
   // Lista de miembros del grupo
   List<Map<String, dynamic>> _miembros = [];
+
+  // Archivo adjunto pendiente de enviar
+  PlatformFile? _archivoAdjunto;
+  String? _descripcionGrupo;
+  bool _editandoDescripcion = false;
+  TextEditingController? _descEditCtrl;
 
   @override
   void initState() {
@@ -51,6 +70,16 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     _cargarMiembros();
 
     _salasFuture = _cargarSalas();
+    _salasPublicasFuture = _cargarSalasPublicas();
+  }
+
+  @override
+  void dispose() {
+    _messageCtrl.dispose();
+    _searchGroupCtrl.dispose();
+    _searchMessageCtrl.dispose();
+    _descEditCtrl?.dispose();
+    super.dispose();
   }
 
   Future<List<Map<String, dynamic>>> _cargarSalas() async {
@@ -92,6 +121,35 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _cargarSalasPublicas() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      // Salas públicas donde el usuario NO es participante
+      final participaciones = await _supabase
+          .from('participantes_sala')
+          .select('sala_id')
+          .eq('usuario_id', user.id);
+
+      final misIds = participaciones
+          .map((p) => p['sala_id'].toString())
+          .toSet();
+
+      final todasSalas = await _supabase
+          .from('salas_chat')
+          .select()
+          .order('created_at', ascending: false);
+
+      // Mostrar salas en las que el usuario NO está
+      return List<Map<String, dynamic>>.from(
+        todasSalas,
+      ).where((s) => !misIds.contains(s['id'].toString())).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
   void _initMensajesStream() {
     _mensajesStream = _supabase
         .from('mensajes_chat')
@@ -113,11 +171,63 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
   Future<void> _cargarInfoSala() async {
     try {
-      final response = await _supabase
+      // 1) Intentar cargar de salas_chat
+      var response = await _supabase
           .from('salas_chat')
-          .select('materia, created_at, creado_por')
+          .select('materia, created_at, creado_por, nombre, descripcion')
           .eq('id', _currentSalaId)
           .maybeSingle();
+
+      // Si no existe la sala, mostrar lo que tenemos del widget
+      if (response == null) {
+        if (mounted) {
+          setState(() {
+            _materia = 'Sin materia';
+            _fecha = 'Desconocida';
+            _creadorId = null;
+            _descripcionGrupo = null;
+          });
+        }
+        return;
+      }
+
+      // 3) Asegurar que el creador está en participantes_sala
+      if (response != null && response['creado_por'] != null) {
+        final creadorId = response['creado_por'].toString();
+        try {
+          final countRes = await _supabase
+              .from('participantes_sala')
+              .select('usuario_id')
+              .eq('sala_id', _currentSalaId)
+              .eq('usuario_id', creadorId)
+              .maybeSingle();
+          if (countRes == null) {
+            await _supabase.from('participantes_sala').insert({
+              'sala_id': _currentSalaId,
+              'usuario_id': creadorId,
+            });
+          }
+        } catch (_) {}
+      }
+
+      // 4) Asegurar que el usuario actual está en participantes_sala
+      final user = _supabase.auth.currentUser;
+      if (user != null) {
+        try {
+          final countRes = await _supabase
+              .from('participantes_sala')
+              .select('usuario_id')
+              .eq('sala_id', _currentSalaId)
+              .eq('usuario_id', user.id)
+              .maybeSingle();
+          if (countRes == null) {
+            await _supabase.from('participantes_sala').insert({
+              'sala_id': _currentSalaId,
+              'usuario_id': user.id,
+            });
+          }
+        } catch (_) {}
+      }
 
       if (!mounted) return;
 
@@ -125,12 +235,31 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
         _materia = response != null && response['materia'] != null
             ? response['materia']
             : 'No especificada';
-        _fecha = response != null && response['created_at'] != null
-            ? DateTime.parse(
-                response['created_at'],
-              ).toLocal().toString().split(' ')[0]
-            : 'Desconocida';
+        if (response['created_at'] != null) {
+          final dt = DateTime.parse(response['created_at']).toLocal();
+          final meses = [
+            'ene',
+            'feb',
+            'mar',
+            'abr',
+            'may',
+            'jun',
+            'jul',
+            'ago',
+            'sep',
+            'oct',
+            'nov',
+            'dic',
+          ];
+          _fecha = '${dt.day} ${meses[dt.month - 1]} ${dt.year}';
+        } else {
+          _fecha = 'Desconocida';
+        }
         _creadorId = response?['creado_por']?.toString();
+        _descripcionGrupo = response?['descripcion']?.toString();
+        if (response != null && response['nombre'] != null) {
+          _currentNombreGrupo = response['nombre'];
+        }
       });
     } catch (e) {
       if (mounted) {
@@ -206,7 +335,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
   Future<void> _enviarMensaje() async {
     final texto = _messageCtrl.text.trim();
-    if (texto.isEmpty) return;
+    final archivo = _archivoAdjunto;
+
+    if (texto.isEmpty && archivo == null) return;
 
     final usuarioActual = _supabase.auth.currentUser;
     if (usuarioActual == null) {
@@ -219,18 +350,106 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     }
 
     _messageCtrl.clear();
+    setState(() => _archivoAdjunto = null);
 
     try {
+      String? archivoUrl;
+      String? tipoArchivo;
+      String? nombreArchivo;
+
+      if (archivo != null && archivo.bytes != null) {
+        tipoArchivo = _getTipoArchivo(archivo.extension ?? '');
+        nombreArchivo = archivo.name;
+        final path =
+            '${_currentSalaId}/${DateTime.now().millisecondsSinceEpoch}_${archivo.name}';
+        await _supabase.storage
+            .from('chat_archivos')
+            .uploadBinary(path, archivo.bytes!);
+        archivoUrl = _supabase.storage.from('chat_archivos').getPublicUrl(path);
+      }
+
       await _supabase.from('mensajes_chat').insert({
         'sala_id': _currentSalaId,
-        'texto': texto,
+        'texto': texto.isEmpty ? null : texto,
         'remitente_id': usuarioActual.id,
+        if (archivoUrl != null) 'archivo_url': archivoUrl,
+        if (tipoArchivo != null) 'tipo_archivo': tipoArchivo,
+        if (nombreArchivo != null) 'nombre_archivo': nombreArchivo,
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error al enviar: $e')));
+      }
+    }
+  }
+
+  String _getTipoArchivo(String ext) {
+    const imagenes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
+    const videos = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
+    const docs = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'];
+    final e = ext.toLowerCase();
+    if (imagenes.contains(e)) return 'imagen';
+    if (videos.contains(e)) return 'video';
+    if (docs.contains(e)) return 'documento';
+    return 'archivo';
+  }
+
+  Future<void> _seleccionarArchivo() async {
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: [
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'webp',
+        'mp4',
+        'mov',
+        'avi',
+        'pdf',
+        'doc',
+        'docx',
+        'xls',
+        'xlsx',
+        'ppt',
+        'pptx',
+        'txt',
+      ],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _archivoAdjunto = result.files.first);
+    }
+  }
+
+  Future<void> _guardarDescripcion(String nuevaDesc) async {
+    try {
+      await _supabase
+          .from('salas_chat')
+          .update({'descripcion': nuevaDesc})
+          .eq('id', _currentSalaId);
+      setState(() {
+        _descripcionGrupo = nuevaDesc;
+        _editandoDescripcion = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Descripción actualizada.',
+              style: GoogleFonts.lexend(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
       }
     }
   }
@@ -275,8 +494,67 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                       .maybeSingle();
 
                   if (userSearch != null) {
+                    // Verificar que la sala existe en salas_chat; si no, crearla
+                    var salaExiste = await _supabase
+                        .from('salas_chat')
+                        .select('id')
+                        .eq('id', _currentSalaId)
+                        .maybeSingle();
+
+                    if (salaExiste == null) {
+                      // La sala no existe en salas_chat: crearla con el nombre actual
+                      try {
+                        final user = _supabase.auth.currentUser;
+                        await _supabase.from('salas_chat').insert({
+                          'id': _currentSalaId,
+                          'nombre': _currentNombreGrupo,
+                          'materia': _materia != 'No especificada'
+                              ? _materia
+                              : null,
+                          'creado_por': user?.id,
+                        });
+                        salaExiste = {'id': _currentSalaId};
+                      } catch (insertErr) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'No se pudo registrar la sala. Intenta de nuevo.',
+                                style: GoogleFonts.lexend(),
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                    }
+
+                    // Verificar si ya es participante para evitar duplicados
+                    final yaParticipa = await _supabase
+                        .from('participantes_sala')
+                        .select('usuario_id')
+                        .eq('sala_id', _currentSalaId)
+                        .eq('usuario_id', userSearch['id'])
+                        .maybeSingle();
+
+                    if (yaParticipa != null) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '${userSearch['primer_nombre']} ya es miembro de este grupo.',
+                              style: GoogleFonts.lexend(),
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
                     // Agregar al usuario como participante de la sala
-                    await _supabase.from('participantes_sala').upsert({
+                    await _supabase.from('participantes_sala').insert({
                       'sala_id': _currentSalaId,
                       'usuario_id': userSearch['id'],
                     });
@@ -291,6 +569,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                         'sala_id': _currentSalaId,
                         'nombre_grupo': _currentNombreGrupo,
                       },
+                      'leida': false,
                     });
 
                     // Recargar miembros
@@ -405,6 +684,685 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     }
   }
 
+  void _reportarUsuario(String usuarioId, String nombre) {
+    final TextEditingController motivoCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Reportar a $nombre',
+          style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Indica el motivo del reporte:',
+              style: GoogleFonts.lexend(fontSize: 13),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: motivoCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Ej. Comportamiento indebido, spam...',
+                hintStyle: GoogleFonts.lexend(color: Colors.grey, fontSize: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.lexend(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              final motivo = motivoCtrl.text.trim();
+              if (motivo.isEmpty) return;
+              Navigator.pop(ctx);
+
+              try {
+                final user = _supabase.auth.currentUser;
+                await _supabase.from('reportes_usuarios').insert({
+                  'reportado_id': usuarioId,
+                  'reportado_por': user?.id,
+                  'motivo': motivo,
+                  'sala_id': _currentSalaId,
+                });
+              } catch (_) {}
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Usuario $nombre reportado exitosamente.',
+                      style: GoogleFonts.lexend(),
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            child: Text(
+              'Enviar Reporte',
+              style: GoogleFonts.lexend(
+                color: Colors.orange,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _bloquearUsuario(String usuarioId, String nombre) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Bloquear a $nombre',
+          style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          '¿Estás seguro de que deseas bloquear a $nombre? Ya no verás sus mensajes en esta sala.',
+          style: GoogleFonts.lexend(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.lexend(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+
+              try {
+                final user = _supabase.auth.currentUser;
+                await _supabase.from('usuarios_bloqueados').insert({
+                  'bloqueado_id': usuarioId,
+                  'bloqueado_por': user?.id,
+                });
+              } catch (_) {}
+
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Usuario $nombre bloqueado exitosamente.',
+                      style: GoogleFonts.lexend(),
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            },
+            child: Text(
+              'Bloquear',
+              style: GoogleFonts.lexend(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarEliminarMiembroDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final currentUserId = _supabase.auth.currentUser?.id;
+        final listMiembrosExcluyendoCreador = _miembros
+            .where((m) => m['id'].toString() != currentUserId)
+            .toList();
+
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Eliminar miembro del grupo',
+            style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+          ),
+          content: listMiembrosExcluyendoCreador.isEmpty
+              ? Text(
+                  'No hay otros miembros en este grupo.',
+                  style: GoogleFonts.lexend(),
+                )
+              : SizedBox(
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: listMiembrosExcluyendoCreador.length,
+                    itemBuilder: (context, index) {
+                      final m = listMiembrosExcluyendoCreador[index];
+                      final id = m['id'].toString();
+                      final nombreCompleto =
+                          '${m['primer_nombre'] ?? ''} ${m['primer_apellido'] ?? ''}'
+                              .trim();
+                      return Material(
+                        color: Colors.white,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.grey.shade300,
+                            child: Text(
+                              nombreCompleto.isNotEmpty
+                                  ? nombreCompleto[0].toUpperCase()
+                                  : '?',
+                              style: GoogleFonts.lexend(color: Colors.black87),
+                            ),
+                          ),
+                          title: Text(
+                            nombreCompleto,
+                            style: GoogleFonts.lexend(fontSize: 14),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(
+                              Icons.person_remove,
+                              color: Colors.red,
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _expulsarMiembro(id, nombreCompleto);
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cerrar',
+                style: GoogleFonts.lexend(color: Colors.grey),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _mostrarInfoGrupoDialog() {
+    final currentUserId = _supabase.auth.currentUser?.id;
+    final esCreador = (_creadorId != null && currentUserId == _creadorId);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 35,
+                          backgroundColor: const Color(0xFFE65100),
+                          child: Text(
+                            _currentNombreGrupo.isNotEmpty
+                                ? _currentNombreGrupo[0].toUpperCase()
+                                : 'G',
+                            style: GoogleFonts.lexend(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 28,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _currentNombreGrupo,
+                          style: GoogleFonts.lexend(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Detalles',
+                    style: GoogleFonts.lexend(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.book_outlined,
+                        size: 18,
+                        color: Colors.black54,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _materia,
+                          style: GoogleFonts.lexend(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 18,
+                        color: Colors.black54,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _fecha,
+                          style: GoogleFonts.lexend(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  const Divider(color: Color(0xFFE3BFB1)),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Miembros (${_miembros.length})',
+                    style: GoogleFonts.lexend(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_miembros.isEmpty)
+                    Text(
+                      'No hay miembros registrados.',
+                      style: GoogleFonts.lexend(
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                    )
+                  else
+                    ..._miembros.map(
+                      (m) => _buildMemberTile(m, currentUserId, esCreador),
+                    ),
+                  const SizedBox(height: 24),
+                  const Divider(color: Color(0xFFE3BFB1)),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _invitarPorCorreo();
+                      },
+                      icon: const Icon(Icons.email_outlined, size: 18),
+                      label: Text(
+                        'Invitar por correo',
+                        style: GoogleFonts.lexend(fontWeight: FontWeight.w600),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1A1A1A),
+                        backgroundColor: const Color(0xFFF2EFED),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _abandonarChat();
+                      },
+                      icon: const Icon(
+                        Icons.exit_to_app,
+                        size: 18,
+                        color: Colors.red,
+                      ),
+                      label: Text(
+                        'Abandonar Chat',
+                        style: GoogleFonts.lexend(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        backgroundColor: const Color(0xFFF2EFED),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildMemberTile(
+    Map<String, dynamic> miembro,
+    String? currentUserId,
+    bool esCreador,
+  ) {
+    final miembroId = miembro['id'].toString();
+    final nombre =
+        '${miembro['primer_nombre'] ?? ''} ${miembro['primer_apellido'] ?? ''}'
+            .trim();
+    final correo = miembro['correo'] ?? '';
+    final esTuMismo = miembroId == currentUserId;
+    final esCreadorMiembro = miembroId == _creadorId;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: esTuMismo ? const Color(0xFFFFF8F0) : const Color(0xFFFDFBF9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: esTuMismo
+              ? const Color(0xFFE65100).withOpacity(0.3)
+              : const Color(0xFFEDE8E4),
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: esCreadorMiembro
+                ? const Color(0xFFE65100)
+                : Colors.grey.shade400,
+            child: Text(
+              nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
+              style: GoogleFonts.lexend(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        esTuMismo ? '$nombre (Tú)' : nombre,
+                        style: GoogleFonts.lexend(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (esCreadorMiembro) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE65100).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Admin',
+                          style: GoogleFonts.lexend(
+                            fontSize: 10,
+                            color: const Color(0xFFE65100),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (correo.isNotEmpty)
+                  Text(
+                    correo,
+                    style: GoogleFonts.lexend(
+                      fontSize: 11,
+                      color: Colors.grey.shade500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+              ],
+            ),
+          ),
+          if (!esTuMismo)
+            PopupMenuButton<String>(
+              icon: const Icon(
+                Icons.more_vert,
+                size: 18,
+                color: Colors.black38,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              onSelected: (value) {
+                if (value == 'expulsar') {
+                  _expulsarMiembro(miembroId, nombre);
+                } else if (value == 'reportar') {
+                  _reportarUsuario(miembroId, nombre);
+                } else if (value == 'bloquear') {
+                  _bloquearUsuario(miembroId, nombre);
+                } else if (value == 'agregar_amigo') {
+                  _agregarAmigo(miembroId, nombre);
+                } else if (value == 'eliminar_grupo') {
+                  _expulsarMiembro(miembroId, nombre);
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'agregar_amigo',
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.person_add_outlined,
+                        size: 18,
+                        color: Color(0xFFE65100),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Agregar amigo',
+                        style: GoogleFonts.lexend(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'reportar',
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.report_problem_outlined,
+                        size: 18,
+                        color: Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      Text('Reportar', style: GoogleFonts.lexend(fontSize: 13)),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'bloquear',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.block, size: 18, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Text('Bloquear', style: GoogleFonts.lexend(fontSize: 13)),
+                    ],
+                  ),
+                ),
+                if (esCreador && !esCreadorMiembro)
+                  PopupMenuItem(
+                    value: 'eliminar_grupo',
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.person_remove,
+                          size: 18,
+                          color: Colors.red,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Eliminar del grupo',
+                          style: GoogleFonts.lexend(
+                            color: Colors.red,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _agregarAmigo(String usuarioId, String nombre) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // Verificar si ya son amigos
+      final yaAmigos = await _supabase
+          .from('amigos')
+          .select('id')
+          .or(
+            'and(usuario_id.eq.${user.id},amigo_id.eq.$usuarioId),and(usuario_id.eq.$usuarioId,amigo_id.eq.${user.id})',
+          )
+          .maybeSingle();
+
+      if (yaAmigos != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Ya eres amigo de $nombre.',
+                style: GoogleFonts.lexend(),
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Verificar si ya hay solicitud pendiente
+      final solicitudExiste = await _supabase
+          .from('solicitudes_amistad')
+          .select('id')
+          .or(
+            'and(remitente_id.eq.${user.id},destinatario_id.eq.$usuarioId),and(remitente_id.eq.$usuarioId,destinatario_id.eq.${user.id})',
+          )
+          .maybeSingle();
+
+      if (solicitudExiste != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Ya existe una solicitud pendiente con $nombre.',
+                style: GoogleFonts.lexend(),
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Enviar solicitud de amistad
+      await _supabase.from('solicitudes_amistad').insert({
+        'remitente_id': user.id,
+        'destinatario_id': usuarioId,
+        'estado': 'pendiente',
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Solicitud de amistad enviada a $nombre.',
+              style: GoogleFonts.lexend(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al agregar amigo: $e')));
+      }
+    }
+  }
+
   Future<void> _abandonarChat() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -461,16 +1419,221 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     }
   }
 
+  void _mostrarCrearGrupoDialog() {
+    final nombreCtrl = TextEditingController();
+    final materiaCtrl = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: [
+              const Icon(Icons.group_add, color: Color(0xFFE65100), size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Crear nuevo grupo',
+                style: GoogleFonts.lexend(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 340,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nombreCtrl,
+                  style: GoogleFonts.lexend(fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Nombre del grupo',
+                    labelStyle: GoogleFonts.lexend(fontSize: 13),
+                    hintText: 'Ej: Mate II sección 2',
+                    hintStyle: GoogleFonts.lexend(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                    prefixIcon: const Icon(Icons.group_outlined, size: 18),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFE65100),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: materiaCtrl,
+                  style: GoogleFonts.lexend(fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Materia',
+                    labelStyle: GoogleFonts.lexend(fontSize: 13),
+                    hintText: 'Ej: Matemáticas II',
+                    hintStyle: GoogleFonts.lexend(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                    prefixIcon: const Icon(Icons.book_outlined, size: 18),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFE65100),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cancelar',
+                style: GoogleFonts.lexend(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final nombre = nombreCtrl.text.trim();
+                      final materia = materiaCtrl.text.trim();
+
+                      if (nombre.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'El nombre del grupo es obligatorio',
+                              style: GoogleFonts.lexend(),
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      final user = _supabase.auth.currentUser;
+                      if (user == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Debes iniciar sesión'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isLoading = true);
+
+                      try {
+                        // Insertar en salas_chat
+                        final result = await _supabase
+                            .from('salas_chat')
+                            .insert({
+                              'nombre': nombre,
+                              'materia': materia.isEmpty ? null : materia,
+                              'creado_por': user.id,
+                            })
+                            .select()
+                            .single();
+
+                        final salaId = result['id'].toString();
+
+                        // Agregar al creador como participante
+                        await _supabase.from('participantes_sala').insert({
+                          'sala_id': salaId,
+                          'usuario_id': user.id,
+                        });
+
+                        if (!mounted) return;
+                        Navigator.pop(ctx);
+
+                        // Actualizar lista de salas y seleccionar la nueva
+                        setState(() {
+                          _salasFuture = _cargarSalas();
+                          _salasPublicasFuture = _cargarSalasPublicas();
+                        });
+                        _seleccionarSala(salaId, nombre);
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '¡Grupo "$nombre" creado exitosamente! 🎉',
+                              style: GoogleFonts.lexend(),
+                            ),
+                            backgroundColor: const Color(0xFFE65100),
+                          ),
+                        );
+                      } catch (e) {
+                        setDialogState(() => isLoading = false);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error al crear grupo: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE65100),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      'Crear grupo',
+                      style: GoogleFonts.lexend(fontWeight: FontWeight.w600),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageBubble(
     Map<String, dynamic> msg, {
     required bool esMio,
     required String remitenteNombre,
   }) {
+    final texto = msg['texto'] as String?;
+    final archivoUrl = msg['archivo_url'] as String?;
+    final tipoArchivo = msg['tipo_archivo'] as String?;
+    final nombreArchivo = msg['nombre_archivo'] as String?;
+
     return Align(
       alignment: esMio ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         constraints: const BoxConstraints(maxWidth: 420),
         decoration: BoxDecoration(
           color: esMio ? const Color(0xFFE65100) : Colors.white,
@@ -489,24 +1652,167 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
               ? CrossAxisAlignment.end
               : CrossAxisAlignment.start,
           children: [
-            if (!esMio)
-              Text(
-                remitenteNombre,
-                style: GoogleFonts.lexend(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFFE65100),
+            // Imagen/video/documento adjunto
+            if (archivoUrl != null) ...[
+              if (tipoArchivo == 'imagen')
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    archivoUrl,
+                    width: 280,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.broken_image),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        tipoArchivo == 'video'
+                            ? Icons.videocam_outlined
+                            : Icons.insert_drive_file_outlined,
+                        size: 20,
+                        color: esMio ? Colors.white70 : const Color(0xFFE65100),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          nombreArchivo ?? 'Archivo',
+                          style: GoogleFonts.lexend(
+                            fontSize: 13,
+                            color: esMio
+                                ? Colors.white
+                                : const Color(0xFF2E2E2E),
+                            decoration: TextDecoration.underline,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+            // Texto del mensaje
+            if (texto != null && texto.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  14,
+                  archivoUrl != null ? 4 : 10,
+                  14,
+                  10,
+                ),
+                child: Column(
+                  crossAxisAlignment: esMio
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    if (!esMio)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          remitenteNombre,
+                          style: GoogleFonts.lexend(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFE65100),
+                          ),
+                        ),
+                      ),
+                    Text(
+                      texto,
+                      style: GoogleFonts.lexend(
+                        fontSize: 14,
+                        color: esMio ? Colors.white : const Color(0xFF2E2E2E),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (archivoUrl == null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                child: Column(
+                  crossAxisAlignment: esMio
+                      ? CrossAxisAlignment.end
+                      : CrossAxisAlignment.start,
+                  children: [
+                    if (!esMio)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Text(
+                          remitenteNombre,
+                          style: GoogleFonts.lexend(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFE65100),
+                          ),
+                        ),
+                      ),
+                    Text(
+                      '',
+                      style: GoogleFonts.lexend(
+                        fontSize: 14,
+                        color: esMio ? Colors.white : const Color(0xFF2E2E2E),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (!esMio && texto == null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
+                child: Text(
+                  remitenteNombre,
+                  style: GoogleFonts.lexend(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFFE65100),
+                  ),
                 ),
               ),
-            const SizedBox(height: 2),
-            Text(
-              msg['texto'] ?? '',
-              style: GoogleFonts.lexend(
-                fontSize: 14,
-                color: esMio ? Colors.white : const Color(0xFF2E2E2E),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavTab(String label, int index) {
+    final isSelected = _selectedNavTab == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedNavTab = index;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: isSelected
+                    ? const Color(0xFFE65100)
+                    : Colors.transparent,
+                width: 2.5,
               ),
             ),
-          ],
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.lexend(
+              fontSize: 12,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              color: isSelected
+                  ? const Color(0xFFE65100)
+                  : Colors.grey.shade600,
+            ),
+          ),
         ),
       ),
     );
@@ -522,100 +1828,233 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
       ),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          // Tabs de navegación: Mis Grupos / Grupos Públicos / Amigos
+          Container(
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFFE3BFB1))),
+            ),
             child: Row(
               children: [
-                Text(
-                  'Todos los Chats',
+                _buildNavTab('Mis Grupos', 0),
+                _buildNavTab('Grupos Públicos', 1),
+                _buildNavTab('Amigos', 2),
+              ],
+            ),
+          ),
+          // Barra de búsqueda de grupos
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 4.0,
+            ),
+            child: Container(
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F4F1),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE3BFB1)),
+              ),
+              child: TextField(
+                controller: _searchGroupCtrl,
+                onChanged: (v) {
+                  setState(() {
+                    _searchGroupQuery = v;
+                  });
+                },
+                style: GoogleFonts.lexend(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Buscar grupos...',
+                  hintStyle: GoogleFonts.lexend(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                  suffixIcon: _searchGroupQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(
+                            Icons.clear,
+                            size: 14,
+                            color: Colors.grey,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _searchGroupCtrl.clear();
+                              _searchGroupQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+              ),
+            ),
+          ),
+          // Botón Crear Grupo
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 38,
+              child: ElevatedButton.icon(
+                onPressed: () => _mostrarCrearGrupoDialog(),
+                icon: const Icon(Icons.add, size: 16, color: Colors.white),
+                label: Text(
+                  'Crear Grupo',
                   style: GoogleFonts.lexend(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
                   ),
                 ),
-              ],
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  elevation: 0,
+                ),
+              ),
             ),
           ),
           const Divider(height: 1, color: Color(0xFFE3BFB1)),
           Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _salasFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFE65100)),
-                  );
-                }
-                final salas = snapshot.data ?? [];
-                if (salas.isEmpty) {
-                  return Center(
+            child: _selectedNavTab == 2
+                // Tab "Amigos": placeholder
+                ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.chat_bubble_outline,
+                            Icons.people_outline,
                             size: 48,
                             color: Colors.grey.shade300,
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'No tienes chats aún',
+                            'Próximamente\npodrás ver tus amigos aquí',
                             style: GoogleFonts.lexend(
                               color: Colors.grey.shade500,
+                              fontSize: 13,
                             ),
+                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
-                  );
-                }
-                return ListView.builder(
-                  itemCount: salas.length,
-                  itemBuilder: (context, index) {
-                    final sala = salas[index];
-                    final isSelected = sala['id'] == _currentSalaId;
-                    return ListTile(
-                      tileColor: isSelected
-                          ? const Color(0xFFFFF3E0)
-                          : Colors.white,
-                      leading: CircleAvatar(
-                        backgroundColor: isSelected
-                            ? const Color(0xFFE65100)
-                            : Colors.grey.shade300,
-                        child: Text(
-                          sala['nombre'] != null && sala['nombre'].isNotEmpty
-                              ? sala['nombre'][0].toUpperCase()
-                              : 'G',
-                          style: GoogleFonts.lexend(
-                            color: isSelected ? Colors.white : Colors.black87,
+                  )
+                : FutureBuilder<List<Map<String, dynamic>>>(
+                    future: _selectedNavTab == 0
+                        ? _salasFuture
+                        : _salasPublicasFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFE65100),
                           ),
-                        ),
-                      ),
-                      title: Text(
-                        sala['nombre'] ?? 'Sin nombre',
-                        style: GoogleFonts.lexend(
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                        ),
-                      ),
-                      subtitle: Text(
-                        sala['materia'] ?? 'Sin materia',
-                        style: GoogleFonts.lexend(fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () => _seleccionarSala(
-                        sala['id'].toString(),
-                        sala['nombre'] ?? 'Sala',
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                        );
+                      }
+                      final allSalas = snapshot.data ?? [];
+                      final salas = allSalas.where((sala) {
+                        final name = (sala['nombre'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final subject = (sala['materia'] ?? '')
+                            .toString()
+                            .toLowerCase();
+                        final q = _searchGroupQuery.toLowerCase();
+                        return name.contains(q) || subject.contains(q);
+                      }).toList();
+
+                      if (salas.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline,
+                                  size: 48,
+                                  color: Colors.grey.shade300,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _searchGroupQuery.isEmpty
+                                      ? (_selectedNavTab == 0
+                                            ? 'No tienes chats aún'
+                                            : 'No hay grupos públicos disponibles')
+                                      : 'No se encontraron grupos',
+                                  style: GoogleFonts.lexend(
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      return ListView.builder(
+                        itemCount: salas.length,
+                        itemBuilder: (context, index) {
+                          final sala = salas[index];
+                          final isSelected = sala['id'] == _currentSalaId;
+                          return Material(
+                            color: isSelected
+                                ? const Color(0xFFFFF3E0)
+                                : Colors.white,
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: isSelected
+                                    ? const Color(0xFFE65100)
+                                    : Colors.grey.shade300,
+                                child: Text(
+                                  sala['nombre'] != null &&
+                                          sala['nombre'].isNotEmpty
+                                      ? sala['nombre'][0].toUpperCase()
+                                      : 'G',
+                                  style: GoogleFonts.lexend(
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                sala['nombre'] ?? 'Sin nombre',
+                                style: GoogleFonts.lexend(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              subtitle: Text(
+                                sala['materia'] ?? 'Sin materia',
+                                style: GoogleFonts.lexend(fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () => _seleccionarSala(
+                                sala['id'].toString(),
+                                sala['nombre'] ?? 'Sala',
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -651,46 +2090,115 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     tooltip: 'Salir del chat',
                   ),
                   const SizedBox(width: 4),
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: const Color(0xFFE65100),
-                    child: Text(
-                      _currentNombreGrupo.isNotEmpty
-                          ? _currentNombreGrupo[0].toUpperCase()
-                          : 'G',
-                      style: GoogleFonts.lexend(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                  if (_isSearchingMessages)
+                    Expanded(
+                      child: Container(
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F4F1),
+                          borderRadius: BorderRadius.circular(19),
+                          border: Border.all(color: const Color(0xFFE3BFB1)),
+                        ),
+                        child: TextField(
+                          controller: _searchMessageCtrl,
+                          autofocus: true,
+                          style: GoogleFonts.lexend(fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Buscar mensajes...',
+                            hintStyle: GoogleFonts.lexend(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                            prefixIcon: const Icon(
+                              Icons.search,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: const Icon(
+                                Icons.close,
+                                size: 16,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isSearchingMessages = false;
+                                  _searchMessageCtrl.clear();
+                                  _searchMessageQuery = '';
+                                });
+                              },
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                            ),
+                          ),
+                          onChanged: (v) {
+                            setState(() {
+                              _searchMessageQuery = v;
+                            });
+                          },
+                        ),
+                      ),
+                    )
+                  else ...[
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: const Color(0xFFE65100),
+                      child: Text(
+                        _currentNombreGrupo.isNotEmpty
+                            ? _currentNombreGrupo[0].toUpperCase()
+                            : 'G',
+                        style: GoogleFonts.lexend(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _currentNombreGrupo,
-                          style: GoogleFonts.lexend(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF333333),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _currentNombreGrupo,
+                            style: GoogleFonts.lexend(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF333333),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${_miembros.length} miembros',
-                          style: GoogleFonts.lexend(
-                            fontSize: 12,
-                            color: Colors.black54,
+                          const SizedBox(height: 2),
+                          GestureDetector(
+                            onTap: _mostrarInfoGrupoDialog,
+                            behavior: HitTestBehavior.opaque,
+                            child: Text(
+                              '${_miembros.length} miembros',
+                              style: GoogleFonts.lexend(
+                                fontSize: 12,
+                                color: Colors.black54,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
+                  // Lupa de buscar mensajes
+                  if (!_isSearchingMessages)
+                    IconButton(
+                      icon: const Icon(Icons.search, color: Color(0xFF4A4A4A)),
+                      onPressed: () {
+                        setState(() {
+                          _isSearchingMessages = true;
+                        });
+                      },
+                      tooltip: 'Buscar mensajes',
+                    ),
                   // Botón de invitar (siempre visible)
                   IconButton(
                     icon: const Icon(
@@ -700,20 +2208,31 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     onPressed: _invitarPorCorreo,
                     tooltip: 'Invitar persona',
                   ),
-                  // Botón de tres puntos → toggle panel derecho
+                  // Botón de eliminar miembro (solo si es creador)
+                  if (esCreador)
+                    IconButton(
+                      icon: const Icon(Icons.person_remove, color: Colors.red),
+                      onPressed: _mostrarEliminarMiembroDialog,
+                      tooltip: 'Eliminar miembro',
+                    ),
+                  // Botón de tres puntos
                   IconButton(
                     icon: Icon(
-                      _mostrarPanelDerecho ? Icons.close : Icons.more_vert,
+                      _mostrarPanelDerecho && isDesktop
+                          ? Icons.close
+                          : Icons.more_vert,
                       color: const Color(0xFF4A4A4A),
                     ),
                     onPressed: () {
-                      setState(() {
-                        _mostrarPanelDerecho = !_mostrarPanelDerecho;
-                      });
+                      if (isDesktop) {
+                        setState(() {
+                          _mostrarPanelDerecho = !_mostrarPanelDerecho;
+                        });
+                      } else {
+                        _mostrarInfoGrupoDialog();
+                      }
                     },
-                    tooltip: _mostrarPanelDerecho
-                        ? 'Cerrar info'
-                        : 'Información del grupo',
+                    tooltip: 'Información del grupo',
                   ),
                 ],
               ),
@@ -738,7 +2257,18 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     );
                   }
 
-                  final mensajes = snapshot.data ?? [];
+                  final allMensajes = snapshot.data ?? [];
+                  final mensajes = _searchMessageQuery.isEmpty
+                      ? allMensajes
+                      : allMensajes.where((m) {
+                          final text = (m['texto'] ?? '')
+                              .toString()
+                              .toLowerCase();
+                          return text.contains(
+                            _searchMessageQuery.toLowerCase(),
+                          );
+                        }).toList();
+
                   if (mensajes.isEmpty) {
                     return Center(
                       child: Column(
@@ -751,7 +2281,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'No hay mensajes aún.\n¡Sé el primero en escribir!',
+                            _searchMessageQuery.isEmpty
+                                ? 'No hay mensajes aún.\n¡Sé el primero en escribir!'
+                                : 'No se encontraron mensajes',
                             style: GoogleFonts.lexend(color: Colors.grey),
                             textAlign: TextAlign.center,
                           ),
@@ -801,50 +2333,131 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
             ),
             // Input de mensajes
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 border: Border(top: BorderSide(color: Color(0xFFF0EAE6))),
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFDFBF9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE3BFB1)),
+                  // Preview archivo adjunto
+                  if (_archivoAdjunto != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
-                      child: TextField(
-                        controller: _messageCtrl,
-                        style: GoogleFonts.lexend(fontSize: 14),
-                        decoration: InputDecoration(
-                          hintText: 'Escribe un mensaje aquí...',
-                          hintStyle: GoogleFonts.lexend(
-                            color: Colors.grey,
-                            fontSize: 13,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0xFFE65100).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getTipoArchivo(_archivoAdjunto!.extension ?? '') ==
+                                    'imagen'
+                                ? Icons.image_outlined
+                                : _getTipoArchivo(
+                                        _archivoAdjunto!.extension ?? '',
+                                      ) ==
+                                      'video'
+                                ? Icons.videocam_outlined
+                                : Icons.insert_drive_file_outlined,
+                            size: 18,
+                            color: const Color(0xFFE65100),
                           ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _archivoAdjunto!.name,
+                              style: GoogleFonts.lexend(
+                                fontSize: 12,
+                                color: const Color(0xFF333333),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${(_archivoAdjunto!.size / 1024).toStringAsFixed(0)} KB',
+                            style: GoogleFonts.lexend(
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.close,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () =>
+                                setState(() => _archivoAdjunto = null),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Fila de texto + enviar
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFDFBF9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE3BFB1)),
+                          ),
+                          child: TextField(
+                            controller: _messageCtrl,
+                            style: GoogleFonts.lexend(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Escribe un mensaje...',
+                              hintStyle: GoogleFonts.lexend(
+                                color: Colors.grey,
+                                fontSize: 13,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              prefixIcon: IconButton(
+                                icon: Icon(
+                                  Icons.attach_file,
+                                  color: _archivoAdjunto != null
+                                      ? const Color(0xFFE65100)
+                                      : Colors.grey,
+                                  size: 20,
+                                ),
+                                onPressed: _seleccionarArchivo,
+                                tooltip: 'Adjuntar imagen, video o documento',
+                              ),
+                            ),
+                            onSubmitted: (_) => _enviarMensaje(),
                           ),
                         ),
-                        onSubmitted: (_) => _enviarMensaje(),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  CircleAvatar(
-                    backgroundColor: const Color(0xFFE65100),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 18,
+                      const SizedBox(width: 12),
+                      CircleAvatar(
+                        backgroundColor: const Color(0xFFE65100),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          onPressed: _enviarMensaje,
+                        ),
                       ),
-                      onPressed: _enviarMensaje,
-                    ),
+                    ],
                   ),
                 ],
               ),
@@ -852,6 +2465,36 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDetalleRow({
+    required IconData icon,
+    String? texto,
+    String placeholder = '',
+    String prefixLabel = '',
+  }) {
+    final hasValue = texto != null && texto.isNotEmpty;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 18,
+          color: hasValue ? Colors.black54 : Colors.grey.shade400,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            hasValue ? '$prefixLabel$texto' : placeholder,
+            style: GoogleFonts.lexend(
+              fontSize: 14,
+              color: hasValue ? const Color(0xFF333333) : Colors.grey.shade400,
+              fontStyle: hasValue ? FontStyle.normal : FontStyle.italic,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -948,39 +2591,137 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.book_outlined,
-                        size: 18,
-                        color: Colors.black54,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _materia,
-                          style: GoogleFonts.lexend(fontSize: 14),
-                        ),
-                      ),
-                    ],
+                  // Materia
+                  // Materia
+                  _buildDetalleRow(
+                    icon: Icons.book_outlined,
+                    texto:
+                        (_materia.isNotEmpty &&
+                            _materia != 'Sin materia' &&
+                            _materia != 'No especificada' &&
+                            _materia != 'Cargando...')
+                        ? _materia
+                        : null,
+                    placeholder: 'Sin materia',
                   ),
                   const SizedBox(height: 10),
+                  // Fecha
+                  _buildDetalleRow(
+                    icon: Icons.calendar_today_outlined,
+                    texto: (_fecha != 'Desconocida' && _fecha != 'Cargando...')
+                        ? 'Creado el $_fecha'
+                        : null,
+                    placeholder: 'Fecha desconocida',
+                  ),
+                  const SizedBox(height: 10),
+                  // Creador
+                  _buildDetalleRow(
+                    icon: Icons.person_outlined,
+                    texto: _creadorId != null
+                        ? (_miembros.firstWhere(
+                                    (m) => m['id'].toString() == _creadorId,
+                                    orElse: () => {},
+                                  )['primer_nombre']
+                                  as String? ??
+                              'Administrador')
+                        : null,
+                    placeholder: 'Administrador desconocido',
+                    prefixLabel: 'Admin: ',
+                  ),
+                  const SizedBox(height: 10),
+                  // Miembros count
+                  _buildDetalleRow(
+                    icon: Icons.people_outlined,
+                    texto:
+                        '${_miembros.length} miembro${_miembros.length == 1 ? '' : 's'}',
+                  ),
+                  const SizedBox(height: 16),
+                  // Descripción editable
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(
-                        Icons.calendar_today_outlined,
-                        size: 18,
-                        color: Colors.black54,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _fecha,
-                          style: GoogleFonts.lexend(fontSize: 14),
+                      Text(
+                        'Descripción',
+                        style: GoogleFonts.lexend(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
                         ),
                       ),
+                      if (esCreador)
+                        IconButton(
+                          icon: Icon(
+                            _editandoDescripcion
+                                ? Icons.check
+                                : Icons.edit_outlined,
+                            size: 16,
+                            color: _editandoDescripcion
+                                ? Colors.green
+                                : const Color(0xFFE65100),
+                          ),
+                          onPressed: () {
+                            if (_editandoDescripcion) {
+                              _guardarDescripcion(
+                                _descEditCtrl?.text.trim() ??
+                                    _descripcionGrupo ??
+                                    '',
+                              );
+                            } else {
+                              _descEditCtrl = TextEditingController(
+                                text: _descripcionGrupo ?? '',
+                              );
+                              setState(() => _editandoDescripcion = true);
+                            }
+                          },
+                          tooltip: _editandoDescripcion
+                              ? 'Guardar'
+                              : 'Editar descripción',
+                        ),
                     ],
                   ),
+                  const SizedBox(height: 6),
+                  if (_editandoDescripcion && esCreador)
+                    TextField(
+                      controller: _descEditCtrl,
+                      maxLines: 3,
+                      style: GoogleFonts.lexend(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: 'Describe el grupo...',
+                        hintStyle: GoogleFonts.lexend(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE3BFB1),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE65100),
+                            width: 1.5,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.all(10),
+                      ),
+                    )
+                  else
+                    Text(
+                      (_descripcionGrupo?.isNotEmpty == true)
+                          ? _descripcionGrupo!
+                          : 'Sin descripción',
+                      style: GoogleFonts.lexend(
+                        fontSize: 13,
+                        color: (_descripcionGrupo?.isNotEmpty == true)
+                            ? const Color(0xFF444444)
+                            : Colors.grey,
+                        fontStyle: (_descripcionGrupo?.isNotEmpty == true)
+                            ? FontStyle.normal
+                            : FontStyle.italic,
+                      ),
+                    ),
 
                   const SizedBox(height: 24),
                   const Divider(color: Color(0xFFE3BFB1)),
@@ -1005,149 +2746,10 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                       ),
                     )
                   else
-                    ..._miembros.map((miembro) {
-                      final miembroId = miembro['id'].toString();
-                      final nombre =
-                          '${miembro['primer_nombre'] ?? ''} ${miembro['primer_apellido'] ?? ''}'
-                              .trim();
-                      final correo = miembro['correo'] ?? '';
-                      final esTuMismo = miembroId == currentUserId;
-                      final esCreadorMiembro = miembroId == _creadorId;
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: esTuMismo
-                              ? const Color(0xFFFFF8F0)
-                              : const Color(0xFFFDFBF9),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: esTuMismo
-                                ? const Color(0xFFE65100).withOpacity(0.3)
-                                : const Color(0xFFEDE8E4),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 16,
-                              backgroundColor: esCreadorMiembro
-                                  ? const Color(0xFFE65100)
-                                  : Colors.grey.shade400,
-                              child: Text(
-                                nombre.isNotEmpty
-                                    ? nombre[0].toUpperCase()
-                                    : '?',
-                                style: GoogleFonts.lexend(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: Text(
-                                          esTuMismo ? '$nombre (Tú)' : nombre,
-                                          style: GoogleFonts.lexend(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      if (esCreadorMiembro) ...[
-                                        const SizedBox(width: 6),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: const Color(
-                                              0xFFE65100,
-                                            ).withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(
-                                              4,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            'Admin',
-                                            style: GoogleFonts.lexend(
-                                              fontSize: 10,
-                                              color: const Color(0xFFE65100),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  if (correo.isNotEmpty)
-                                    Text(
-                                      correo,
-                                      style: GoogleFonts.lexend(
-                                        fontSize: 11,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            // Botón de expulsar (solo para el creador, y no puede expulsarse a sí mismo)
-                            if (esCreador && !esTuMismo)
-                              PopupMenuButton<String>(
-                                icon: const Icon(
-                                  Icons.more_vert,
-                                  size: 18,
-                                  color: Colors.black38,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                onSelected: (value) {
-                                  if (value == 'expulsar') {
-                                    _expulsarMiembro(miembroId, nombre);
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    value: 'expulsar',
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.person_remove,
-                                          size: 18,
-                                          color: Colors.red,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'Expulsar',
-                                          style: GoogleFonts.lexend(
-                                            color: Colors.red,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                          ],
-                        ),
-                      );
-                    }),
+                    ..._miembros.map(
+                      (miembro) =>
+                          _buildMemberTile(miembro, currentUserId, esCreador),
+                    ),
 
                   const SizedBox(height: 24),
                   const Divider(color: Color(0xFFE3BFB1)),
