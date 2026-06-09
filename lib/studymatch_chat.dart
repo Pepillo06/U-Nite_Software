@@ -74,6 +74,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
     _salasFuture = _cargarSalas();
     _salasPublicasFuture = _cargarSalasPublicas();
+    _sincronizarGruposEstudio();
   }
 
   @override
@@ -83,6 +84,66 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     _searchMessageCtrl.dispose();
     _descEditCtrl?.dispose();
     super.dispose();
+  }
+
+  // Sincroniza grupos_estudio con salas_chat automáticamente
+  // Si el usuario creó un grupo en grupos_estudio que no tiene sala en salas_chat, la crea
+  Future<void> _sincronizarGruposEstudio() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      // 1. Traer grupos creados por este usuario en grupos_estudio
+      final gruposEstudio = await _supabase
+          .from('grupos_estudio')
+          .select('id, nombre, materia, descripcion, creado_por')
+          .eq('creado_por', user.id);
+
+      if (gruposEstudio.isEmpty) return;
+
+      // 2. Traer salas existentes creadas por este usuario
+      final salasExistentes = await _supabase
+          .from('salas_chat')
+          .select('nombre, creado_por')
+          .eq('creado_por', user.id);
+
+      final nombresExistentes = salasExistentes
+          .map((s) => s['nombre'].toString().trim().toLowerCase())
+          .toSet();
+
+      // 3. Por cada grupo que no tenga sala, crearla
+      for (final grupo in gruposEstudio) {
+        final nombre = grupo['nombre'].toString().trim();
+        if (nombresExistentes.contains(nombre.toLowerCase())) continue;
+
+        // Crear sala en salas_chat
+        final salaResult = await _supabase
+            .from('salas_chat')
+            .insert({
+              'nombre': nombre,
+              'materia': grupo['materia'],
+              'descripcion': grupo['descripcion'],
+              'creado_por': user.id,
+            })
+            .select()
+            .single();
+
+        // Agregar creador como admin en participantes_sala
+        await _supabase.from('participantes_sala').insert({
+          'sala_id': salaResult['id'],
+          'usuario_id': user.id,
+          'es_admin': true,
+        });
+      }
+
+      // 4. Recargar salas después de sincronizar
+      if (mounted) {
+        setState(() {
+          _salasFuture = _cargarSalas();
+          _salasPublicasFuture = _cargarSalasPublicas();
+        });
+      }
+    } catch (_) {}
   }
 
   Future<List<Map<String, dynamic>>> _cargarSalas() async {
@@ -2169,36 +2230,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
               ),
             ),
           ),
-          // Botón Crear Grupo
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 8.0,
-            ),
-            child: SizedBox(
-              width: double.infinity,
-              height: 38,
-              child: ElevatedButton.icon(
-                onPressed: () => _mostrarCrearGrupoDialog(),
-                icon: const Icon(Icons.add, size: 16, color: Colors.white),
-                label: Text(
-                  'Crear Grupo',
-                  style: GoogleFonts.lexend(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE65100),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  elevation: 0,
-                ),
-              ),
-            ),
-          ),
+
           const Divider(height: 1, color: Color(0xFFE3BFB1)),
           Expanded(
             child: _selectedNavTab == 2
