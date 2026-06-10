@@ -69,6 +69,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
   // Lista de miembros del grupo
   List<Map<String, dynamic>> _miembros = [];
 
+  // IDs de usuarios bloqueados por el usuario actual
+  Set<String> _usuariosBloqueados = {};
+
   // Si el usuario actual es admin de esta sala
   bool _esAdminActual = false;
 
@@ -101,6 +104,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     }
     _cargarInfoSala();
     _cargarMiembros();
+    _cargarUsuariosBloqueados();
     setState(() {
       _salasFuture = _cargarSalas();
       _salasPublicasFuture = _cargarSalasPublicas();
@@ -641,6 +645,106 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
             .eq('id', _currentSalaId);
       }
     } catch (_) {}
+  }
+
+  Future<void> _cargarUsuariosBloqueados() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final data = await _supabase
+          .from('usuarios_bloqueados')
+          .select('bloqueado_id')
+          .eq('bloqueado_por', user.id);
+
+      if (mounted) {
+        setState(() {
+          _usuariosBloqueados = data
+              .map((r) => r['bloqueado_id'].toString())
+              .toSet();
+        });
+      }
+    } catch (_) {}
+  }
+
+  List<Map<String, dynamic>> _filtrarMensajesBloqueados(
+    List<Map<String, dynamic>> mensajes,
+  ) {
+    if (_usuariosBloqueados.isEmpty) return mensajes;
+
+    return mensajes.where((m) {
+      final remitenteId = m['remitente_id']?.toString();
+      if (remitenteId == null) return true;
+      return !_usuariosBloqueados.contains(remitenteId);
+    }).toList();
+  }
+
+  bool _estaBloqueado(String usuarioId) =>
+      _usuariosBloqueados.contains(usuarioId);
+
+  Future<List<Map<String, dynamic>>> _obtenerUsuariosBloqueadosConNombre() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return [];
+
+    try {
+      final data = await _supabase
+          .from('usuarios_bloqueados')
+          .select('bloqueado_id')
+          .eq('bloqueado_por', user.id);
+
+      final List<Map<String, dynamic>> result = [];
+      for (final r in data) {
+        final id = r['bloqueado_id'].toString();
+        String nombre = 'Usuario';
+        try {
+          final userData = await _supabase
+              .from('usuarios')
+              .select('primer_nombre, primer_apellido')
+              .eq('id', id)
+              .maybeSingle();
+          if (userData != null) {
+            nombre =
+                '${userData['primer_nombre'] ?? ''} ${userData['primer_apellido'] ?? ''}'
+                    .trim();
+            if (nombre.isEmpty) nombre = 'Usuario';
+          }
+        } catch (_) {}
+        result.add({'id': id, 'nombre': nombre});
+      }
+      return result;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _ejecutarDesbloqueo(String usuarioId, {String? nombre}) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await _supabase
+          .from('usuarios_bloqueados')
+          .delete()
+          .eq('bloqueado_id', usuarioId)
+          .eq('bloqueado_por', user.id);
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _usuariosBloqueados.remove(usuarioId);
+      });
+      if (nombre != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$nombre desbloqueado. Volverás a ver sus mensajes.',
+              style: GoogleFonts.lexend(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _cargarMiembros() async {
@@ -1409,18 +1513,18 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
               try {
                 final user = _supabase.auth.currentUser;
-                // 1. Registrar bloqueo
                 await _supabase.from('usuarios_bloqueados').insert({
                   'bloqueado_id': usuarioId,
                   'bloqueado_por': user?.id,
                 });
-                // No expulsamos del grupo automáticamente —
-                // el bloqueo es personal (no verás sus mensajes)
               } catch (e) {
                 // Si ya está bloqueado (duplicate key), ignorar silenciosamente
               }
 
               if (mounted) {
+                setState(() {
+                  _usuariosBloqueados.add(usuarioId);
+                });
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -1438,6 +1542,137 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                 color: Colors.red,
                 fontWeight: FontWeight.bold,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _desbloquearUsuario(String usuarioId, String nombre) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Desbloquear a $nombre',
+          style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          '¿Deseas desbloquear a $nombre? Volverás a ver sus mensajes en esta sala.',
+          style: GoogleFonts.lexend(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.lexend(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _ejecutarDesbloqueo(usuarioId, nombre: nombre);
+            },
+            child: Text(
+              'Desbloquear',
+              style: GoogleFonts.lexend(
+                color: const Color(0xFF2E7D32),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarUsuariosBloqueadosDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Usuarios bloqueados',
+          style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _obtenerUsuariosBloqueadosConNombre(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: CircularProgressIndicator(color: Color(0xFFE65100)),
+                  ),
+                );
+              }
+
+              final bloqueados = snapshot.data ?? [];
+              if (bloqueados.isEmpty) {
+                return Text(
+                  'No tienes usuarios bloqueados.',
+                  style: GoogleFonts.lexend(color: Colors.grey),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                itemCount: bloqueados.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final usuario = bloqueados[index];
+                  final id = usuario['id'].toString();
+                  final nombre = usuario['nombre'].toString();
+
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.grey.shade400,
+                      child: Text(
+                        nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
+                        style: GoogleFonts.lexend(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      nombre,
+                      style: GoogleFonts.lexend(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    trailing: TextButton(
+                      onPressed: () async {
+                        await _ejecutarDesbloqueo(id, nombre: nombre);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                      child: Text(
+                        'Desbloquear',
+                        style: GoogleFonts.lexend(
+                          color: const Color(0xFF2E7D32),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cerrar',
+              style: GoogleFonts.lexend(color: Colors.grey),
             ),
           ),
         ],
@@ -1677,6 +1912,31 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _mostrarUsuariosBloqueadosDialog();
+                      },
+                      icon: const Icon(Icons.block, size: 18, color: Colors.red),
+                      label: Text(
+                        _usuariosBloqueados.isEmpty
+                            ? 'Usuarios bloqueados'
+                            : 'Usuarios bloqueados (${_usuariosBloqueados.length})',
+                        style: GoogleFonts.lexend(fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1A1A1A),
+                        side: const BorderSide(color: Color(0xFFE3BFB1)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
@@ -1805,6 +2065,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     final esTuMismo = miembroId == currentUserId;
     final esCreadorMiembro = miembroId == _creadorId;
     final esAdminMiembro = miembro['es_admin'] == true;
+    final estaBloqueado = _estaBloqueado(miembroId);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1893,6 +2154,27 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                         ),
                       ),
                     ],
+                    if (estaBloqueado) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Bloqueado',
+                          style: GoogleFonts.lexend(
+                            fontSize: 10,
+                            color: Colors.red[700],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
                 if (correo.isNotEmpty)
@@ -1924,6 +2206,8 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                   _reportarUsuario(miembroId, nombre);
                 } else if (value == 'bloquear') {
                   _bloquearUsuario(miembroId, nombre);
+                } else if (value == 'desbloquear') {
+                  _desbloquearUsuario(miembroId, nombre);
                 } else if (value == 'agregar_amigo') {
                   _agregarAmigo(miembroId, nombre);
                 } else if (value == 'eliminar_grupo') {
@@ -1966,16 +2250,41 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     ],
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'bloquear',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.block, size: 18, color: Colors.red),
-                      const SizedBox(width: 8),
-                      Text('Bloquear', style: GoogleFonts.lexend(fontSize: 13)),
-                    ],
+                if (estaBloqueado)
+                  PopupMenuItem(
+                    value: 'desbloquear',
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.lock_open,
+                          size: 18,
+                          color: Color(0xFF2E7D32),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Desbloquear',
+                          style: GoogleFonts.lexend(
+                            fontSize: 13,
+                            color: const Color(0xFF2E7D32),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  PopupMenuItem(
+                    value: 'bloquear',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.block, size: 18, color: Colors.red),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Bloquear',
+                          style: GoogleFonts.lexend(fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 if (_esAdminActual && !esCreadorMiembro && !esAdminMiembro)
                   PopupMenuItem(
                     value: 'dar_admin',
@@ -3363,7 +3672,8 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     );
                   }
 
-                  final allMensajes = snapshot.data ?? [];
+                  final allMensajes =
+                      _filtrarMensajesBloqueados(snapshot.data ?? []);
                   final mensajes = _searchMessageQuery.isEmpty
                       ? allMensajes
                       : allMensajes.where((m) {
@@ -3857,6 +4167,28 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                   const SizedBox(height: 16),
 
                   // Botones de acción
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _mostrarUsuariosBloqueadosDialog,
+                      icon: const Icon(Icons.block, size: 18, color: Colors.red),
+                      label: Text(
+                        _usuariosBloqueados.isEmpty
+                            ? 'Usuarios bloqueados'
+                            : 'Usuarios bloqueados (${_usuariosBloqueados.length})',
+                        style: GoogleFonts.lexend(fontWeight: FontWeight.w600),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1A1A1A),
+                        side: const BorderSide(color: Color(0xFFE3BFB1)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
