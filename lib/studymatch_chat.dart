@@ -1,10 +1,26 @@
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'widgets/unite_header.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html show window;
+
+class _AdjuntoParseado {
+  final String url;
+  final String tipo;
+  final String nombre;
+  final String? texto;
+
+  const _AdjuntoParseado({
+    required this.url,
+    required this.tipo,
+    required this.nombre,
+    this.texto,
+  });
+}
 
 class StudymatchChatPage extends StatefulWidget {
   final String grupoInicialId;
@@ -61,20 +77,205 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
   String? _descripcionGrupo;
   bool _editandoDescripcion = false;
   TextEditingController? _descEditCtrl;
+  String? _grupoEstudioId;
 
   @override
   void initState() {
     super.initState();
     _currentSalaId = widget.grupoInicialId;
     _currentNombreGrupo = widget.nombreGrupo;
-
+    // Inicializar de inmediato para que el build no falle con late fields
     _initMensajesStream();
-    _cargarInfoSala();
-    _cargarMiembros();
-
     _salasFuture = _cargarSalas();
     _salasPublicasFuture = _cargarSalasPublicas();
+    _inicializarSalaYDatos();
+  }
+
+  Future<void> _inicializarSalaYDatos() async {
+    final salaIdAntes = _currentSalaId;
+    await _resolverSalaDesdeGrupo();
+    await _eliminarSalasDuplicadas();
+    if (!mounted) return;
+    if (_currentSalaId != salaIdAntes) {
+      _initMensajesStream();
+    }
+    _cargarInfoSala();
+    _cargarMiembros();
+    setState(() {
+      _salasFuture = _cargarSalas();
+      _salasPublicasFuture = _cargarSalasPublicas();
+    });
     _sincronizarGruposEstudio();
+  }
+
+  /// Convierte un ID de grupos_estudio al ID real de salas_chat (si aplica).
+  Future<void> _resolverSalaDesdeGrupo() async {
+    final id = widget.grupoInicialId;
+
+    try {
+      final salaDirecta = await _supabase
+          .from('salas_chat')
+          .select('id, nombre')
+          .eq('id', id)
+          .maybeSingle();
+
+      if (salaDirecta != null) {
+        _currentSalaId = salaDirecta['id'].toString();
+        _currentNombreGrupo =
+            salaDirecta['nombre']?.toString() ?? widget.nombreGrupo;
+        return;
+      }
+
+      final grupo = await _supabase
+          .from('grupos_estudio')
+          .select('id, nombre, materia, descripcion, creado_por')
+          .eq('id', id)
+          .maybeSingle();
+
+      if (grupo == null) return;
+
+      _grupoEstudioId = grupo['id'].toString();
+      final nombre = grupo['nombre'].toString().trim();
+      final creadorId = grupo['creado_por']?.toString();
+      _currentNombreGrupo = nombre;
+
+      final salasMismoNombre = await _supabase
+          .from('salas_chat')
+          .select('id, nombre, creado_por, descripcion')
+          .ilike('nombre', nombre);
+
+      Map<String, dynamic>? salaElegida;
+      for (final s in (salasMismoNombre as List)) {
+        if (creadorId != null && s['creado_por']?.toString() == creadorId) {
+          salaElegida = Map<String, dynamic>.from(s);
+          break;
+        }
+      }
+      salaElegida ??= salasMismoNombre.isNotEmpty
+          ? Map<String, dynamic>.from(salasMismoNombre.first)
+          : null;
+
+      if (salaElegida != null) {
+        _currentSalaId = salaElegida['id'].toString();
+        final descSala = salaElegida['descripcion']?.toString();
+        final descGrupo = grupo['descripcion']?.toString();
+        if ((descSala == null || descSala.trim().isEmpty) &&
+            descGrupo != null &&
+            descGrupo.trim().isNotEmpty) {
+          await _supabase
+              .from('salas_chat')
+              .update({'descripcion': descGrupo.trim()})
+              .eq('id', _currentSalaId);
+        }
+        return;
+      }
+
+      final user = _supabase.auth.currentUser;
+      if (user == null) return;
+
+      final nuevaSala = await _supabase
+          .from('salas_chat')
+          .insert({
+            'nombre': nombre,
+            'materia': grupo['materia'],
+            'descripcion': grupo['descripcion'],
+            'creado_por': creadorId ?? user.id,
+          })
+          .select()
+          .single();
+
+      _currentSalaId = nuevaSala['id'].toString();
+      await _supabase.from('participantes_sala').insert({
+        'sala_id': _currentSalaId,
+        'usuario_id': creadorId ?? user.id,
+        'es_admin': true,
+      });
+    } catch (_) {}
+  }
+
+  /// Fusiona y elimina salas duplicadas (mismo nombre + mismo creador).
+  Future<void> _eliminarSalasDuplicadas() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final misSalas = await _supabase
+          .from('salas_chat')
+          .select('id, nombre, creado_por, created_at')
+          .eq('creado_por', user.id);
+
+      final Map<String, List<Map<String, dynamic>>> porClave = {};
+      for (final s in (misSalas as List)) {
+        final clave =
+            '${s['nombre'].toString().trim().toLowerCase()}|${s['creado_por']}';
+        porClave.putIfAbsent(clave, () => []).add(Map<String, dynamic>.from(s));
+      }
+
+      for (final grupo in porClave.values) {
+        if (grupo.length < 2) continue;
+
+        grupo.sort((a, b) {
+          final da = a['created_at']?.toString() ?? '';
+          final db = b['created_at']?.toString() ?? '';
+          return da.compareTo(db);
+        });
+
+        final salaPrincipal = grupo.first;
+        final idPrincipal = salaPrincipal['id'].toString();
+
+        for (final duplicada in grupo.skip(1)) {
+          final idDup = duplicada['id'].toString();
+          if (idDup == idPrincipal) continue;
+
+          try {
+            final participantes = await _supabase
+                .from('participantes_sala')
+                .select('usuario_id, es_admin')
+                .eq('sala_id', idDup);
+
+            for (final p in (participantes as List)) {
+              final uid = p['usuario_id'].toString();
+              final yaExiste = await _supabase
+                  .from('participantes_sala')
+                  .select('usuario_id, es_admin')
+                  .eq('sala_id', idPrincipal)
+                  .eq('usuario_id', uid)
+                  .maybeSingle();
+
+              if (yaExiste == null) {
+                await _supabase.from('participantes_sala').insert({
+                  'sala_id': idPrincipal,
+                  'usuario_id': uid,
+                  'es_admin': p['es_admin'] == true,
+                });
+              } else if (p['es_admin'] == true &&
+                  yaExiste['es_admin'] != true) {
+                await _supabase
+                    .from('participantes_sala')
+                    .update({'es_admin': true})
+                    .eq('sala_id', idPrincipal)
+                    .eq('usuario_id', uid);
+              }
+            }
+
+            await _supabase
+                .from('mensajes_chat')
+                .update({'sala_id': idPrincipal})
+                .eq('sala_id', idDup);
+
+            await _supabase.from('participantes_sala').delete().eq(
+              'sala_id',
+              idDup,
+            );
+            await _supabase.from('salas_chat').delete().eq('id', idDup);
+
+            if (_currentSalaId == idDup) {
+              _currentSalaId = idPrincipal;
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -87,7 +288,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
   }
 
   // Sincroniza grupos_estudio con salas_chat automáticamente
-  // Si el usuario creó un grupo en grupos_estudio que no tiene sala en salas_chat, la crea
+  // Usa el ID del grupo como referencia para evitar duplicados
   Future<void> _sincronizarGruposEstudio() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -101,39 +302,79 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
       if (gruposEstudio.isEmpty) return;
 
-      // 2. Traer salas existentes creadas por este usuario
+      // 2. Traer TODAS las salas para comparar por nombre (evitar duplicados exactos)
       final salasExistentes = await _supabase
           .from('salas_chat')
-          .select('nombre, creado_por')
-          .eq('creado_por', user.id);
+          .select('id, nombre, creado_por');
 
-      final nombresExistentes = salasExistentes
-          .map((s) => s['nombre'].toString().trim().toLowerCase())
-          .toSet();
+      // Índice: nombre lowercase → sala
+      final Map<String, Map<String, dynamic>> salasPorNombre = {};
+      for (final s in (salasExistentes as List)) {
+        final key = s['nombre'].toString().trim().toLowerCase();
+        salasPorNombre[key] = s;
+      }
 
-      // 3. Por cada grupo que no tenga sala, crearla
-      for (final grupo in gruposEstudio) {
+      // 3. Por cada grupo que no tenga sala con el mismo nombre Y mismo creador, crearla
+      for (final grupo in (gruposEstudio as List)) {
         final nombre = grupo['nombre'].toString().trim();
-        if (nombresExistentes.contains(nombre.toLowerCase())) continue;
+        final key = nombre.toLowerCase();
 
-        // Crear sala en salas_chat
-        final salaResult = await _supabase
-            .from('salas_chat')
-            .insert({
-              'nombre': nombre,
-              'materia': grupo['materia'],
-              'descripcion': grupo['descripcion'],
-              'creado_por': user.id,
-            })
-            .select()
-            .single();
+        // Si ya existe una sala con ese nombre creada por este usuario, no crear otra
+        final existing = salasPorNombre[key];
+        if (existing != null && existing['creado_por'].toString() == user.id) {
+          // Asegurar que el creador sea participante admin en esa sala
+          try {
+            final salaId = existing['id'].toString();
+            final yaParticipante = await _supabase
+                .from('participantes_sala')
+                .select('usuario_id, es_admin')
+                .eq('sala_id', salaId)
+                .eq('usuario_id', user.id)
+                .maybeSingle();
+            if (yaParticipante == null) {
+              await _supabase.from('participantes_sala').insert({
+                'sala_id': salaId,
+                'usuario_id': user.id,
+                'es_admin': true,
+              });
+            } else if (yaParticipante['es_admin'] != true) {
+              await _supabase
+                  .from('participantes_sala')
+                  .update({'es_admin': true})
+                  .eq('sala_id', salaId)
+                  .eq('usuario_id', user.id);
+            }
+            final descGrupo = grupo['descripcion']?.toString();
+            if (descGrupo != null && descGrupo.trim().isNotEmpty) {
+              await _supabase
+                  .from('salas_chat')
+                  .update({'descripcion': descGrupo.trim()})
+                  .eq('id', salaId);
+            }
+          } catch (_) {}
+          continue;
+        }
 
-        // Agregar creador como admin en participantes_sala
-        await _supabase.from('participantes_sala').insert({
-          'sala_id': salaResult['id'],
-          'usuario_id': user.id,
-          'es_admin': true,
-        });
+        // No existe sala con ese nombre para este creador → crear
+        try {
+          final salaResult = await _supabase
+              .from('salas_chat')
+              .insert({
+                'nombre': nombre,
+                'materia': grupo['materia'],
+                'descripcion': grupo['descripcion'],
+                'creado_por': user.id,
+              })
+              .select()
+              .single();
+
+          // Agregar creador como admin en participantes_sala
+          await _supabase.from('participantes_sala').insert({
+            'sala_id': salaResult['id'],
+            'usuario_id': user.id,
+            'es_admin': true,
+          });
+        } catch (_) {}
       }
 
       // 4. Recargar salas después de sincronizar
@@ -179,7 +420,23 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
           .inFilter('id', salaIds.toList())
           .order('created_at', ascending: false);
 
-      return List<Map<String, dynamic>>.from(salas);
+      final adminParticipaciones = await _supabase
+          .from('participantes_sala')
+          .select('sala_id, es_admin')
+          .eq('usuario_id', user.id)
+          .eq('es_admin', true);
+
+      final adminSalaIds = (adminParticipaciones as List)
+          .map((p) => p['sala_id'].toString())
+          .toSet();
+
+      return (salas as List).map((s) {
+        final m = Map<String, dynamic>.from(s);
+        m['soy_admin'] =
+            adminSalaIds.contains(s['id'].toString()) ||
+            s['creado_por']?.toString() == user.id;
+        return m;
+      }).toList();
     } catch (e) {
       return [];
     }
@@ -255,41 +512,56 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
         return;
       }
 
-      // 3) Asegurar que el creador está en participantes_sala
-      if (response != null && response['creado_por'] != null) {
-        final creadorId = response['creado_por'].toString();
+      final user = _supabase.auth.currentUser;
+      final creadorId = response['creado_por']?.toString();
+
+      // 3) PRIMERO: reparar permisos del creador en participantes_sala
+      if (creadorId != null) {
         try {
-          final countRes = await _supabase
+          final existing = await _supabase
               .from('participantes_sala')
-              .select('usuario_id')
+              .select('usuario_id, es_admin')
               .eq('sala_id', _currentSalaId)
               .eq('usuario_id', creadorId)
               .maybeSingle();
-          if (countRes == null) {
+          if (existing == null) {
+            // El creador no está en participantes — insertarlo como admin
             await _supabase.from('participantes_sala').insert({
               'sala_id': _currentSalaId,
               'usuario_id': creadorId,
+              'es_admin': true,
             });
+          } else if (existing['es_admin'] != true) {
+            // El creador existe pero sin flag admin — corregirlo
+            await _supabase
+                .from('participantes_sala')
+                .update({'es_admin': true})
+                .eq('sala_id', _currentSalaId)
+                .eq('usuario_id', creadorId);
           }
         } catch (_) {}
       }
 
-      // 4) Verificar si el usuario actual es participante y obtener su es_admin
-      // NO se agrega automáticamente para evitar que cualquiera entre a cualquier sala
-      final user = _supabase.auth.currentUser;
+      // 4) DESPUÉS de reparar: leer es_admin del usuario actual
+      // Si el usuario actual ES el creador, siempre es admin (sin consulta extra)
       bool esAdminActual = false;
       if (user != null) {
-        try {
-          final countRes = await _supabase
-              .from('participantes_sala')
-              .select('usuario_id, es_admin')
-              .eq('sala_id', _currentSalaId)
-              .eq('usuario_id', user.id)
-              .maybeSingle();
-          if (countRes != null) {
-            esAdminActual = countRes['es_admin'] == true;
-          }
-        } catch (_) {}
+        if (user.id == creadorId) {
+          // El creador siempre tiene admin — ya lo garantizamos arriba
+          esAdminActual = true;
+        } else {
+          try {
+            final participante = await _supabase
+                .from('participantes_sala')
+                .select('usuario_id, es_admin')
+                .eq('sala_id', _currentSalaId)
+                .eq('usuario_id', user.id)
+                .maybeSingle();
+            if (participante != null) {
+              esAdminActual = participante['es_admin'] == true;
+            }
+          } catch (_) {}
+        }
       }
 
       if (!mounted) return;
@@ -321,12 +593,16 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
         } else {
           _fecha = 'Desconocida';
         }
-        _creadorId = response?['creado_por']?.toString();
-        _descripcionGrupo = response?['descripcion']?.toString();
-        if (response != null && response['nombre'] != null) {
+        _creadorId = creadorId;
+        _descripcionGrupo = response['descripcion']?.toString();
+        if (response['nombre'] != null) {
           _currentNombreGrupo = response['nombre'];
         }
       });
+
+      if (_descripcionGrupo == null || _descripcionGrupo!.trim().isEmpty) {
+        await _cargarDescripcionDesdeGrupoEstudio();
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -336,6 +612,35 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
         });
       }
     }
+  }
+
+  Future<void> _cargarDescripcionDesdeGrupoEstudio() async {
+    try {
+      Map<String, dynamic>? grupo;
+      if (_grupoEstudioId != null) {
+        grupo = await _supabase
+            .from('grupos_estudio')
+            .select('descripcion')
+            .eq('id', _grupoEstudioId!)
+            .maybeSingle();
+      } else {
+        grupo = await _supabase
+            .from('grupos_estudio')
+            .select('descripcion')
+            .eq('nombre', _currentNombreGrupo)
+            .eq('creado_por', _creadorId ?? '')
+            .maybeSingle();
+      }
+
+      final desc = grupo?['descripcion']?.toString();
+      if (desc != null && desc.trim().isNotEmpty && mounted) {
+        setState(() => _descripcionGrupo = desc.trim());
+        await _supabase
+            .from('salas_chat')
+            .update({'descripcion': desc.trim()})
+            .eq('id', _currentSalaId);
+      }
+    } catch (_) {}
   }
 
   Future<void> _cargarMiembros() async {
@@ -430,21 +735,49 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
         tipoArchivo = _getTipoArchivo(archivo.extension ?? '');
         nombreArchivo = archivo.name;
         final path =
-            '${_currentSalaId}/${DateTime.now().millisecondsSinceEpoch}_${archivo.name}';
-        await _supabase.storage
-            .from('chat_archivos')
-            .uploadBinary(path, archivo.bytes!);
+            '${usuarioActual.id}/$_currentSalaId/${DateTime.now().millisecondsSinceEpoch}_${archivo.name}';
+        await _supabase.storage.from('chat_archivos').uploadBinary(
+          path,
+          archivo.bytes!,
+          fileOptions: FileOptions(
+            contentType: _mimeDesdeExtension(archivo.extension ?? ''),
+          ),
+        );
         archivoUrl = _supabase.storage.from('chat_archivos').getPublicUrl(path);
       }
 
-      await _supabase.from('mensajes_chat').insert({
+      final basePayload = {
         'sala_id': _currentSalaId,
-        'texto': texto.isEmpty ? null : texto,
         'remitente_id': usuarioActual.id,
-        if (archivoUrl != null) 'archivo_url': archivoUrl,
-        if (tipoArchivo != null) 'tipo_archivo': tipoArchivo,
-        if (nombreArchivo != null) 'nombre_archivo': nombreArchivo,
-      });
+      };
+
+      if (archivoUrl != null) {
+        try {
+          await _supabase.from('mensajes_chat').insert({
+            ...basePayload,
+            'texto': texto.isEmpty ? null : texto,
+            'archivo_url': archivoUrl,
+            'tipo_archivo': tipoArchivo,
+            'nombre_archivo': nombreArchivo,
+          });
+        } on PostgrestException catch (e) {
+          if (e.code != 'PGRST204') rethrow;
+          await _supabase.from('mensajes_chat').insert({
+            ...basePayload,
+            'texto': _textoConAdjunto(
+              url: archivoUrl,
+              tipo: tipoArchivo!,
+              nombre: nombreArchivo!,
+              caption: texto,
+            ),
+          });
+        }
+      } else {
+        await _supabase.from('mensajes_chat').insert({
+          ...basePayload,
+          'texto': texto,
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -454,42 +787,163 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     }
   }
 
+  String _textoConAdjunto({
+    required String url,
+    required String tipo,
+    required String nombre,
+    required String caption,
+  }) {
+    final marcador = tipo == 'imagen'
+        ? '[imagen]$url'
+        : '[archivo:$nombre]$url';
+    if (caption.isEmpty) return marcador;
+    return '$marcador\n$caption';
+  }
+
+  _AdjuntoParseado? _extraerAdjunto(Map<String, dynamic> msg) {
+    final urlCol = msg['archivo_url']?.toString();
+    if (urlCol != null && urlCol.isNotEmpty) {
+      return _AdjuntoParseado(
+        url: urlCol,
+        tipo: msg['tipo_archivo']?.toString() ?? 'archivo',
+        nombre: msg['nombre_archivo']?.toString() ?? 'Archivo',
+        texto: msg['texto']?.toString(),
+      );
+    }
+
+    final raw = msg['texto']?.toString() ?? '';
+    if (raw.startsWith('[imagen]')) {
+      final rest = raw.substring('[imagen]'.length);
+      final nl = rest.indexOf('\n');
+      if (nl >= 0) {
+        return _AdjuntoParseado(
+          url: rest.substring(0, nl).trim(),
+          tipo: 'imagen',
+          nombre: 'imagen',
+          texto: rest.substring(nl + 1).trim(),
+        );
+      }
+      return _AdjuntoParseado(
+        url: rest.trim(),
+        tipo: 'imagen',
+        nombre: 'imagen',
+      );
+    }
+
+    final match = RegExp(r'^\[archivo:([^\]]+)\](\S+)').firstMatch(raw);
+    if (match != null) {
+      final nombre = match.group(1) ?? 'Archivo';
+      final url = match.group(2) ?? '';
+      final despues = raw.substring(match.end);
+      final caption = despues.startsWith('\n')
+          ? despues.substring(1).trim()
+          : null;
+      return _AdjuntoParseado(
+        url: url,
+        tipo: _getTipoArchivo(nombre.contains('.') ? nombre.split('.').last : ''),
+        nombre: nombre,
+        texto: caption?.isNotEmpty == true ? caption : null,
+      );
+    }
+
+    return null;
+  }
+
+  void _abrirArchivo(String url) {
+    if (kIsWeb) {
+      html.window.open(url, '_blank');
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Archivo: $url', style: GoogleFonts.lexend())),
+    );
+  }
+
   String _getTipoArchivo(String ext) {
-    const imagenes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
-    const videos = ['mp4', 'mov', 'avi', 'mkv', 'webm'];
-    const docs = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'];
-    final e = ext.toLowerCase();
+    const imagenes = [
+      'jpg',
+      'jpeg',
+      'png',
+      'gif',
+      'webp',
+      'heic',
+      'bmp',
+      'svg',
+    ];
+    const videos = ['mp4', 'mov', 'avi', 'mkv', 'webm', 'wmv', 'm4v'];
+    const audios = ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'];
+    const docs = [
+      'pdf',
+      'doc',
+      'docx',
+      'xls',
+      'xlsx',
+      'ppt',
+      'pptx',
+      'txt',
+      'rtf',
+      'odt',
+      'ods',
+      'csv',
+    ];
+    final e = ext.toLowerCase().replaceAll('.', '');
     if (imagenes.contains(e)) return 'imagen';
     if (videos.contains(e)) return 'video';
+    if (audios.contains(e)) return 'audio';
     if (docs.contains(e)) return 'documento';
     return 'archivo';
   }
 
+  String _mimeDesdeExtension(String ext) {
+    const map = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'webp': 'image/webp',
+      'pdf': 'application/pdf',
+      'mp4': 'video/mp4',
+      'mov': 'video/quicktime',
+      'mp3': 'audio/mpeg',
+      'wav': 'audio/wav',
+      'txt': 'text/plain',
+      'doc': 'application/msword',
+      'docx':
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls': 'application/vnd.ms-excel',
+      'xlsx':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'ppt': 'application/vnd.ms-powerpoint',
+      'pptx':
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'zip': 'application/zip',
+    };
+    return map[ext.toLowerCase()] ?? 'application/octet-stream';
+  }
+
   Future<void> _seleccionarArchivo() async {
     final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: [
-        'jpg',
-        'jpeg',
-        'png',
-        'gif',
-        'webp',
-        'mp4',
-        'mov',
-        'avi',
-        'pdf',
-        'doc',
-        'docx',
-        'xls',
-        'xlsx',
-        'ppt',
-        'pptx',
-        'txt',
-      ],
+      type: FileType.any,
       withData: true,
+      allowMultiple: false,
     );
     if (result != null && result.files.isNotEmpty) {
-      setState(() => _archivoAdjunto = result.files.first);
+      final file = result.files.first;
+      if (file.bytes == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'No se pudo leer el archivo. Intenta con uno más pequeño.',
+                style: GoogleFonts.lexend(),
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+      setState(() => _archivoAdjunto = file);
     }
   }
 
@@ -499,6 +953,22 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
           .from('salas_chat')
           .update({'descripcion': nuevaDesc})
           .eq('id', _currentSalaId);
+
+      try {
+        if (_grupoEstudioId != null) {
+          await _supabase
+              .from('grupos_estudio')
+              .update({'descripcion': nuevaDesc})
+              .eq('id', _grupoEstudioId!);
+        } else if (_creadorId != null) {
+          await _supabase
+              .from('grupos_estudio')
+              .update({'descripcion': nuevaDesc})
+              .eq('nombre', _currentNombreGrupo)
+              .eq('creado_por', _creadorId!);
+        }
+      } catch (_) {}
+
       setState(() {
         _descripcionGrupo = nuevaDesc;
         _editandoDescripcion = false;
@@ -783,88 +1253,127 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     final TextEditingController motivoCtrl = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Reportar a $nombre',
-          style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Indica el motivo del reporte:',
-              style: GoogleFonts.lexend(fontSize: 13),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'Reportar a $nombre',
+            style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Indica el motivo del reporte:',
+                style: GoogleFonts.lexend(fontSize: 13),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: motivoCtrl,
+                maxLines: 3,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Ej. Comportamiento indebido, spam...',
+                  hintStyle: GoogleFonts.lexend(
+                    color: Colors.grey,
+                    fontSize: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: Color(0xFFE65100),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'El reporte será enviado a los administradores para revisión.',
+                style: GoogleFonts.lexend(
+                  fontSize: 11,
+                  color: Colors.grey.shade500,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cancelar',
+                style: GoogleFonts.lexend(color: Colors.grey),
+              ),
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: motivoCtrl,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Ej. Comportamiento indebido, spam...',
-                hintStyle: GoogleFonts.lexend(color: Colors.grey, fontSize: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+            TextButton(
+              onPressed: () async {
+                final motivo = motivoCtrl.text.trim();
+                if (motivo.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Por favor escribe el motivo del reporte.',
+                        style: GoogleFonts.lexend(),
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx);
+
+                try {
+                  final user = _supabase.auth.currentUser;
+                  // Solo registrar el reporte — NO expulsar automáticamente
+                  await _supabase.from('reportes_usuarios').insert({
+                    'reportado_id': usuarioId,
+                    'reportado_por': user?.id,
+                    'motivo': motivo,
+                    'sala_id': _currentSalaId,
+                  });
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Reporte enviado. Los administradores lo revisarán.',
+                          style: GoogleFonts.lexend(),
+                        ),
+                        backgroundColor: const Color(0xFF2E7D32),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Error al enviar reporte: $e',
+                          style: GoogleFonts.lexend(),
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Text(
+                'Enviar Reporte',
+                style: GoogleFonts.lexend(
+                  color: Colors.orange,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancelar',
-              style: GoogleFonts.lexend(color: Colors.grey),
-            ),
-          ),
-          TextButton(
-            onPressed: () async {
-              final motivo = motivoCtrl.text.trim();
-              if (motivo.isEmpty) return;
-              Navigator.pop(ctx);
-
-              try {
-                final user = _supabase.auth.currentUser;
-                // 1. Registrar el reporte
-                await _supabase.from('reportes_usuarios').insert({
-                  'reportado_id': usuarioId,
-                  'reportado_por': user?.id,
-                  'motivo': motivo,
-                  'sala_id': _currentSalaId,
-                });
-                // 2. Expulsar del grupo automáticamente
-                await _supabase
-                    .from('participantes_sala')
-                    .delete()
-                    .eq('sala_id', _currentSalaId)
-                    .eq('usuario_id', usuarioId);
-                // 3. Refrescar lista de miembros
-                _cargarMiembros();
-              } catch (_) {}
-
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Usuario $nombre reportado y eliminado del grupo.',
-                      style: GoogleFonts.lexend(),
-                    ),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
-            },
-            child: Text(
-              'Enviar Reporte',
-              style: GoogleFonts.lexend(
-                color: Colors.orange,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -901,21 +1410,17 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                   'bloqueado_id': usuarioId,
                   'bloqueado_por': user?.id,
                 });
-                // 2. Expulsar del grupo automáticamente
-                await _supabase
-                    .from('participantes_sala')
-                    .delete()
-                    .eq('sala_id', _currentSalaId)
-                    .eq('usuario_id', usuarioId);
-                // 3. Refrescar lista de miembros
-                _cargarMiembros();
-              } catch (_) {}
+                // No expulsamos del grupo automáticamente —
+                // el bloqueo es personal (no verás sus mensajes)
+              } catch (e) {
+                // Si ya está bloqueado (duplicate key), ignorar silenciosamente
+              }
 
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      'Usuario $nombre bloqueado y eliminado del grupo.',
+                      '$nombre bloqueado. Ya no verás sus mensajes.',
                       style: GoogleFonts.lexend(),
                     ),
                     backgroundColor: Colors.green,
@@ -1108,17 +1613,12 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                   ),
                   const SizedBox(height: 10),
                   _buildDetalleRow(
-                    icon: Icons.person_outlined,
-                    texto: _creadorId != null
-                        ? (_miembros.firstWhere(
-                                    (m) => m['id'].toString() == _creadorId,
-                                    orElse: () => {},
-                                  )['primer_nombre']
-                                  as String? ??
-                              'Administrador')
+                    icon: Icons.admin_panel_settings_outlined,
+                    texto: _textoAdministradores().isNotEmpty
+                        ? _textoAdministradores()
                         : null,
-                    placeholder: 'Administrador desconocido',
-                    prefixLabel: 'Admin: ',
+                    placeholder: 'Sin administradores',
+                    prefixLabel: 'Admins: ',
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -1225,6 +1725,39 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                       ),
                     ),
                   ),
+                  if (_puedeEliminarGrupo()) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _eliminarGrupo();
+                        },
+                        icon: const Icon(
+                          Icons.delete_forever_outlined,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          'Eliminar grupo',
+                          style: GoogleFonts.lexend(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.red.shade700,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             );
@@ -1232,6 +1765,28 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
         );
       },
     );
+  }
+
+  String _textoAdministradores() {
+    final admins = _miembros.where((m) => m['es_admin'] == true).toList();
+    if (admins.isEmpty && _creadorId != null) {
+      final creador = _miembros.firstWhere(
+        (m) => m['id'].toString() == _creadorId,
+        orElse: () => {},
+      );
+      final nombre =
+          '${creador['primer_nombre'] ?? ''} ${creador['primer_apellido'] ?? ''}'
+              .trim();
+      return nombre.isNotEmpty ? nombre : 'Administrador';
+    }
+    return admins
+        .map((m) {
+          final n =
+              '${m['primer_nombre'] ?? ''} ${m['primer_apellido'] ?? ''}'
+                  .trim();
+          return n.isNotEmpty ? n : 'Usuario';
+        })
+        .join(', ');
   }
 
   Widget _buildMemberTile(
@@ -1293,6 +1848,27 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    if (esCreadorMiembro) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE65100).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Creador',
+                          style: GoogleFonts.lexend(
+                            fontSize: 10,
+                            color: const Color(0xFFE65100),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                     if (esAdminMiembro) ...[
                       const SizedBox(width: 6),
                       Container(
@@ -1301,18 +1877,14 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: esCreadorMiembro
-                              ? const Color(0xFFE65100).withOpacity(0.1)
-                              : Colors.blue.withOpacity(0.1),
+                          color: Colors.blue.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          esCreadorMiembro ? 'Creador' : 'Admin',
+                          'Admin',
                           style: GoogleFonts.lexend(
                             fontSize: 10,
-                            color: esCreadorMiembro
-                                ? const Color(0xFFE65100)
-                                : Colors.blue[700],
+                            color: Colors.blue[700],
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1619,12 +2191,39 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
     if (confirm == true) {
       try {
+        final user = _supabase.auth.currentUser;
+
         await _supabase
             .from('participantes_sala')
             .update({'es_admin': true})
             .eq('sala_id', _currentSalaId)
             .eq('usuario_id', usuarioId);
 
+        // El admin actual conserva sus permisos (ambos son administradores)
+        if (user != null) {
+          final yoParticipante = await _supabase
+              .from('participantes_sala')
+              .select('usuario_id')
+              .eq('sala_id', _currentSalaId)
+              .eq('usuario_id', user.id)
+              .maybeSingle();
+
+          if (yoParticipante == null) {
+            await _supabase.from('participantes_sala').insert({
+              'sala_id': _currentSalaId,
+              'usuario_id': user.id,
+              'es_admin': true,
+            });
+          } else {
+            await _supabase
+                .from('participantes_sala')
+                .update({'es_admin': true})
+                .eq('sala_id', _currentSalaId)
+                .eq('usuario_id', user.id);
+          }
+        }
+
+        if (mounted) setState(() => _esAdminActual = true);
         _cargarMiembros();
 
         if (mounted) {
@@ -1753,9 +2352,128 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     }
   }
 
+  bool _puedeEliminarGrupo() {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return false;
+    return _esAdminActual ||
+        (_creadorId != null && user.id == _creadorId);
+  }
+
+  Future<void> _eliminarGrupo() async {
+    if (!_puedeEliminarGrupo()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Solo un administrador puede eliminar el grupo.',
+              style: GoogleFonts.lexend(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Eliminar grupo',
+          style: GoogleFonts.lexend(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          '¿Eliminar "$_currentNombreGrupo" permanentemente? Se borrarán los mensajes y no se podrá recuperar.',
+          style: GoogleFonts.lexend(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.lexend(color: Colors.grey),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Eliminar',
+              style: GoogleFonts.lexend(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final salaId = _currentSalaId;
+    final nombreGrupo = _currentNombreGrupo;
+    final creadorId = _creadorId;
+
+    try {
+      await _supabase.from('mensajes_chat').delete().eq('sala_id', salaId);
+      await _supabase.from('participantes_sala').delete().eq('sala_id', salaId);
+      await _supabase.from('salas_chat').delete().eq('id', salaId);
+
+      try {
+        var query = _supabase.from('grupos_estudio').delete().eq(
+          'nombre',
+          nombreGrupo,
+        );
+        if (creadorId != null) {
+          query = query.eq('creado_por', creadorId);
+        }
+        await query;
+      } catch (_) {}
+
+      if (!mounted) return;
+
+      setState(() {
+        _salasFuture = _cargarSalas();
+        _salasPublicasFuture = _cargarSalasPublicas();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Grupo "$nombreGrupo" eliminado.',
+            style: GoogleFonts.lexend(),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      final salas = await _cargarSalas();
+      if (!mounted) return;
+      if (salas.isNotEmpty) {
+        _seleccionarSala(
+          salas.first['id'].toString(),
+          salas.first['nombre']?.toString() ?? 'Grupo',
+        );
+      } else {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al eliminar grupo: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _mostrarCrearGrupoDialog() {
     final nombreCtrl = TextEditingController();
     final materiaCtrl = TextEditingController();
+    final descripcionCtrl = TextEditingController();
     bool isLoading = false;
 
     showDialog(
@@ -1832,6 +2550,35 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: descripcionCtrl,
+                  maxLines: 3,
+                  style: GoogleFonts.lexend(fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Descripción',
+                    labelStyle: GoogleFonts.lexend(fontSize: 13),
+                    hintText: 'Objetivo del grupo, horarios, etc.',
+                    hintStyle: GoogleFonts.lexend(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.only(bottom: 40),
+                      child: Icon(Icons.description_outlined, size: 18),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFE65100),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -1849,6 +2596,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                   : () async {
                       final nombre = nombreCtrl.text.trim();
                       final materia = materiaCtrl.text.trim();
+                      final descripcion = descripcionCtrl.text.trim();
 
                       if (nombre.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1877,18 +2625,31 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                       setDialogState(() => isLoading = true);
 
                       try {
-                        // Insertar en salas_chat
+                        // Insertar en salas_chat y grupos_estudio
                         final result = await _supabase
                             .from('salas_chat')
                             .insert({
                               'nombre': nombre,
                               'materia': materia.isEmpty ? null : materia,
+                              'descripcion':
+                                  descripcion.isEmpty ? null : descripcion,
                               'creado_por': user.id,
                             })
                             .select()
                             .single();
 
                         final salaId = result['id'].toString();
+
+                        await _supabase.from('grupos_estudio').insert({
+                          'nombre': nombre,
+                          'materia': materia.isEmpty ? 'Sin materia' : materia,
+                          'descripcion':
+                              descripcion.isEmpty ? null : descripcion,
+                          'creado_por': user.id,
+                          'seccion': 1,
+                          'max_miembros': 20,
+                          'es_privado': false,
+                        });
 
                         // Agregar al creador como participante y admin
                         await _supabase.from('participantes_sala').insert({
@@ -1904,7 +2665,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                         setState(() {
                           _salasFuture = _cargarSalas();
                           _salasPublicasFuture = _cargarSalasPublicas();
-                          _esAdminActual = true; // El creador es admin
+                          _esAdminActual = true;
+                          _descripcionGrupo =
+                              descripcion.isEmpty ? null : descripcion;
                         });
                         _seleccionarSala(salaId, nombre);
 
@@ -1961,10 +2724,11 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     required bool esMio,
     required String remitenteNombre,
   }) {
-    final texto = msg['texto'] as String?;
-    final archivoUrl = msg['archivo_url'] as String?;
-    final tipoArchivo = msg['tipo_archivo'] as String?;
-    final nombreArchivo = msg['nombre_archivo'] as String?;
+    final adjunto = _extraerAdjunto(msg);
+    final archivoUrl = adjunto?.url;
+    final tipoArchivo = adjunto?.tipo;
+    final nombreArchivo = adjunto?.nombre;
+    final texto = adjunto?.texto ?? msg['texto'] as String?;
 
     return Align(
       alignment: esMio ? Alignment.centerRight : Alignment.centerLeft,
@@ -1991,45 +2755,55 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
             // Imagen/video/documento adjunto
             if (archivoUrl != null) ...[
               if (tipoArchivo == 'imagen')
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    archivoUrl,
-                    width: 280,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.broken_image),
+                GestureDetector(
+                  onTap: () => _abrirArchivo(archivoUrl),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      archivoUrl,
+                      width: 280,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image),
+                    ),
                   ),
                 )
               else
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        tipoArchivo == 'video'
-                            ? Icons.videocam_outlined
-                            : Icons.insert_drive_file_outlined,
-                        size: 20,
-                        color: esMio ? Colors.white70 : const Color(0xFFE65100),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          nombreArchivo ?? 'Archivo',
-                          style: GoogleFonts.lexend(
-                            fontSize: 13,
-                            color: esMio
-                                ? Colors.white
-                                : const Color(0xFF2E2E2E),
-                            decoration: TextDecoration.underline,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                InkWell(
+                  onTap: () => _abrirArchivo(archivoUrl),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          tipoArchivo == 'video'
+                              ? Icons.videocam_outlined
+                              : tipoArchivo == 'audio'
+                              ? Icons.audiotrack_outlined
+                              : Icons.insert_drive_file_outlined,
+                          size: 20,
+                          color:
+                              esMio ? Colors.white70 : const Color(0xFFE65100),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            nombreArchivo ?? 'Archivo',
+                            style: GoogleFonts.lexend(
+                              fontSize: 13,
+                              color: esMio
+                                  ? Colors.white
+                                  : const Color(0xFF2E2E2E),
+                              decoration: TextDecoration.underline,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -2317,6 +3091,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                         itemBuilder: (context, index) {
                           final sala = salas[index];
                           final isSelected = sala['id'] == _currentSalaId;
+                          final esAdminSala = sala['soy_admin'] == true;
                           return Material(
                             color: isSelected
                                 ? const Color(0xFFFFF3E0)
@@ -2352,6 +3127,23 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              trailing: _selectedNavTab == 0 && esAdminSala
+                                  ? IconButton(
+                                      icon: Icon(
+                                        Icons.delete_outline,
+                                        size: 18,
+                                        color: Colors.red.shade400,
+                                      ),
+                                      tooltip: 'Eliminar grupo',
+                                      onPressed: () {
+                                        _seleccionarSala(
+                                          sala['id'].toString(),
+                                          sala['nombre'] ?? 'Sala',
+                                        );
+                                        _eliminarGrupo();
+                                      },
+                                    )
+                                  : null,
                               onTap: () => _seleccionarSala(
                                 sala['id'].toString(),
                                 sala['nombre'] ?? 'Sala',
@@ -2922,19 +3714,14 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     placeholder: 'Fecha desconocida',
                   ),
                   const SizedBox(height: 10),
-                  // Creador
+                  // Administradores
                   _buildDetalleRow(
-                    icon: Icons.person_outlined,
-                    texto: _creadorId != null
-                        ? (_miembros.firstWhere(
-                                    (m) => m['id'].toString() == _creadorId,
-                                    orElse: () => {},
-                                  )['primer_nombre']
-                                  as String? ??
-                              'Administrador')
+                    icon: Icons.admin_panel_settings_outlined,
+                    texto: _textoAdministradores().isNotEmpty
+                        ? _textoAdministradores()
                         : null,
-                    placeholder: 'Administrador desconocido',
-                    prefixLabel: 'Admin: ',
+                    placeholder: 'Sin administradores',
+                    prefixLabel: 'Admins: ',
                   ),
                   const SizedBox(height: 10),
                   // Miembros count
@@ -2956,7 +3743,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                           color: Colors.grey.shade600,
                         ),
                       ),
-                      if (esCreador)
+                      if (_esAdminActual)
                         IconButton(
                           icon: Icon(
                             _editandoDescripcion
@@ -2988,7 +3775,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  if (_editandoDescripcion && esCreador)
+                  if (_editandoDescripcion && _esAdminActual)
                     TextField(
                       controller: _descEditCtrl,
                       maxLines: 3,
@@ -3112,6 +3899,36 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                       ),
                     ),
                   ),
+                  if (_puedeEliminarGrupo()) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _eliminarGrupo,
+                        icon: const Icon(
+                          Icons.delete_forever_outlined,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          'Eliminar grupo',
+                          style: GoogleFonts.lexend(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.red.shade700,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

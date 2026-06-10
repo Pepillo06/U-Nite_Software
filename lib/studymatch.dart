@@ -26,6 +26,8 @@ class _StudymatchPageState extends State<StudymatchPage> {
 
   List<_GrupoData> _grupos = [];
   bool _isLoading = true;
+  // IDs de grupos donde el usuario es miembro (para tab "Mis Grupos")
+  Set<String> _misGruposIds = {};
 
   @override
   void initState() {
@@ -36,19 +38,91 @@ class _StudymatchPageState extends State<StudymatchPage> {
   Future<void> _cargarGrupos() async {
     try {
       final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+
+      // 1. Cargar todos los grupos
       final response = await supabase
           .from('grupos_estudio')
           .select(
             'id, nombre, descripcion, materia, seccion, max_miembros, es_privado, foto_url, creado_por',
           );
 
+      // 2. Cargar grupos donde el usuario es miembro (a través de participantes_sala → salas_chat → grupos_estudio)
+      Set<String> misIds = {};
+      if (userId != null) {
+        // Grupos creados por el usuario
+        for (final row in (response as List)) {
+          if (row['creado_por']?.toString() == userId) {
+            misIds.add(row['id'].toString());
+          }
+        }
+        // Grupos donde el usuario es participante de la sala asociada
+        try {
+          final participaciones = await supabase
+              .from('participantes_sala')
+              .select('sala_id')
+              .eq('usuario_id', userId);
+          final salaIds = participaciones
+              .map((p) => p['sala_id'].toString())
+              .toSet();
+          if (salaIds.isNotEmpty) {
+            final salas = await supabase
+                .from('salas_chat')
+                .select('id, nombre')
+                .inFilter('id', salaIds.toList());
+            final nombresSalas = salas
+                .map((s) => s['nombre'].toString().trim().toLowerCase())
+                .toSet();
+            for (final row in (response as List)) {
+              final nombre = (row['nombre'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+              if (nombresSalas.contains(nombre)) {
+                misIds.add(row['id'].toString());
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. Contar miembros por grupo (via participantes_sala)
+      final Map<String, int> conteoMiembros = {};
+      try {
+        final participantes = await supabase
+            .from('participantes_sala')
+            .select('sala_id');
+        // Agrupa por sala_id para contar
+        final Map<String, int> porSala = {};
+        for (final p in (participantes as List)) {
+          final sid = p['sala_id'].toString();
+          porSala[sid] = (porSala[sid] ?? 0) + 1;
+        }
+        // Mapear sala → grupo por nombre
+        final salas = await supabase.from('salas_chat').select('id, nombre');
+        final Map<String, String> salaNameToId = {};
+        for (final s in (salas as List)) {
+          salaNameToId[s['nombre'].toString().trim().toLowerCase()] = s['id']
+              .toString();
+        }
+        for (final row in (response as List)) {
+          final nombre = (row['nombre'] ?? '').toString().trim().toLowerCase();
+          final salaId = salaNameToId[nombre];
+          if (salaId != null) {
+            conteoMiembros[row['id'].toString()] = porSala[salaId] ?? 0;
+          }
+        }
+      } catch (_) {}
+
       final grupos = (response as List).map((row) {
-        return _GrupoData.fromMap(row);
+        final gid = row['id'].toString();
+        return _GrupoData.fromMap(row, miembrosCount: conteoMiembros[gid] ?? 0);
       }).toList();
 
       if (mounted) {
         setState(() {
           _grupos = grupos;
+          _misGruposIds = misIds;
           _isLoading = false;
         });
       }
@@ -75,10 +149,11 @@ class _StudymatchPageState extends State<StudymatchPage> {
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
     return _grupos.where((g) {
-      // Tab 1 = Mis Grupos: solo los creados por el usuario logueado
-      // Tab 2 = Grupos Publicos: los que NO creo el usuario logueado
-      if (_selectedTab == 1 && g.creadoPor != userId) return false;
-      if (_selectedTab == 2 && g.creadoPor == userId) return false;
+      // Tab 1 = Mis Grupos: grupos donde el usuario es creador O miembro
+      // Tab 2 = Grupos Públicos: grupos donde el usuario NO es miembro
+      final esMiembro = _misGruposIds.contains(g.id);
+      if (_selectedTab == 1 && !esMiembro) return false;
+      if (_selectedTab == 2 && esMiembro) return false;
 
       final matchSearch =
           _searchQuery.isEmpty ||
@@ -255,6 +330,8 @@ class _StudymatchPageState extends State<StudymatchPage> {
                 grupos: _gruposFiltrados,
                 columns: gridCols,
                 onCrear: _showCreateDialog,
+                misGruposIds: _misGruposIds,
+                onEliminar: _eliminarGrupo,
               ),
       ],
     );
@@ -267,6 +344,100 @@ class _StudymatchPageState extends State<StudymatchPage> {
     );
     // Recargar grupos al volver por si se creó uno nuevo
     _cargarGrupos();
+  }
+
+  Future<void> _eliminarGrupo(_GrupoData grupo) async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null || grupo.creadoPor != userId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFD32F2F),
+          content: Text(
+            'Solo el creador puede eliminar este grupo.',
+            style: GoogleFonts.lexend(color: Colors.white),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          'Eliminar grupo',
+          style: GoogleFonts.lexend(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          '¿Eliminar "${grupo.nombre}" permanentemente? Se borrarán los mensajes del chat.',
+          style: GoogleFonts.lexend(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.lexend(color: const Color(0xFF757575)),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Eliminar',
+              style: GoogleFonts.lexend(
+                color: const Color(0xFFD32F2F),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final supabase = Supabase.instance.client;
+    try {
+      final salas = await supabase
+          .from('salas_chat')
+          .select('id')
+          .eq('nombre', grupo.nombre)
+          .eq('creado_por', userId);
+
+      for (final sala in (salas as List)) {
+        final salaId = sala['id'].toString();
+        await supabase.from('mensajes_chat').delete().eq('sala_id', salaId);
+        await supabase.from('participantes_sala').delete().eq(
+          'sala_id',
+          salaId,
+        );
+        await supabase.from('salas_chat').delete().eq('id', salaId);
+      }
+
+      await supabase.from('grupos_estudio').delete().eq('id', grupo.id);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFE65100),
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'Grupo "${grupo.nombre}" eliminado.',
+            style: GoogleFonts.lexend(color: Colors.white),
+          ),
+        ),
+      );
+      _cargarGrupos();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFD32F2F),
+          content: Text('Error al eliminar: $e'),
+        ),
+      );
+    }
   }
 }
 
@@ -957,11 +1128,15 @@ class _GruposGrid extends StatelessWidget {
   final List<_GrupoData> grupos;
   final int columns;
   final VoidCallback onCrear;
+  final Set<String> misGruposIds;
+  final void Function(_GrupoData grupo) onEliminar;
 
   const _GruposGrid({
     required this.grupos,
     required this.columns,
     required this.onCrear,
+    required this.misGruposIds,
+    required this.onEliminar,
   });
 
   @override
@@ -980,9 +1155,12 @@ class _GruposGrid extends StatelessWidget {
         childAspectRatio: columns == 1 ? 1.7 : 0.85,
       ),
       itemBuilder: (_, i) {
-        // 🌟 CAMBIO 2: Borramos el "if" que dibujaba la tarjeta de CrearCard.
-        // Ahora solo dibuja las tarjetas reales de los grupos.
-        return _GrupoCard(grupo: grupos[i]);
+        final g = grupos[i];
+        return _GrupoCard(
+          grupo: g,
+          esMiembro: misGruposIds.contains(g.id),
+          onEliminar: () => onEliminar(g),
+        );
       },
     );
   }
@@ -999,7 +1177,7 @@ class _GrupoData {
   final int miembros;
   final int max;
   final String materia;
-  final int seccion;
+  final int? seccion;
   final String? fotoUrl;
   final bool esPrivado;
   final String? creadoPor;
@@ -1011,23 +1189,32 @@ class _GrupoData {
     required this.miembros,
     required this.max,
     required this.materia,
-    required this.seccion,
+    this.seccion,
     this.fotoUrl,
     this.esPrivado = false,
     this.creadoPor,
   });
 
-  factory _GrupoData.fromMap(Map<String, dynamic> map) {
+  factory _GrupoData.fromMap(
+    Map<String, dynamic> map, {
+    int miembrosCount = 0,
+  }) {
+    final seccionRaw = map['seccion'];
+    final seccionVal = seccionRaw is int
+        ? seccionRaw
+        : int.tryParse(seccionRaw?.toString() ?? '');
     return _GrupoData(
       id: map['id']?.toString() ?? '',
       nombre: map['nombre'] ?? 'Sin nombre',
       descripcion: map['descripcion'] ?? '',
-      miembros: 0, // miembros reales requerirían otra query
-      max: map['max_miembros'] ?? 20,
-      materia: map['materia'] ?? '',
-      seccion: map['seccion'] is int
-          ? map['seccion']
-          : int.tryParse(map['seccion']?.toString() ?? '1') ?? 1,
+      miembros: miembrosCount,
+      max: map['max_miembros'] ?? 0,
+      materia:
+          (map['materia'] != null &&
+              map['materia'].toString().trim().isNotEmpty)
+          ? map['materia'].toString().trim()
+          : 'Sin materia',
+      seccion: seccionVal,
       fotoUrl: map['foto_url'],
       esPrivado: map['es_privado'] == true,
       creadoPor: map['creado_por']?.toString(),
@@ -1093,7 +1280,7 @@ class _GrupoData {
     return const Color(0xFF616161);
   }
 
-  String get seccionLabel => 'Sec $seccion';
+  String get seccionLabel => seccion != null ? 'Sec $seccion' : 'Sin sección';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1102,12 +1289,32 @@ class _GrupoData {
 
 class _GrupoCard extends StatelessWidget {
   final _GrupoData grupo;
-  const _GrupoCard({required this.grupo});
+  final bool esMiembro;
+  final VoidCallback? onEliminar;
+  const _GrupoCard({
+    required this.grupo,
+    required this.esMiembro,
+    this.onEliminar,
+  });
 
   Future<void> _manejarUnirse(BuildContext context) async {
     final supabase = Supabase.instance.client;
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return;
+
+    // Si ya es miembro, ir directo al chat
+    if (esMiembro) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => StudymatchChatPage(
+            grupoInicialId: grupo.id,
+            nombreGrupo: grupo.nombre,
+          ),
+        ),
+      );
+      return;
+    }
 
     if (grupo.esPrivado) {
       // Mostrar diálogo de solicitud
@@ -1226,6 +1433,11 @@ class _GrupoCard extends StatelessWidget {
     }
   }
 
+  bool get _soyCreador {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    return userId != null && grupo.creadoPor == userId;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1272,6 +1484,18 @@ class _GrupoCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (_soyCreador && onEliminar != null)
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.red.shade400,
+                        ),
+                        tooltip: 'Eliminar grupo',
+                        onPressed: onEliminar,
+                      ),
                     // Badge de privacidad
                     if (grupo.esPrivado)
                       Container(
@@ -1369,7 +1593,9 @@ class _GrupoCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    '${grupo.miembros} / ${grupo.max} miembros',
+                    grupo.max > 0
+                        ? '${grupo.miembros} / ${grupo.max} miembros'
+                        : '${grupo.miembros} miembro${grupo.miembros == 1 ? '' : 's'}',
                     style: GoogleFonts.lexend(
                       fontSize: 11,
                       color: const Color(0xFF9E9E9E),
@@ -1403,12 +1629,20 @@ class _GrupoCard extends StatelessWidget {
               child: TextButton.icon(
                 onPressed: () => _manejarUnirse(context),
                 icon: Icon(
-                  grupo.esPrivado ? Icons.send_rounded : Icons.login_rounded,
+                  esMiembro
+                      ? Icons.chat_bubble_outline
+                      : grupo.esPrivado
+                      ? Icons.send_rounded
+                      : Icons.login_rounded,
                   size: 15,
                   color: Colors.white,
                 ),
                 label: Text(
-                  grupo.esPrivado ? 'Solicitar unirse' : 'Unirse',
+                  esMiembro
+                      ? 'Abrir chat'
+                      : grupo.esPrivado
+                      ? 'Solicitar unirse'
+                      : 'Unirse',
                   style: GoogleFonts.lexend(
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
@@ -1416,7 +1650,9 @@ class _GrupoCard extends StatelessWidget {
                   ),
                 ),
                 style: TextButton.styleFrom(
-                  backgroundColor: grupo.esPrivado
+                  backgroundColor: esMiembro
+                      ? const Color(0xFF1565C0)
+                      : grupo.esPrivado
                       ? const Color(0xFFE65100)
                       : const Color(0xFF2E5900),
                   shape: RoundedRectangleBorder(

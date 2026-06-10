@@ -94,18 +94,40 @@ class _CrearGrupoPageState extends State<CrearGrupoPage>
               .getPublicUrl(fileName);
         }
 
-        // Insertamos los datos en tu tabla 'grupos_estudio'
+        final nombre = _nombreCtrl.text.trim();
+        final descripcion = _descCtrl.text.trim().isEmpty
+            ? null
+            : _descCtrl.text.trim();
+        final materia = _materiaCtrl.text.trim();
+
+        // Insertamos los datos en grupos_estudio
         await supabase.from('grupos_estudio').insert({
-          'nombre': _nombreCtrl.text.trim(),
-          'descripcion': _descCtrl.text.trim().isEmpty
-              ? null
-              : _descCtrl.text.trim(),
-          'materia': _materiaCtrl.text.trim(),
+          'nombre': nombre,
+          'descripcion': descripcion,
+          'materia': materia,
           'seccion': int.tryParse(_seccionCtrl.text.trim()) ?? 1,
           'max_miembros': int.tryParse(_maxMiembrosCtrl.text.trim()) ?? 20,
           'es_privado': _esPrivado,
           'creado_por': userId,
           'foto_url': ?fotoUrl,
+        });
+
+        // Crear sala de chat vinculada con la misma información
+        final salaResult = await supabase
+            .from('salas_chat')
+            .insert({
+              'nombre': nombre,
+              'materia': materia.isEmpty ? null : materia,
+              'descripcion': descripcion,
+              'creado_por': userId,
+            })
+            .select()
+            .single();
+
+        await supabase.from('participantes_sala').insert({
+          'sala_id': salaResult['id'],
+          'usuario_id': userId,
+          'es_admin': true,
         });
 
         if (!mounted) return;
