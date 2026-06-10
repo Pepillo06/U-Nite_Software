@@ -3,12 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import 'dart:io';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../widgets/unite_header.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+// Importación condicional: usa dart:html solo en web, stub en otras plataformas.
+import 'web_utils_stub.dart' if (dart.library.html) 'web_utils_web.dart';
 
 class CrearGrupoPage extends StatefulWidget {
   const CrearGrupoPage({super.key});
@@ -252,17 +251,10 @@ class _CrearGrupoPageState extends State<CrearGrupoPage>
                               imagenBytes: _imagenBytes,
                               onTap: () async {
                                 if (kIsWeb) {
-                                  final input = html.FileUploadInputElement()
-                                    ..accept = 'image/*'
-                                    ..click();
-                                  await input.onChange.first;
-                                  if (input.files!.isEmpty) return;
-                                  final reader = html.FileReader();
-                                  reader.readAsArrayBuffer(input.files![0]);
-                                  await reader.onLoad.first;
-                                  final bytes = reader.result as List<int>;
+                                  final bytes = await pickImageFromWeb();
+                                  if (bytes == null) return;
                                   setState(() {
-                                    _imagenBytes = Uint8List.fromList(bytes);
+                                    _imagenBytes = bytes;
                                     _imagenSeleccionada = XFile('web');
                                   });
                                 } else {

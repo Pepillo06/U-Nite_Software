@@ -5,8 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'widgets/unite_header.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html show window;
+// Importación condicional: usa dart:html solo en web, stub en otras plataformas.
+import 'web_utils_stub.dart' if (dart.library.html) 'web_utils_web.dart';
 
 class _AdjuntoParseado {
   final String url;
@@ -263,10 +263,10 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                 .update({'sala_id': idPrincipal})
                 .eq('sala_id', idDup);
 
-            await _supabase.from('participantes_sala').delete().eq(
-              'sala_id',
-              idDup,
-            );
+            await _supabase
+                .from('participantes_sala')
+                .delete()
+                .eq('sala_id', idDup);
             await _supabase.from('salas_chat').delete().eq('id', idDup);
 
             if (_currentSalaId == idDup) {
@@ -736,13 +736,15 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
         nombreArchivo = archivo.name;
         final path =
             '${usuarioActual.id}/$_currentSalaId/${DateTime.now().millisecondsSinceEpoch}_${archivo.name}';
-        await _supabase.storage.from('chat_archivos').uploadBinary(
-          path,
-          archivo.bytes!,
-          fileOptions: FileOptions(
-            contentType: _mimeDesdeExtension(archivo.extension ?? ''),
-          ),
-        );
+        await _supabase.storage
+            .from('chat_archivos')
+            .uploadBinary(
+              path,
+              archivo.bytes!,
+              fileOptions: FileOptions(
+                contentType: _mimeDesdeExtension(archivo.extension ?? ''),
+              ),
+            );
         archivoUrl = _supabase.storage.from('chat_archivos').getPublicUrl(path);
       }
 
@@ -840,7 +842,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
           : null;
       return _AdjuntoParseado(
         url: url,
-        tipo: _getTipoArchivo(nombre.contains('.') ? nombre.split('.').last : ''),
+        tipo: _getTipoArchivo(
+          nombre.contains('.') ? nombre.split('.').last : '',
+        ),
         nombre: nombre,
         texto: caption?.isNotEmpty == true ? caption : null,
       );
@@ -851,7 +855,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
   void _abrirArchivo(String url) {
     if (kIsWeb) {
-      html.window.open(url, '_blank');
+      openUrlInNewTab(url);
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1781,9 +1785,8 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
     }
     return admins
         .map((m) {
-          final n =
-              '${m['primer_nombre'] ?? ''} ${m['primer_apellido'] ?? ''}'
-                  .trim();
+          final n = '${m['primer_nombre'] ?? ''} ${m['primer_apellido'] ?? ''}'
+              .trim();
           return n.isNotEmpty ? n : 'Usuario';
         })
         .join(', ');
@@ -2355,8 +2358,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
   bool _puedeEliminarGrupo() {
     final user = _supabase.auth.currentUser;
     if (user == null) return false;
-    return _esAdminActual ||
-        (_creadorId != null && user.id == _creadorId);
+    return _esAdminActual || (_creadorId != null && user.id == _creadorId);
   }
 
   Future<void> _eliminarGrupo() async {
@@ -2421,10 +2423,10 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
       await _supabase.from('salas_chat').delete().eq('id', salaId);
 
       try {
-        var query = _supabase.from('grupos_estudio').delete().eq(
-          'nombre',
-          nombreGrupo,
-        );
+        var query = _supabase
+            .from('grupos_estudio')
+            .delete()
+            .eq('nombre', nombreGrupo);
         if (creadorId != null) {
           query = query.eq('creado_por', creadorId);
         }
@@ -2631,8 +2633,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                             .insert({
                               'nombre': nombre,
                               'materia': materia.isEmpty ? null : materia,
-                              'descripcion':
-                                  descripcion.isEmpty ? null : descripcion,
+                              'descripcion': descripcion.isEmpty
+                                  ? null
+                                  : descripcion,
                               'creado_por': user.id,
                             })
                             .select()
@@ -2643,8 +2646,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                         await _supabase.from('grupos_estudio').insert({
                           'nombre': nombre,
                           'materia': materia.isEmpty ? 'Sin materia' : materia,
-                          'descripcion':
-                              descripcion.isEmpty ? null : descripcion,
+                          'descripcion': descripcion.isEmpty
+                              ? null
+                              : descripcion,
                           'creado_por': user.id,
                           'seccion': 1,
                           'max_miembros': 20,
@@ -2666,8 +2670,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                           _salasFuture = _cargarSalas();
                           _salasPublicasFuture = _cargarSalasPublicas();
                           _esAdminActual = true;
-                          _descripcionGrupo =
-                              descripcion.isEmpty ? null : descripcion;
+                          _descripcionGrupo = descripcion.isEmpty
+                              ? null
+                              : descripcion;
                         });
                         _seleccionarSala(salaId, nombre);
 
@@ -2784,8 +2789,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                               ? Icons.audiotrack_outlined
                               : Icons.insert_drive_file_outlined,
                           size: 20,
-                          color:
-                              esMio ? Colors.white70 : const Color(0xFFE65100),
+                          color: esMio
+                              ? Colors.white70
+                              : const Color(0xFFE65100),
                         ),
                         const SizedBox(width: 8),
                         Flexible(

@@ -47,6 +47,7 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
   String? _titleError;
   String? _descriptionError;
   String? _priceError;
+  String? _campusError;
   bool _isHoveringPublicar = false;
   bool _isPressingPublicar = false;
   String? _pressingCondition;
@@ -115,6 +116,13 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
       }
     } else {
       setState(() => _priceError = null);
+    }
+
+    if (_selectedCampusUniversidades.isEmpty) {
+      setState(() => _campusError = 'Debes seleccionar al menos un campus de entrega.');
+      hasError = true;
+    } else {
+      setState(() => _campusError = null);
     }
 
     if (hasError) return;
@@ -857,6 +865,26 @@ class _PublicarArticuloPageState extends State<PublicarArticuloPage> {
 
         // Tarjeta de Entrega en Campus
         buildCampusPickupCard(primaryOrange, darkText, Colors.white),
+        if (_campusError != null) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, size: 14, color: Color(0xFFE53935)),
+                const SizedBox(width: 6),
+                Text(
+                  _campusError!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFFE53935),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
