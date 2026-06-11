@@ -763,7 +763,9 @@ class _StudymatchPageState extends State<StudymatchPage> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(30),
-                    child: _HeroBanner(isMobile: isMobile),
+                    child: _isPersonasTab
+                        ? _HeroBannerPersonas(isMobile: isMobile)
+                        : _HeroBanner(isMobile: isMobile),
                   ),
                 ),
                 Padding(
@@ -783,8 +785,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
                               width: 200,
                               child: _Sidebar(
                                 selected: _selectedTab,
-                                onSelect: (i) =>
-                                    setState(() => _selectedTab = i),
+                                onSelect: _onTabSelect,
                                 horizontal: false,
                               ),
                             ),
@@ -805,7 +806,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
                           children: [
                             _Sidebar(
                               selected: _selectedTab,
-                              onSelect: (i) => setState(() => _selectedTab = i),
+                              onSelect: _onTabSelect,
                               horizontal: true,
                               compact: isMobile,
                             ),
@@ -824,6 +825,14 @@ class _StudymatchPageState extends State<StudymatchPage> {
         },
       ),
     );
+  }
+
+  void _onTabSelect(int i) {
+    // Al tocar el header "Personas", ir directo a "Amigos"
+    final tab = (i == 3) ? 4 : i;
+    setState(() => _selectedTab = tab);
+    if (tab == 4) _cargarAmigos();
+    if (tab == 5) _cargarEstudiantes();
   }
 
   void _showCreateDialog() async {
