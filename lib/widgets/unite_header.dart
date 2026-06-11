@@ -159,34 +159,11 @@ class _UniteHeaderState extends State<UniteHeader> {
       child: Row(
         children: [
           // Logo
-          GestureDetector(
+          _LogoAnimado(
+            isMobile: isMobile,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MarketPage()),
-            ),
-            child: Row(
-              children: [
-                Image.asset(
-                  'images/Logo_U-NITE_SoloU.png',
-                  height: 36,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.school_rounded,
-                    color: Color(0xFFF36900),
-                    size: 36,
-                  ),
-                ),
-                if (!isMobile) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    'U-NITE',
-                    style: GoogleFonts.lexend(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFF245000),
-                    ),
-                  ),
-                ],
-              ],
             ),
           ),
 
@@ -548,6 +525,104 @@ class _NavLinkActivoState extends State<_NavLinkActivo> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// LOGO CON ANIMACIÓN HOVER
+// ═══════════════════════════════════════════════════════
+class _LogoAnimado extends StatefulWidget {
+  final bool isMobile;
+  final VoidCallback onTap;
+
+  const _LogoAnimado({required this.isMobile, required this.onTap});
+
+  @override
+  State<_LogoAnimado> createState() => _LogoAnimadoState();
+}
+
+class _LogoAnimadoState extends State<_LogoAnimado>
+    with SingleTickerProviderStateMixin {
+  bool _hovering = false;
+  late AnimationController _controller;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _rotateAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 1.08).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _rotateAnim = Tween<double>(begin: 0.0, end: -0.06).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) {
+        setState(() => _hovering = true);
+        _controller.forward();
+      },
+      onExit: (_) {
+        setState(() => _hovering = false);
+        _controller.reverse();
+      },
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnim.value,
+              child: Row(
+                children: [
+                  Transform.rotate(
+                    angle: _rotateAnim.value,
+                    child: Image.asset(
+                      'images/Logo_U-NITE_SoloU.png',
+                      height: 36,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.school_rounded,
+                        color: Color(0xFFF36900),
+                        size: 36,
+                      ),
+                    ),
+                  ),
+                  if (!widget.isMobile) ...[
+                    const SizedBox(width: 8),
+                    AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 250),
+                      style: GoogleFonts.lexend(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: _hovering
+                            ? const Color(0xFFF36900)
+                            : const Color(0xFF245000),
+                      ),
+                      child: const Text('U-NITE'),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
