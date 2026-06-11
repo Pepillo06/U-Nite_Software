@@ -368,6 +368,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                 'materia': grupo['materia'],
                 'descripcion': grupo['descripcion'],
                 'creado_por': user.id,
+                'es_privado': false,  // ← CAMBIO: salas públicas por defecto
               })
               .select()
               .single();
@@ -447,34 +448,32 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
   }
 
   Future<List<Map<String, dynamic>>> _cargarSalasPublicas() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return [];
+  final user = _supabase.auth.currentUser;
+  if (user == null) return [];
 
-    try {
-      // Salas públicas donde el usuario NO es participante
-      final participaciones = await _supabase
-          .from('participantes_sala')
-          .select('sala_id')
-          .eq('usuario_id', user.id);
+  try {
+    final participaciones = await _supabase
+        .from('participantes_sala')
+        .select('sala_id')
+        .eq('usuario_id', user.id);
 
-      final misIds = participaciones
-          .map((p) => p['sala_id'].toString())
-          .toSet();
+    final misIds = participaciones
+        .map((p) => p['sala_id'].toString())
+        .toSet();
 
-      final todasSalas = await _supabase
-          .from('salas_chat')
-          .select()
-          .order('created_at', ascending: false);
+    final todasSalas = await _supabase
+        .from('salas_chat')
+        .select()
+        .eq('es_privado', false)   // ← CAMBIO: solo salas públicas
+        .order('created_at', ascending: false);
 
-      // Mostrar salas en las que el usuario NO está
-      return List<Map<String, dynamic>>.from(
-        todasSalas,
-      ).where((s) => !misIds.contains(s['id'].toString())).toList();
-    } catch (e) {
-      return [];
-    }
+    return List<Map<String, dynamic>>.from(
+      todasSalas,
+    ).where((s) => !misIds.contains(s['id'].toString())).toList();
+  } catch (e) {
+    return [];
   }
-
+}
   void _initMensajesStream() {
     _mensajesStream = _supabase
         .from('mensajes_chat')
@@ -483,7 +482,47 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
         .order('created_at', ascending: true);
   }
 
-  void _seleccionarSala(String salaId, String nombre) {
+  Future<void> _seleccionarSala(String salaId, String nombre) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return;
+
+    // Verificar si el usuario ya es participante
+    final yaParticipa = await _supabase
+        .from('participantes_sala')
+        .select('usuario_id')
+        .eq('sala_id', salaId)
+        .eq('usuario_id', user.id)
+        .maybeSingle();
+
+    if (yaParticipa != null) {
+      // Ya es miembro → entrar directamente
+      _entrarSala(salaId, nombre);
+      return;
+    }
+
+    // No es miembro → unirse automáticamente (sala pública)
+    // Las salas privadas no aparecen en la lista, así que si llegó aquí es pública
+    try {
+      await _supabase.from('participantes_sala').insert({
+        'sala_id': salaId,
+        'usuario_id': user.id,
+        'es_admin': false,
+      });
+      _entrarSala(salaId, nombre);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo unir al grupo: $e',
+                style: GoogleFonts.lexend()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _entrarSala(String salaId, String nombre) {
     setState(() {
       _currentSalaId = salaId;
       _currentNombreGrupo = nombre;
