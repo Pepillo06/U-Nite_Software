@@ -87,6 +87,9 @@ class _StudymatchPageState extends State<StudymatchPage> {
   List<_SolicitudData> _solicitudesPendientes = [];
   Set<String> _misAmigosIds = {};
   bool _isLoadingPersonas = false;
+  // ─── SOLICITUDES DE GRUPO ────────────────────────────────────────────────
+  List<_SolicitudGrupoData> _solicitudesGrupo = [];
+  bool _isLoadingSolicitudesGrupo = false;
   // ─────────────────────────────────────────────────────────────────────────
 
   @override
@@ -235,6 +238,184 @@ class _StudymatchPageState extends State<StudymatchPage> {
       }
     }
   }
+
+  // ─── SOLICITUDES DE GRUPO ────────────────────────────────────────────────
+  Future<void> _cargarSolicitudesGrupo() async {
+    if (_isLoadingSolicitudesGrupo) return;
+    setState(() => _isLoadingSolicitudesGrupo = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        setState(() => _isLoadingSolicitudesGrupo = false);
+        return;
+      }
+      // Traer solicitudes pendientes de grupos creados por el usuario actual
+      final resp = await supabase
+          .from('solicitudes_grupo')
+          .select(
+            'id, grupo_id, usuario_id, estado, creado_en',
+          )
+          .eq('estado', 'pendiente');
+
+      // Filtrar sólo los grupos que el usuario creó
+      final misGruposCreados = _grupos
+          .where((g) => g.creadoPor == userId)
+          .map((g) => g.id)
+          .toSet();
+
+      final solicitudesFiltradas = (resp as List)
+          .where((r) => misGruposCreados.contains(r['grupo_id']?.toString()))
+          .toList();
+
+      // Cargar datos de usuario y grupo para cada solicitud
+      final List<_SolicitudGrupoData> lista = [];
+      for (final row in solicitudesFiltradas) {
+        final solicitanteId = row['usuario_id']?.toString() ?? '';
+        final grupoId = row['grupo_id']?.toString() ?? '';
+
+        // Datos del solicitante
+        Map<String, dynamic>? userData;
+        try {
+          userData = await supabase
+              .from('usuarios')
+              .select(
+                'id, primer_nombre, primer_apellido, foto_perfil_url, carrera',
+              )
+              .eq('id', solicitanteId)
+              .single();
+        } catch (_) {}
+
+        // Nombre del grupo
+        final grupoData = _grupos.firstWhere(
+          (g) => g.id == grupoId,
+          orElse: () => _GrupoData(
+            id: grupoId,
+            nombre: 'Grupo',
+            descripcion: '',
+            miembros: 0,
+            max: 0,
+            materia: '',
+          ),
+        );
+
+        if (userData != null) {
+          lista.add(
+            _SolicitudGrupoData(
+              solicitudId: row['id']?.toString() ?? '',
+              grupoId: grupoId,
+              nombreGrupo: grupoData.nombre,
+              solicitante: _PersonaData.fromMap(userData),
+            ),
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _solicitudesGrupo = lista;
+          _isLoadingSolicitudesGrupo = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingSolicitudesGrupo = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFFD32F2F),
+            content: Text('Error al cargar solicitudes: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _aceptarSolicitudGrupo(String solicitudId, String grupoId, String solicitanteId) async {
+    final supabase = Supabase.instance.client;
+    try {
+      // 1. Actualizar estado de la solicitud a 'aceptado'
+      await supabase
+          .from('solicitudes_grupo')
+          .update({'estado': 'aceptado'})
+          .eq('id', solicitudId);
+
+      // 2. Obtener la sala de chat asociada al grupo
+      final grupo = _grupos.firstWhere((g) => g.id == grupoId, orElse: () => _GrupoData(id: '', nombre: '', descripcion: '', miembros: 0, max: 0, materia: ''));
+      if (grupo.id.isEmpty) return;
+
+      final salas = await supabase
+          .from('salas_chat')
+          .select('id')
+          .eq('nombre', grupo.nombre)
+          .eq('creado_por', grupo.creadoPor ?? '');
+
+      if ((salas as List).isNotEmpty) {
+        final salaId = salas.first['id'].toString();
+        // 3. Agregar al usuario como participante de la sala
+        await supabase.from('participantes_sala').upsert({
+          'sala_id': salaId,
+          'usuario_id': solicitanteId,
+        });
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF2E7D32),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text(
+            'Solicitud aceptada. El usuario ya puede acceder al grupo.',
+            style: GoogleFonts.lexend(color: Colors.white),
+          ),
+        ),
+      );
+      // Recargar la lista
+      _cargarSolicitudesGrupo();
+      _cargarGrupos();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFD32F2F),
+          content: Text('Error al aceptar solicitud: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _rechazarSolicitudGrupo(String solicitudId) async {
+    final supabase = Supabase.instance.client;
+    try {
+      await supabase
+          .from('solicitudes_grupo')
+          .update({'estado': 'rechazado'})
+          .eq('id', solicitudId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF757575),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          content: Text(
+            'Solicitud rechazada.',
+            style: GoogleFonts.lexend(color: Colors.white),
+          ),
+        ),
+      );
+      _cargarSolicitudesGrupo();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFD32F2F),
+          content: Text('Error al rechazar solicitud: $e'),
+        ),
+      );
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   void _restablecerFiltros() {
     setState(() {
@@ -611,7 +792,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
 
   Widget _buildContent({required bool isMobile, required bool isTablet}) {
     // ─── TABS DE PERSONAS ────────────────────────────────────────────────
-    if (_selectedTab == 4) {
+    if (_selectedTab == 5) {
       return _PersonasContent(
         isMobile: isMobile,
         isTablet: isTablet,
@@ -626,7 +807,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
         subTab: 'amigos',
       );
     }
-    if (_selectedTab == 5) {
+    if (_selectedTab == 6) {
       return _PersonasContent(
         isMobile: isMobile,
         isTablet: isTablet,
@@ -637,6 +818,16 @@ class _StudymatchPageState extends State<StudymatchPage> {
         estudiantes: _estudiantes,
         onAgregar: _enviarSolicitud,
         subTab: 'estudiantes',
+      );
+    }
+    // ─── TAB SOLICITUDES DE GRUPO ────────────────────────────────────────
+    if (_selectedTab == 3) {
+      return _SolicitudesGrupoContent(
+        isMobile: isMobile,
+        solicitudesGrupo: _solicitudesGrupo,
+        isLoading: _isLoadingSolicitudesGrupo,
+        onAceptar: _aceptarSolicitudGrupo,
+        onRechazar: _rechazarSolicitudGrupo,
       );
     }
     // ────────────────────────────────────────────────────────────────────
@@ -737,7 +928,7 @@ class _StudymatchPageState extends State<StudymatchPage> {
     );
   }
 
-  bool get _isPersonasTab => _selectedTab >= 3 && _selectedTab <= 5;
+  bool get _isPersonasTab => _selectedTab >= 4 && _selectedTab <= 6;
 
   @override
   Widget build(BuildContext context) {
@@ -829,10 +1020,11 @@ class _StudymatchPageState extends State<StudymatchPage> {
 
   void _onTabSelect(int i) {
     // Al tocar el header "Personas", ir directo a "Amigos"
-    final tab = (i == 3) ? 4 : i;
+    final tab = (i == 4) ? 5 : i;
     setState(() => _selectedTab = tab);
-    if (tab == 4) _cargarAmigos();
-    if (tab == 5) _cargarEstudiantes();
+    if (tab == 5) _cargarAmigos();
+    if (tab == 6) _cargarEstudiantes();
+    if (tab == 3) _cargarSolicitudesGrupo();
   }
 
   void _showCreateDialog() async {
@@ -983,6 +1175,283 @@ class _SolicitudData {
   final String solicitudId;
   final _PersonaData persona;
   _SolicitudData({required this.solicitudId, required this.persona});
+}
+
+class _SolicitudGrupoData {
+  final String solicitudId;
+  final String grupoId;
+  final String nombreGrupo;
+  final _PersonaData solicitante;
+  _SolicitudGrupoData({
+    required this.solicitudId,
+    required this.grupoId,
+    required this.nombreGrupo,
+    required this.solicitante,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONTENIDO SOLICITUDES DE GRUPO
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _SolicitudesGrupoContent extends StatelessWidget {
+  final bool isMobile;
+  final List<_SolicitudGrupoData> solicitudesGrupo;
+  final bool isLoading;
+  final Future<void> Function(String solicitudId, String grupoId, String solicitanteId) onAceptar;
+  final Future<void> Function(String solicitudId) onRechazar;
+
+  const _SolicitudesGrupoContent({
+    required this.isMobile,
+    required this.solicitudesGrupo,
+    required this.isLoading,
+    required this.onAceptar,
+    required this.onRechazar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 3,
+              height: 18,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE65100),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Solicitudes de Unión a Mis Grupos',
+              style: GoogleFonts.lexend(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1A1A1A),
+              ),
+            ),
+            if (solicitudesGrupo.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE65100),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${solicitudesGrupo.length}',
+                  style: GoogleFonts.lexend(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Aquí aparecen las solicitudes de personas que quieren unirse a tus grupos privados.',
+          style: GoogleFonts.lexend(
+            fontSize: 13,
+            color: const Color(0xFF9E9E9E),
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (isLoading)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(48),
+              child: CircularProgressIndicator(color: Color(0xFFE65100)),
+            ),
+          )
+        else if (solicitudesGrupo.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 60),
+              child: Column(
+                children: [
+                  const Icon(Icons.inbox_rounded, size: 48, color: Color(0xFFD7CCC8)),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No tienes solicitudes pendientes.',
+                    style: GoogleFonts.lexend(
+                      fontSize: 14,
+                      color: const Color(0xFF9E9E9E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          Column(
+            children: solicitudesGrupo
+                .map(
+                  (s) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _SolicitudGrupoCard(
+                      solicitud: s,
+                      isMobile: isMobile,
+                      onAceptar: () => onAceptar(s.solicitudId, s.grupoId, s.solicitante.id),
+                      onRechazar: () => onRechazar(s.solicitudId),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+      ],
+    );
+  }
+}
+
+class _SolicitudGrupoCard extends StatefulWidget {
+  final _SolicitudGrupoData solicitud;
+  final bool isMobile;
+  final VoidCallback onAceptar;
+  final VoidCallback onRechazar;
+
+  const _SolicitudGrupoCard({
+    required this.solicitud,
+    required this.isMobile,
+    required this.onAceptar,
+    required this.onRechazar,
+  });
+
+  @override
+  State<_SolicitudGrupoCard> createState() => _SolicitudGrupoCardState();
+}
+
+class _SolicitudGrupoCardState extends State<_SolicitudGrupoCard> {
+  bool _loading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.solicitud.solicitante;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFFCC80)),
+      ),
+      child: Row(
+        children: [
+          _Avatar(url: p.fotoPerfil, nombre: p.nombreCompleto, radius: 24),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  p.nombreCompleto,
+                  style: GoogleFonts.lexend(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1A1A1A),
+                  ),
+                ),
+                if ((p.carrera ?? '').isNotEmpty)
+                  Text(
+                    p.carrera!,
+                    style: GoogleFonts.lexend(
+                      fontSize: 12,
+                      color: const Color(0xFF9E9E9E),
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.lock_rounded, size: 12, color: Color(0xFFE65100)),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        'Quiere unirse a: ${widget.solicitud.nombreGrupo}',
+                        style: GoogleFonts.lexend(
+                          fontSize: 12,
+                          color: const Color(0xFFE65100),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          if (_loading)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFE65100),
+              ),
+            )
+          else
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Botón Rechazar
+                GestureDetector(
+                  onTap: () async {
+                    setState(() => _loading = true);
+                    await Future.microtask(widget.onRechazar);
+                    if (mounted) setState(() => _loading = false);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(50),
+                      border: Border.all(color: const Color(0xFFE0E0E0)),
+                    ),
+                    child: Text(
+                      'Rechazar',
+                      style: GoogleFonts.lexend(
+                        fontSize: 12,
+                        color: const Color(0xFF757575),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Botón Aceptar
+                GestureDetector(
+                  onTap: () async {
+                    setState(() => _loading = true);
+                    await Future.microtask(widget.onAceptar);
+                    if (mounted) setState(() => _loading = false);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E7D32),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: Text(
+                      'Aceptar',
+                      style: GoogleFonts.lexend(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2217,6 +2686,7 @@ class _Sidebar extends StatelessWidget {
     _SI(icon: Icons.grid_view_rounded, label: 'Grupos', isHeader: true),
     _SI(icon: null, label: 'Mis Grupos', isHeader: false),
     _SI(icon: null, label: 'Grupos Públicos', isHeader: false),
+    _SI(icon: null, label: 'Solicitudes', isHeader: false),
     _SI(icon: Icons.people_alt_outlined, label: 'Personas', isHeader: true),
     _SI(icon: null, label: 'Amigos', isHeader: false),
     _SI(icon: null, label: 'Estudiantes', isHeader: false),
@@ -2224,8 +2694,8 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool showGruposSubItems = (selected >= 0 && selected <= 2);
-    final bool showPersonasSubItems = (selected >= 3 && selected <= 5);
+    final bool showGruposSubItems = (selected >= 0 && selected <= 3);
+    final bool showPersonasSubItems = (selected >= 4 && selected <= 6);
 
     Widget? gruposTile;
     final List<Widget> gruposSubTiles = [];
@@ -2239,7 +2709,7 @@ class _Sidebar extends StatelessWidget {
       // Lógica de activación visual:
       final bool isActive = (i == 0)
           ? showGruposSubItems
-          : (i == 3)
+          : (i == 4)
           ? showPersonasSubItems
           : (selected == i);
 
@@ -2252,7 +2722,7 @@ class _Sidebar extends StatelessWidget {
         onTap: () {
           if (i == 0 && showGruposSubItems) {
             onSelect(-1);
-          } else if (i == 3 && showPersonasSubItems) {
+          } else if (i == 4 && showPersonasSubItems) {
             onSelect(-1);
           } else {
             onSelect(i); // Navegación/Apertura normal
@@ -2270,9 +2740,9 @@ class _Sidebar extends StatelessWidget {
       );
 
       if (i == 0) gruposTile = tileWithPadding;
-      if (i == 1 || i == 2) gruposSubTiles.add(tileWithPadding);
-      if (i == 3) personasTile = tileWithPadding;
-      if (i == 4 || i == 5) personasSubTiles.add(tileWithPadding);
+      if (i == 1 || i == 2 || i == 3) gruposSubTiles.add(tileWithPadding);
+      if (i == 4) personasTile = tileWithPadding;
+      if (i == 5 || i == 6) personasSubTiles.add(tileWithPadding);
     }
 
     final List<Widget> tiles = [];
@@ -3328,6 +3798,15 @@ class _GrupoCardState extends State<_GrupoCard> {
   VoidCallback? get onEliminar => widget.onEliminar;
 
   @override
+  void didUpdateWidget(covariant _GrupoCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Si el usuario fue aceptado y ahora es miembro, limpiar el estado pendiente
+    if (!oldWidget.esMiembro && widget.esMiembro) {
+      _solicitudEnviada = false;
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     _verificarSolicitudExistente();
@@ -3343,7 +3822,7 @@ class _GrupoCardState extends State<_GrupoCard> {
           .select('id, estado')
           .eq('grupo_id', grupo.id)
           .eq('usuario_id', userId)
-          .inFilter('estado', ['pendiente', 'aceptado'])
+          .eq('estado', 'pendiente')
           .maybeSingle();
       if (!mounted) return;
       if (result != null) setState(() => _solicitudEnviada = true);
@@ -3372,21 +3851,17 @@ class _GrupoCardState extends State<_GrupoCard> {
     }
 
     if (grupo.esPrivado) {
-      // ── Verificar solicitud pendiente o membresía activa ──────────────────
+      // ── Verificar solicitud pendiente ─────────────────────────────────────
       try {
         final solicitudExistente = await supabase
             .from('solicitudes_grupo')
             .select('id, estado')
             .eq('grupo_id', grupo.id)
             .eq('usuario_id', userId)
-            .inFilter('estado', ['pendiente', 'aceptado'])
+            .eq('estado', 'pendiente')
             .maybeSingle();
 
         if (solicitudExistente != null) {
-          final estado = solicitudExistente['estado']?.toString() ?? '';
-          final mensaje = estado == 'pendiente'
-              ? 'Ya tienes una solicitud pendiente para este grupo.'
-              : 'Ya eres miembro activo de este grupo.';
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -3401,7 +3876,7 @@ class _GrupoCardState extends State<_GrupoCard> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      mensaje,
+                      'Ya tienes una solicitud pendiente para este grupo.',
                       style: GoogleFonts.lexend(color: Colors.white),
                     ),
                   ),
@@ -3728,10 +4203,16 @@ class _GrupoCardState extends State<_GrupoCard> {
               width: double.infinity,
               height: 36,
               child: TextButton.icon(
-                onPressed: _solicitudEnviada ? null : () => _manejarUnirse(),
+                onPressed: esMiembro
+                    ? () => _manejarUnirse()
+                    : _solicitudEnviada
+                    ? null
+                    : () => _manejarUnirse(),
                 icon: Icon(
                   esMiembro
                       ? Icons.chat_bubble_outline
+                      : _solicitudEnviada
+                      ? Icons.hourglass_top_rounded
                       : grupo.esPrivado
                       ? Icons.send_rounded
                       : Icons.login_rounded,
@@ -3741,6 +4222,8 @@ class _GrupoCardState extends State<_GrupoCard> {
                 label: Text(
                   esMiembro
                       ? 'Abrir chat'
+                      : _solicitudEnviada
+                      ? 'Pendiente'
                       : grupo.esPrivado
                       ? 'Solicitar unirse'
                       : 'Unirse',
@@ -3753,6 +4236,8 @@ class _GrupoCardState extends State<_GrupoCard> {
                 style: TextButton.styleFrom(
                   backgroundColor: esMiembro
                       ? const Color(0xFF1565C0)
+                      : _solicitudEnviada
+                      ? const Color(0xFF9E9E9E)
                       : grupo.esPrivado
                       ? const Color(0xFFE65100)
                       : const Color(0xFF2E5900),
