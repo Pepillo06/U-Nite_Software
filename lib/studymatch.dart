@@ -923,6 +923,11 @@ class _StudymatchPageState extends State<StudymatchPage> {
                 onCrear: _showCreateDialog,
                 misGruposIds: _misGruposIds,
                 onEliminar: _eliminarGrupo,
+                filtroActivo: _searchQuery.isNotEmpty ||
+                    _filtroMateria != null ||
+                    _filtroSeccion != null ||
+                    _filtroPrivacidad != null ||
+                    _filtroTipo != null,
               ),
       ],
     );
@@ -3620,6 +3625,7 @@ class _GruposGrid extends StatelessWidget {
   final VoidCallback onCrear;
   final Set<String> misGruposIds;
   final void Function(_GrupoData grupo) onEliminar;
+  final bool filtroActivo;
 
   const _GruposGrid({
     required this.grupos,
@@ -3627,12 +3633,29 @@ class _GruposGrid extends StatelessWidget {
     required this.onCrear,
     required this.misGruposIds,
     required this.onEliminar,
+    this.filtroActivo = false,
   });
 
   @override
   Widget build(BuildContext context) {
     // 🌟 CAMBIO 1: Quitamos el "+ 1" para que no cuente una tarjeta extra
     final total = grupos.length;
+
+    if (total == 0 && filtroActivo) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 60),
+          child: Text(
+            'No se encontraron grupos para este criterio',
+            style: GoogleFonts.lexend(
+              fontSize: 14,
+              color: const Color(0xFF9E9E9E),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
 
     return GridView.builder(
       shrinkWrap: true,
