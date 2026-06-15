@@ -29,6 +29,7 @@ class _UniteHeaderState extends State<UniteHeader> {
   final _supabase = Supabase.instance.client;
   String? _nombreCompleto;
   String? _fotoPerfilUrl;
+  bool _esPremium = false;
   int _mensajesPendientes = 0;
   int _notificacionesPendientes = 0;
 
@@ -40,6 +41,30 @@ class _UniteHeaderState extends State<UniteHeader> {
     _cargarNotificacionesPendientes();
     _suscribirseAMensajes();
     _suscribirseANotificaciones();
+    _suscribirseAPremium();
+  }
+
+  // Escucha en tiempo real el cambio de es_premium en la tabla usuarios
+  void _suscribirseAPremium() {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    _supabase
+        .channel('header_premium_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'usuarios',
+          callback: (payload) {
+            final newRow = payload.newRecord;
+            // Verificamos que el update es del usuario actual
+            if (newRow['id'] == userId &&
+                newRow['es_premium'] == true &&
+                mounted) {
+              setState(() => _esPremium = true);
+            }
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _cargarUsuario() async {
@@ -48,7 +73,7 @@ class _UniteHeaderState extends State<UniteHeader> {
     try {
       final data = await _supabase
           .from('usuarios')
-          .select('primer_nombre, primer_apellido, foto_perfil_url')
+          .select('primer_nombre, primer_apellido, foto_perfil_url, es_premium')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -57,6 +82,7 @@ class _UniteHeaderState extends State<UniteHeader> {
           _nombreCompleto =
               "${data['primer_nombre'] ?? ''} ${data['primer_apellido'] ?? ''}";
           _fotoPerfilUrl = data['foto_perfil_url'];
+          _esPremium = data['es_premium'] == true;
         });
       }
     } catch (e) {
@@ -324,18 +350,19 @@ class _UniteHeaderState extends State<UniteHeader> {
               const SizedBox(width: 4),
 
               // ══════════════════════════════════════
-              // BOTÓN PREMIUM (entre mensajes y perfil)
+              // BOTÓN PREMIUM — solo si NO es premium
               // ══════════════════════════════════════
-              _PremiumButton(
-                isMobile: isMobile,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const PremiumPlansPage()),
-                  );
-                },
-              ),
+              if (!_esPremium)
+                _PremiumButton(
+                  isMobile: isMobile,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const PremiumPlansPage()),
+                    );
+                  },
+                ),
 
               const SizedBox(width: 8),
 
@@ -392,11 +419,16 @@ class _UniteHeaderState extends State<UniteHeader> {
                     value: 'premium',
                     child: Row(
                       children: [
-                        const Icon(Icons.diamond_outlined,
-                            size: 18, color: Color(0xFFFF6100)),
+                        Icon(
+                          _esPremium
+                              ? Icons.swap_horiz_rounded
+                              : Icons.diamond_outlined,
+                          size: 18,
+                          color: const Color(0xFFFF6100),
+                        ),
                         const SizedBox(width: 10),
                         Text(
-                          'Ser Premium',
+                          _esPremium ? 'Cambiar suscripción' : 'Ser Premium',
                           style: GoogleFonts.lexend(
                             fontSize: 14,
                             color: const Color(0xFFFF6100),
@@ -433,8 +465,66 @@ class _UniteHeaderState extends State<UniteHeader> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Avatar desktop con badge premium
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                CircleAvatar(
+                                  radius: 21,
+                                  backgroundColor: Colors.grey[200],
+                                  backgroundImage: _fotoPerfilUrl != null &&
+                                          _fotoPerfilUrl!.isNotEmpty
+                                      ? NetworkImage(_fotoPerfilUrl!)
+                                      : null,
+                                  child: _fotoPerfilUrl == null ||
+                                          _fotoPerfilUrl!.isEmpty
+                                      ? const Icon(Icons.person,
+                                          size: 18, color: Colors.grey)
+                                      : null,
+                                ),
+                                if (_esPremium)
+                                  const Positioned(
+                                    bottom: -3,
+                                    right: -3,
+                                    child: _PremiumBadge(),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "$_nombreCompleto",
+                                  style: GoogleFonts.lexend(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF333333),
+                                  ),
+                                ),
+                                if (_esPremium)
+                                  Text(
+                                    '✦ Premium',
+                                    style: GoogleFonts.lexend(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFFFF6100),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 16),
+                      ] else if (isMobile) ...[
+                        // Avatar móvil con badge premium
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
                             CircleAvatar(
-                              radius: 21,
+                              radius: 18,
                               backgroundColor: Colors.grey[200],
                               backgroundImage: _fotoPerfilUrl != null &&
                                       _fotoPerfilUrl!.isNotEmpty
@@ -446,31 +536,13 @@ class _UniteHeaderState extends State<UniteHeader> {
                                       size: 18, color: Colors.grey)
                                   : null,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              "$_nombreCompleto",
-                              style: GoogleFonts.lexend(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF333333),
+                            if (_esPremium)
+                              const Positioned(
+                                bottom: -3,
+                                right: -3,
+                                child: _PremiumBadge(),
                               ),
-                            ),
                           ],
-                        ),
-                        const SizedBox(width: 16),
-                      ] else if (isMobile) ...[
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: Colors.grey[200],
-                          backgroundImage: _fotoPerfilUrl != null &&
-                                  _fotoPerfilUrl!.isNotEmpty
-                              ? NetworkImage(_fotoPerfilUrl!)
-                              : null,
-                          child: _fotoPerfilUrl == null ||
-                                  _fotoPerfilUrl!.isEmpty
-                              ? const Icon(Icons.person,
-                                  size: 18, color: Colors.grey)
-                              : null,
                         ),
                       ],
                     ],
@@ -480,6 +552,42 @@ class _UniteHeaderState extends State<UniteHeader> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BADGE PREMIUM (sobre el avatar)
+// ═══════════════════════════════════════════════════════
+class _PremiumBadge extends StatelessWidget {
+  const _PremiumBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF6100), Color(0xFFFF9500)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6100).withOpacity(0.4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.diamond_rounded,
+        size: 10,
+        color: Colors.white,
       ),
     );
   }

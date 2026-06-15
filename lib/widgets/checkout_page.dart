@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/unite_header.dart';
 
 // ═══════════════════════════════════════════════════════
@@ -114,15 +115,81 @@ class _CheckoutPageState extends State<CheckoutPage>
   }
 
   Future<void> _finalizar() async {
-    setState(() => _enviando = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _enviando = false);
+    // Validaciones básicas
+    if (_fechaController.text.isEmpty ||
+        _celularController.text.isEmpty ||
+        _cedulaController.text.isEmpty ||
+        _referenciaController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Por favor, completa todos los campos.',
+            style: GoogleFonts.lexend(fontSize: 13),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+      return;
+    }
 
-    showDialog(
-      context: context,
-      builder: (_) => _ConfirmacionDialog(planNombre: widget.planNombre),
-    );
+    setState(() => _enviando = true);
+
+    try {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+
+      if (userId == null) throw Exception('Usuario no autenticado');
+
+      // Parsear fecha (formato mm/dd/yyyy → yyyy-mm-dd para Postgres)
+      final partes = _fechaController.text.split('/');
+      final fechaIso =
+          '${partes[2]}-${partes[0].padLeft(2, '0')}-${partes[1].padLeft(2, '0')}';
+
+      // 1. Insertar el registro en pagos_premium
+      await supabase.from('pagos_premium').insert({
+        'usuario_id': userId,
+        'tipo_plan': widget.planNombre,
+        'es_anual': widget.esAnual,
+        'monto': widget.monto,
+        'fecha_pago': fechaIso,
+        'banco_origen': _bancoSeleccionado,
+        'prefijo_celular': _prefijoCelular,
+        'celular_emisor': _celularController.text.trim(),
+        'cedula_emisor': _cedulaController.text.trim(),
+        'ultimos4_ref': _referenciaController.text.trim(),
+        'estado': 'pendiente',
+      });
+
+      // 2. Activar es_premium = true en la tabla usuarios
+      //    (El equipo también puede aprobarlo manualmente via aprobar_pago_premium())
+      await supabase
+          .from('usuarios')
+          .update({'es_premium': true}).eq('id', userId);
+
+      if (!mounted) return;
+      setState(() => _enviando = false);
+
+      showDialog(
+        context: context,
+        builder: (_) => _ConfirmacionDialog(planNombre: widget.planNombre),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _enviando = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error al procesar el pago: ${e.toString()}',
+            style: GoogleFonts.lexend(fontSize: 13),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
   }
 
   @override
