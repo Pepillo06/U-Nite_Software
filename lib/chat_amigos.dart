@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -57,12 +59,21 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
   String? _currentAmigoId;
   String _currentNombreAmigo = 'Cargando...';
   String? _currentCarrera;
+  String? _currentUniversidad;
   String? _currentFotoUrl;
 
   late Stream<List<Map<String, dynamic>>> _mensajesStream;
   late Future<List<Map<String, dynamic>>> _amigosFuture;
 
   final Map<String, String> _nombresUsuarios = {};
+
+  // Estado de conexión y escritura del amigo activo
+  String _estadoConexion = '';
+  bool _amigoEscribiendo = false;
+  Timer? _timerConexion;
+  Timer? _typingHideTimer;
+  Timer? _typingBroadcastTimer;
+  RealtimeChannel? _typingChannel;
 
   // Toggle para mostrar/ocultar panel derecho (info del amigo)
   bool _mostrarPanelDerecho = false;
@@ -88,11 +99,17 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
     super.initState();
     _amigosFuture = _cargarAmigos();
     _initMensajesStreamVacio();
+    _messageCtrl.addListener(_onMessageChanged);
     _inicializar();
   }
 
   @override
   void dispose() {
+    _timerConexion?.cancel();
+    _typingHideTimer?.cancel();
+    _typingBroadcastTimer?.cancel();
+    _desuscribirTyping();
+    _messageCtrl.removeListener(_onMessageChanged);
     _messageCtrl.dispose();
     _searchAmigoCtrl.dispose();
     _searchMessageCtrl.dispose();
@@ -121,6 +138,177 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
     if (mounted) {
       setState(() => _isLoadingInicial = false);
     }
+
+    _timerConexion?.cancel();
+    _timerConexion = Timer.periodic(const Duration(seconds: 30), (_) {
+      final amigoId = _currentAmigoId;
+      if (amigoId != null) _cargarEstadoConexion(amigoId);
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Estado en línea y "escribiendo..."
+  // ---------------------------------------------------------------------
+
+  bool _estaEnLineaDesde(String? ultimaConexion) {
+    if (ultimaConexion == null || ultimaConexion.isEmpty) return false;
+    try {
+      final ultima = DateTime.parse(ultimaConexion).toLocal();
+      return DateTime.now().difference(ultima).inSeconds < 90;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _formatearEstadoConexion(String? ultimaConexion) {
+    if (ultimaConexion == null || ultimaConexion.isEmpty) {
+      return 'Sin conexión reciente';
+    }
+    try {
+      final ultima = DateTime.parse(ultimaConexion).toLocal();
+      final diferencia = DateTime.now().difference(ultima);
+
+      if (diferencia.inSeconds < 90) return 'En línea';
+
+      if (diferencia.inHours < 24 && ultima.day == DateTime.now().day) {
+        final hora =
+            '${ultima.hour.toString().padLeft(2, '0')}:${ultima.minute.toString().padLeft(2, '0')}';
+        return 'Última vez hoy a las $hora';
+      }
+      if (diferencia.inDays == 1) {
+        final hora =
+            '${ultima.hour.toString().padLeft(2, '0')}:${ultima.minute.toString().padLeft(2, '0')}';
+        return 'Última vez ayer a las $hora';
+      }
+      return 'Última vez ${ultima.day}/${ultima.month}';
+    } catch (_) {
+      return 'Sin conexión reciente';
+    }
+  }
+
+  bool get _estaEnLinea => _estadoConexion == 'En línea';
+
+  Future<void> _cargarEstadoConexion(String amigoId) async {
+    try {
+      final data = await _supabase
+          .from('usuarios')
+          .select('ultima_conexion')
+          .eq('id', amigoId)
+          .maybeSingle();
+
+      if (!mounted) return;
+      setState(() {
+        _estadoConexion = _formatearEstadoConexion(
+          data?['ultima_conexion']?.toString(),
+        );
+      });
+    } catch (_) {}
+  }
+
+  void _onMessageChanged() {
+    if (_currentConversacionId == null) return;
+    if (_messageCtrl.text.trim().isEmpty) return;
+    _notificarEscribiendo();
+  }
+
+  void _notificarEscribiendo() {
+    final userId = _supabase.auth.currentUser?.id;
+    final convId = _currentConversacionId;
+    if (userId == null || convId == null || _typingChannel == null) return;
+
+    _typingBroadcastTimer?.cancel();
+    _typingChannel!.sendBroadcastMessage(
+      event: 'typing',
+      payload: {'user_id': userId},
+    );
+    _typingBroadcastTimer = Timer(const Duration(seconds: 2), () {
+      _typingChannel?.sendBroadcastMessage(
+        event: 'typing_stop',
+        payload: {'user_id': userId},
+      );
+    });
+  }
+
+  void _suscribirTyping(String conversacionId) {
+    _desuscribirTyping();
+    final myId = _supabase.auth.currentUser?.id;
+    if (myId == null) return;
+
+    _typingChannel = _supabase.channel('typing_amigos_$conversacionId');
+    _typingChannel!
+        .onBroadcast(
+          event: 'typing',
+          callback: (payload) {
+            final userId = payload['user_id']?.toString();
+            if (userId == null || userId == myId || !mounted) return;
+            setState(() => _amigoEscribiendo = true);
+            _typingHideTimer?.cancel();
+            _typingHideTimer = Timer(const Duration(seconds: 3), () {
+              if (mounted) setState(() => _amigoEscribiendo = false);
+            });
+          },
+        )
+        .onBroadcast(
+          event: 'typing_stop',
+          callback: (payload) {
+            final userId = payload['user_id']?.toString();
+            if (userId == null || userId == myId || !mounted) return;
+            _typingHideTimer?.cancel();
+            setState(() => _amigoEscribiendo = false);
+          },
+        )
+        .subscribe();
+  }
+
+  void _desuscribirTyping() {
+    _typingChannel?.unsubscribe();
+    _typingChannel = null;
+    _amigoEscribiendo = false;
+  }
+
+  Widget _buildEstadoConexionWidget({double fontSize = 11}) {
+    if (_amigoEscribiendo) {
+      return Text(
+        'Escribiendo...',
+        style: GoogleFonts.lexend(
+          fontSize: fontSize,
+          color: const Color(0xFFE65100),
+          fontWeight: FontWeight.w500,
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: _estaEnLinea
+                ? const Color(0xFF306B18)
+                : const Color(0xFF9E9E9E),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            _estadoConexion.isEmpty ? '...' : _estadoConexion,
+            style: GoogleFonts.lexend(
+              fontSize: fontSize,
+              color: _estaEnLinea
+                  ? const Color(0xFF306B18)
+                  : Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
   }
 
   // ---------------------------------------------------------------------
@@ -159,7 +347,7 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
       final usuarios = await _supabase
           .from('usuarios')
           .select(
-            'id, primer_nombre, primer_apellido, carrera, foto_perfil_url',
+            'id, primer_nombre, primer_apellido, carrera, universidad, foto_perfil_url, ultima_conexion',
           )
           .inFilter('id', amigoIds.toList());
 
@@ -226,7 +414,9 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
           'primer_nombre': u['primer_nombre'],
           'primer_apellido': u['primer_apellido'],
           'carrera': u['carrera'],
+          'universidad': u['universidad'],
           'foto_perfil_url': u['foto_perfil_url'],
+          'ultima_conexion': u['ultima_conexion'],
           'conversacion_id': convId,
           'ultimo_mensaje': ultimoMensaje,
           'ultima_fecha': ultimaFecha,
@@ -333,6 +523,8 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
       _currentAmigoId = amigoId;
       _currentNombreAmigo = nombrePrevio ?? 'Cargando...';
       _mostrarPanelDerecho = false;
+      _amigoEscribiendo = false;
+      _estadoConexion = '';
     });
 
     try {
@@ -346,7 +538,9 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
       // Cargar datos del amigo
       final userData = await _supabase
           .from('usuarios')
-          .select('primer_nombre, primer_apellido, carrera, foto_perfil_url')
+          .select(
+            'primer_nombre, primer_apellido, carrera, universidad, foto_perfil_url, ultima_conexion',
+          )
           .eq('id', amigoId)
           .maybeSingle();
 
@@ -359,7 +553,11 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
                     .trim();
             _currentNombreAmigo = nombre.isNotEmpty ? nombre : 'Usuario';
             _currentCarrera = userData['carrera']?.toString();
+            _currentUniversidad = userData['universidad']?.toString();
             _currentFotoUrl = userData['foto_perfil_url']?.toString();
+            _estadoConexion = _formatearEstadoConexion(
+              userData['ultima_conexion']?.toString(),
+            );
           }
           _mensajesStream = _supabase
               .from('mensajes')
@@ -370,6 +568,7 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
         });
       }
 
+      _suscribirTyping(convId);
       _marcarMensajesComoLeidos(convId);
     } catch (e) {
       if (mounted) {
@@ -564,6 +763,69 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
   bool _estaBloqueado(String usuarioId) =>
       _usuariosBloqueados.contains(usuarioId);
 
+  Future<bool> _ejecutarDesbloqueo(String usuarioId, {String? nombre}) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      await _supabase
+          .from('usuarios_bloqueados')
+          .delete()
+          .eq('bloqueado_id', usuarioId)
+          .eq('bloqueado_por', user.id);
+
+      final stillBlocked = await _supabase
+          .from('usuarios_bloqueados')
+          .select('bloqueado_id')
+          .eq('bloqueado_id', usuarioId)
+          .eq('bloqueado_por', user.id)
+          .maybeSingle();
+
+      if (stillBlocked != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'No se pudo desbloquear. Intenta de nuevo.',
+                style: GoogleFonts.lexend(),
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return false;
+      }
+
+      await _cargarUsuariosBloqueados();
+
+      if (mounted && nombre != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$nombre desbloqueado. Volverás a ver sus mensajes.',
+              style: GoogleFonts.lexend(),
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error al desbloquear: $e',
+              style: GoogleFonts.lexend(),
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
   void _bloquearUsuario(String usuarioId, String nombre) {
     showDialog(
       context: context,
@@ -590,25 +852,36 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
             onPressed: () async {
               Navigator.pop(ctx);
               final user = _supabase.auth.currentUser;
+              if (user == null) return;
               try {
                 await _supabase.from('usuarios_bloqueados').insert({
                   'bloqueado_id': usuarioId,
-                  'bloqueado_por': user?.id,
+                  'bloqueado_por': user.id,
                 });
-              } catch (_) {
-                // Ya bloqueado, ignorar
-              }
-              if (mounted) {
-                setState(() => _usuariosBloqueados.add(usuarioId));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '$nombre bloqueado. Ya no verás sus mensajes.',
-                      style: GoogleFonts.lexend(),
+                await _cargarUsuariosBloqueados();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        '$nombre bloqueado. Ya no verás sus mensajes.',
+                        style: GoogleFonts.lexend(),
+                      ),
+                      backgroundColor: Colors.green,
                     ),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                  );
+                }
+              } catch (_) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'No se pudo bloquear a $nombre.',
+                        style: GoogleFonts.lexend(),
+                      ),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               }
             },
             child: Text(
@@ -648,27 +921,7 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final user = _supabase.auth.currentUser;
-              if (user == null) return;
-              try {
-                await _supabase
-                    .from('usuarios_bloqueados')
-                    .delete()
-                    .eq('bloqueado_id', usuarioId)
-                    .eq('bloqueado_por', user.id);
-              } catch (_) {}
-              if (mounted) {
-                setState(() => _usuariosBloqueados.remove(usuarioId));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '$nombre desbloqueado. Volverás a ver sus mensajes.',
-                      style: GoogleFonts.lexend(),
-                    ),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              }
+              await _ejecutarDesbloqueo(usuarioId, nombre: nombre);
             },
             child: Text(
               'Desbloquear',
@@ -863,6 +1116,11 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
 
     _messageCtrl.clear();
     setState(() => _archivoAdjunto = null);
+    _typingBroadcastTimer?.cancel();
+    _typingChannel?.sendBroadcastMessage(
+      event: 'typing_stop',
+      payload: {'user_id': usuarioActual.id},
+    );
 
     try {
       String contenido = texto;
@@ -1347,13 +1605,33 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
                                 )
                               : null,
                         ),
-                        title: Text(
-                          nombre.isNotEmpty ? nombre : 'Usuario',
-                          style: GoogleFonts.lexend(
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
+                        title: Row(
+                          children: [
+                            if (_estaEnLineaDesde(
+                              amigo['ultima_conexion']?.toString(),
+                            ))
+                              Container(
+                                width: 8,
+                                height: 8,
+                                margin: const EdgeInsets.only(right: 6),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF306B18),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            Expanded(
+                              child: Text(
+                                nombre.isNotEmpty ? nombre : 'Usuario',
+                                style: GoogleFonts.lexend(
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                         subtitle: Text(
                           amigo['ultimo_mensaje']?.toString() ??
@@ -1363,12 +1641,8 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (noLeidos > 0)
-                              Container(
-                                margin: const EdgeInsets.only(right: 6),
+                        trailing: noLeidos > 0
+                            ? Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
                                   vertical: 2,
@@ -1385,22 +1659,8 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.delete_outline,
-                                size: 18,
-                                color: Colors.red.shade300,
-                              ),
-                              tooltip: 'Eliminar chat',
-                              onPressed: () => _ocultarChat(
-                                id,
-                                nombre.isNotEmpty ? nombre : 'Usuario',
-                                amigo['conversacion_id']?.toString(),
-                              ),
-                            ),
-                          ],
-                        ),
+                              )
+                            : null,
                         onTap: () => _seleccionarAmigo(
                           id,
                           conversacionId: amigo['conversacion_id']?.toString(),
@@ -1556,13 +1816,32 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _currentNombreAmigo,
-                            style: GoogleFonts.lexend(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            children: [
+                              if (_estaEnLinea && !_amigoEscribiendo)
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.only(right: 6),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF306B18),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              Expanded(
+                                child: Text(
+                                  _currentNombreAmigo,
+                                  style: GoogleFonts.lexend(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
+                          _buildEstadoConexionWidget(fontSize: 12),
                           if (_currentCarrera != null &&
                               _currentCarrera!.isNotEmpty)
                             Text(
@@ -1571,6 +1850,8 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
                                 fontSize: 12,
                                 color: Colors.grey.shade600,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                         ],
                       ),
@@ -1945,6 +2226,7 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
                                   tooltip: 'Adjuntar imagen, video o documento',
                                 ),
                               ),
+                              onChanged: (_) => _notificarEscribiendo(),
                               onSubmitted: (_) => _enviarMensaje(),
                             ),
                           ),
@@ -2103,6 +2385,12 @@ class _ChatAmigosPageState extends State<ChatAmigosPage> {
                     icon: Icons.school_outlined,
                     texto: _currentCarrera,
                     placeholder: 'Sin carrera registrada',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildDetalleRow(
+                    icon: Icons.account_balance_outlined,
+                    texto: _currentUniversidad,
+                    placeholder: 'Sin universidad registrada',
                   ),
                   const SizedBox(height: 24),
                   const Divider(color: Color(0xFFE3BFB1)),
