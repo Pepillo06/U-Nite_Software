@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/unite_header.dart';
+import '../market.dart';
 
 // ═══════════════════════════════════════════════════════
 // CHECKOUT PAGE
@@ -173,7 +174,15 @@ class _CheckoutPageState extends State<CheckoutPage>
 
       showDialog(
         context: context,
-        builder: (_) => _ConfirmacionDialog(planNombre: widget.planNombre),
+        builder: (_) => _ConfirmacionDialog(
+          planNombre: widget.planNombre,
+          onIrAlInicio: () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MarketPage()),
+              (route) => false,
+            );
+          },
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -1672,7 +1681,8 @@ class _BancoDropdownState extends State<_BancoDropdown> {
 // ═══════════════════════════════════════════════════════
 class _ConfirmacionDialog extends StatefulWidget {
   final String planNombre;
-  const _ConfirmacionDialog({required this.planNombre});
+  final VoidCallback onIrAlInicio;
+  const _ConfirmacionDialog({required this.planNombre, required this.onIrAlInicio});
 
   @override
   State<_ConfirmacionDialog> createState() => _ConfirmacionDialogState();
@@ -1856,9 +1866,8 @@ class _ConfirmacionDialogState extends State<_ConfirmacionDialog>
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
+                      Navigator.of(context).pop(); // Cierra el diálogo
+                      widget.onIrAlInicio();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF22C55E),

@@ -41,7 +41,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
       // Traemos solo los campos que sabemos que existen en la tabla usuarios
       final data = await Supabase.instance.client
           .from('usuarios')
-          .select('primer_nombre, primer_apellido, foto_perfil_url, calificacion_promedio, total_ventas')
+          .select('primer_nombre, primer_apellido, foto_perfil_url, calificacion_promedio, total_ventas, es_premium')
           .eq('id', vendedorId)
           .maybeSingle();
       if (mounted) {
@@ -56,7 +56,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
       try {
         final data = await Supabase.instance.client
             .from('usuarios')
-            .select('primer_nombre, primer_apellido, foto_perfil_url')
+            .select('primer_nombre, primer_apellido, foto_perfil_url, es_premium')
             .eq('id', vendedorId)
             .maybeSingle();
         if (mounted) {
@@ -969,6 +969,7 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
         (_vendedorData?['calificacion_promedio'] as num?)?.toDouble();
     final totalVentas =
         (_vendedorData?['total_ventas'] as num?)?.toInt() ?? 0;
+    final esPremium = _vendedorData?['es_premium'] == true;
 
     return GestureDetector(
       onTap: () => _irAlPerfilVendedor(context),
@@ -981,14 +982,25 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: const Color(0xFFDDDDDD),
-              backgroundImage:
-                  fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
-              child: fotoUrl.isEmpty
-                  ? const Icon(Icons.person, size: 20, color: Colors.grey)
-                  : null,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: const Color(0xFFDDDDDD),
+                  backgroundImage:
+                      fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
+                  child: fotoUrl.isEmpty
+                      ? const Icon(Icons.person, size: 20, color: Colors.grey)
+                      : null,
+                ),
+                if (esPremium)
+                  const Positioned(
+                    bottom: -3,
+                    right: -3,
+                    child: _PremiumBadgeVendedor(),
+                  ),
+              ],
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1138,6 +1150,42 @@ class _DetalleAnuncioDialogState extends State<DetalleAnuncioDialog> {
           ),
         ],
       ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BADGE PREMIUM (sobre la foto de perfil del vendedor)
+// ═══════════════════════════════════════════════════════
+class _PremiumBadgeVendedor extends StatelessWidget {
+  const _PremiumBadgeVendedor();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 18,
+      height: 18,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF6100), Color(0xFFFF9500)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6100).withOpacity(0.4),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: const Icon(
+        Icons.diamond_rounded,
+        size: 10,
+        color: Colors.white,
+      ),
     );
   }
 }
