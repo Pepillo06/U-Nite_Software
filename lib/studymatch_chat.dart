@@ -682,7 +682,8 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
   bool _estaBloqueado(String usuarioId) =>
       _usuariosBloqueados.contains(usuarioId);
 
-  Future<List<Map<String, dynamic>>> _obtenerUsuariosBloqueadosConNombre() async {
+  Future<List<Map<String, dynamic>>>
+  _obtenerUsuariosBloqueadosConNombre() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return [];
 
@@ -1917,7 +1918,11 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                         Navigator.pop(context);
                         _mostrarUsuariosBloqueadosDialog();
                       },
-                      icon: const Icon(Icons.block, size: 18, color: Colors.red),
+                      icon: const Icon(
+                        Icons.block,
+                        size: 18,
+                        color: Colors.red,
+                      ),
                       label: Text(
                         _usuariosBloqueados.isEmpty
                             ? 'Usuarios bloqueados'
@@ -3253,7 +3258,7 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
       ),
       child: Column(
         children: [
-          // Tabs de navegación: Mis Grupos / Grupos Públicos / Amigos
+          // Tabs de navegación: Mis Grupos / Grupos Públicos
           Container(
             decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: Color(0xFFE3BFB1))),
@@ -3262,7 +3267,6 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
               children: [
                 _buildNavTab('Mis Grupos', 0),
                 _buildNavTab('Grupos Públicos', 1),
-                _buildNavTab('Amigos', 2),
               ],
             ),
           ),
@@ -3322,153 +3326,104 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
 
           const Divider(height: 1, color: Color(0xFFE3BFB1)),
           Expanded(
-            child: _selectedNavTab == 2
-                // Tab "Amigos": placeholder
-                ? Center(
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _selectedNavTab == 0
+                  ? _salasFuture
+                  : _salasPublicasFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFE65100)),
+                  );
+                }
+                final allSalas = snapshot.data ?? [];
+                final salas = allSalas.where((sala) {
+                  final name = (sala['nombre'] ?? '').toString().toLowerCase();
+                  final subject = (sala['materia'] ?? '')
+                      .toString()
+                      .toLowerCase();
+                  final q = _searchGroupQuery.toLowerCase();
+                  return name.contains(q) || subject.contains(q);
+                }).toList();
+
+                if (salas.isEmpty) {
+                  return Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.people_outline,
+                            Icons.chat_bubble_outline,
                             size: 48,
                             color: Colors.grey.shade300,
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Próximamente\npodrás ver tus amigos aquí',
+                            _searchGroupQuery.isEmpty
+                                ? (_selectedNavTab == 0
+                                      ? 'No tienes chats aún'
+                                      : 'No hay grupos públicos disponibles')
+                                : 'No se encontraron grupos',
                             style: GoogleFonts.lexend(
                               color: Colors.grey.shade500,
-                              fontSize: 13,
                             ),
                             textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
-                  )
-                : FutureBuilder<List<Map<String, dynamic>>>(
-                    future: _selectedNavTab == 0
-                        ? _salasFuture
-                        : _salasPublicasFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: Color(0xFFE65100),
-                          ),
-                        );
-                      }
-                      final allSalas = snapshot.data ?? [];
-                      final salas = allSalas.where((sala) {
-                        final name = (sala['nombre'] ?? '')
-                            .toString()
-                            .toLowerCase();
-                        final subject = (sala['materia'] ?? '')
-                            .toString()
-                            .toLowerCase();
-                        final q = _searchGroupQuery.toLowerCase();
-                        return name.contains(q) || subject.contains(q);
-                      }).toList();
-
-                      if (salas.isEmpty) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.chat_bubble_outline,
-                                  size: 48,
-                                  color: Colors.grey.shade300,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  _searchGroupQuery.isEmpty
-                                      ? (_selectedNavTab == 0
-                                            ? 'No tienes chats aún'
-                                            : 'No hay grupos públicos disponibles')
-                                      : 'No se encontraron grupos',
-                                  style: GoogleFonts.lexend(
-                                    color: Colors.grey.shade500,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+                  );
+                }
+                return ListView.builder(
+                  itemCount: salas.length,
+                  itemBuilder: (context, index) {
+                    final sala = salas[index];
+                    final isSelected = sala['id'] == _currentSalaId;
+                    final esAdminSala = sala['soy_admin'] == true;
+                    return Material(
+                      color: isSelected
+                          ? const Color(0xFFFFF3E0)
+                          : Colors.white,
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isSelected
+                              ? const Color(0xFFE65100)
+                              : Colors.grey.shade300,
+                          child: Text(
+                            sala['nombre'] != null && sala['nombre'].isNotEmpty
+                                ? sala['nombre'][0].toUpperCase()
+                                : 'G',
+                            style: GoogleFonts.lexend(
+                              color: isSelected ? Colors.white : Colors.black87,
                             ),
                           ),
-                        );
-                      }
-                      return ListView.builder(
-                        itemCount: salas.length,
-                        itemBuilder: (context, index) {
-                          final sala = salas[index];
-                          final isSelected = sala['id'] == _currentSalaId;
-                          final esAdminSala = sala['soy_admin'] == true;
-                          return Material(
-                            color: isSelected
-                                ? const Color(0xFFFFF3E0)
-                                : Colors.white,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: isSelected
-                                    ? const Color(0xFFE65100)
-                                    : Colors.grey.shade300,
-                                child: Text(
-                                  sala['nombre'] != null &&
-                                          sala['nombre'].isNotEmpty
-                                      ? sala['nombre'][0].toUpperCase()
-                                      : 'G',
-                                  style: GoogleFonts.lexend(
-                                    color: isSelected
-                                        ? Colors.white
-                                        : Colors.black87,
-                                  ),
-                                ),
-                              ),
-                              title: Text(
-                                sala['nombre'] ?? 'Sin nombre',
-                                style: GoogleFonts.lexend(
-                                  fontWeight: isSelected
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                              subtitle: Text(
-                                sala['materia'] ?? 'Sin materia',
-                                style: GoogleFonts.lexend(fontSize: 12),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: _selectedNavTab == 0 && esAdminSala
-                                  ? IconButton(
-                                      icon: Icon(
-                                        Icons.delete_outline,
-                                        size: 18,
-                                        color: Colors.red.shade400,
-                                      ),
-                                      tooltip: 'Eliminar grupo',
-                                      onPressed: () {
-                                        _seleccionarSala(
-                                          sala['id'].toString(),
-                                          sala['nombre'] ?? 'Sala',
-                                        );
-                                        _eliminarGrupo();
-                                      },
-                                    )
-                                  : null,
-                              onTap: () => _seleccionarSala(
-                                sala['id'].toString(),
-                                sala['nombre'] ?? 'Sala',
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                        ),
+                        title: Text(
+                          sala['nombre'] ?? 'Sin nombre',
+                          style: GoogleFonts.lexend(
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: Text(
+                          sala['materia'] ?? 'Sin materia',
+                          style: GoogleFonts.lexend(fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: null,
+                        onTap: () => _seleccionarSala(
+                          sala['id'].toString(),
+                          sala['nombre'] ?? 'Sala',
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -3672,8 +3627,9 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     );
                   }
 
-                  final allMensajes =
-                      _filtrarMensajesBloqueados(snapshot.data ?? []);
+                  final allMensajes = _filtrarMensajesBloqueados(
+                    snapshot.data ?? [],
+                  );
                   final mensajes = _searchMessageQuery.isEmpty
                       ? allMensajes
                       : allMensajes.where((m) {
@@ -4171,7 +4127,11 @@ class _StudymatchChatPageState extends State<StudymatchChatPage> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: _mostrarUsuariosBloqueadosDialog,
-                      icon: const Icon(Icons.block, size: 18, color: Colors.red),
+                      icon: const Icon(
+                        Icons.block,
+                        size: 18,
+                        color: Colors.red,
+                      ),
                       label: Text(
                         _usuariosBloqueados.isEmpty
                             ? 'Usuarios bloqueados'

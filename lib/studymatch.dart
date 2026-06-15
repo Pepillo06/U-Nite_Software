@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/unite_header.dart';
 import 'crear_grupos.dart';
 import 'studymatch_chat.dart';
+import 'chat_amigos.dart';
 import 'public_profile_page.dart';
 
 String normalizarTexto(String texto) {
@@ -1976,7 +1977,17 @@ class _PersonaCardState extends State<_PersonaCard> {
     final p = widget.persona;
     if (widget.esAmigo) {
       return TextButton.icon(
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatAmigosPage(
+                amigoId: p.id,
+                nombreAmigo: p.nombreCompleto,
+              ),
+            ),
+          );
+        },
         icon: const Icon(Icons.send_rounded, size: 15, color: Colors.white),
         label: Text(
           'Enviar Mensaje',
