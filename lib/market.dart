@@ -875,6 +875,48 @@ class _CuadriculaProductosState extends State<_CuadriculaProductos> {
         }).toList();
       }
 
+      // 5. ORDENAR: Los anuncios de usuarios PREMIUM aparecen primero
+      try {
+        final vendedorIds = resultado
+            .map((a) => a['vendedor_id']?.toString())
+            .whereType<String>()
+            .toSet()
+            .toList();
+
+        if (vendedorIds.isNotEmpty) {
+          final usuariosData = await _supabase
+              .from('usuarios')
+              .select('id, es_premium')
+              .inFilter('id', vendedorIds);
+
+          final Set<String> vendedoresPremium = {};
+          for (final u in usuariosData) {
+            if (u['es_premium'] == true) {
+              vendedoresPremium.add(u['id'].toString());
+            }
+          }
+
+          if (vendedoresPremium.isNotEmpty) {
+            final List<Map<String, dynamic>> anunciosPremium = [];
+            final List<Map<String, dynamic>> anunciosNormales = [];
+
+            for (final anuncio in resultado) {
+              final vendedorId = anuncio['vendedor_id']?.toString();
+              if (vendedorId != null && vendedoresPremium.contains(vendedorId)) {
+                anunciosPremium.add(anuncio);
+              } else {
+                anunciosNormales.add(anuncio);
+              }
+            }
+
+            // Se mantiene el orden por fecha dentro de cada grupo (premium / no premium)
+            resultado = [...anunciosPremium, ...anunciosNormales];
+          }
+        }
+      } catch (e) {
+        debugPrint('Error al ordenar anuncios premium: $e');
+      }
+
       setState(() {
         _anuncios = resultado;
         _cargando = false;
