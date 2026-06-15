@@ -7,7 +7,8 @@ import '../profile_page.dart';
 import '../home_page.dart';
 import '../screens/chat/chat_list_screen.dart';
 import '../screens/chat/notifications_screen.dart';
-import '../studymatch.dart'; 
+import '../studymatch.dart';
+import 'premium_plans_page.dart'; // ← Importar la pantalla de planes
 
 class UniteHeader extends StatefulWidget implements PreferredSizeWidget {
   final int currentIndex;
@@ -200,7 +201,7 @@ class _UniteHeaderState extends State<UniteHeader> {
           // Íconos y acciones
           Row(
             children: [
-              // Notificaciones con badge y subrayado naranja
+              // Notificaciones con badge
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -320,6 +321,22 @@ class _UniteHeaderState extends State<UniteHeader> {
                 ],
               ),
 
+              const SizedBox(width: 4),
+
+              // ══════════════════════════════════════
+              // BOTÓN PREMIUM (entre mensajes y perfil)
+              // ══════════════════════════════════════
+              _PremiumButton(
+                isMobile: isMobile,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PremiumPlansPage()),
+                  );
+                },
+              ),
+
               const SizedBox(width: 8),
 
               // Avatar + nombre con dropdown
@@ -337,6 +354,12 @@ class _UniteHeaderState extends State<UniteHeader> {
                       context,
                       MaterialPageRoute(builder: (_) => const ProfilePage()),
                     ).then((_) => _cargarUsuario());
+                  } else if (value == 'premium') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const PremiumPlansPage()),
+                    );
                   } else if (value == 'cerrar_sesion') {
                     await _supabase.auth.signOut();
                     if (mounted) {
@@ -352,7 +375,8 @@ class _UniteHeaderState extends State<UniteHeader> {
                     value: 'perfil',
                     child: Row(
                       children: [
-                        const Icon(Icons.person_outline, size: 18, color: Color(0xFF4A4A4A)),
+                        const Icon(Icons.person_outline,
+                            size: 18, color: Color(0xFF4A4A4A)),
                         const SizedBox(width: 10),
                         Text(
                           'Ver perfil',
@@ -364,12 +388,31 @@ class _UniteHeaderState extends State<UniteHeader> {
                       ],
                     ),
                   ),
+                  PopupMenuItem(
+                    value: 'premium',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.diamond_outlined,
+                            size: 18, color: Color(0xFFFF6100)),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Ser Premium',
+                          style: GoogleFonts.lexend(
+                            fontSize: 14,
+                            color: const Color(0xFFFF6100),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const PopupMenuDivider(height: 1),
                   PopupMenuItem(
                     value: 'cerrar_sesion',
                     child: Row(
                       children: [
-                        const Icon(Icons.logout_outlined, size: 18, color: Colors.redAccent),
+                        const Icon(Icons.logout_outlined,
+                            size: 18, color: Colors.redAccent),
                         const SizedBox(width: 10),
                         Text(
                           'Cerrar sesión',
@@ -382,53 +425,56 @@ class _UniteHeaderState extends State<UniteHeader> {
                     ),
                   ),
                 ],
-                child: Row(
-                  children: [
-                    if (!isMobile && _nombreCompleto != null) ...[
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircleAvatar(
-                            radius: 21,
-                            backgroundColor: Colors.grey[200],
-                            backgroundImage: _fotoPerfilUrl != null &&
-                                    _fotoPerfilUrl!.isNotEmpty
-                                ? NetworkImage(_fotoPerfilUrl!)
-                                : null,
-                            child: _fotoPerfilUrl == null ||
-                                    _fotoPerfilUrl!.isEmpty
-                                ? const Icon(Icons.person,
-                                    size: 18, color: Colors.grey)
-                                : null,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "$_nombreCompleto",
-                            style: GoogleFonts.lexend(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF333333),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Row(
+                    children: [
+                      if (!isMobile && _nombreCompleto != null) ...[
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            CircleAvatar(
+                              radius: 21,
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage: _fotoPerfilUrl != null &&
+                                      _fotoPerfilUrl!.isNotEmpty
+                                  ? NetworkImage(_fotoPerfilUrl!)
+                                  : null,
+                              child: _fotoPerfilUrl == null ||
+                                      _fotoPerfilUrl!.isEmpty
+                                  ? const Icon(Icons.person,
+                                      size: 18, color: Colors.grey)
+                                  : null,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 16),
-                    ] else if (isMobile) ...[
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Colors.grey[200],
-                        backgroundImage: _fotoPerfilUrl != null &&
-                                _fotoPerfilUrl!.isNotEmpty
-                            ? NetworkImage(_fotoPerfilUrl!)
-                            : null,
-                        child: _fotoPerfilUrl == null ||
-                                _fotoPerfilUrl!.isEmpty
-                            ? const Icon(Icons.person,
-                                size: 18, color: Colors.grey)
-                            : null,
-                      ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "$_nombreCompleto",
+                              style: GoogleFonts.lexend(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF333333),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 16),
+                      ] else if (isMobile) ...[
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage: _fotoPerfilUrl != null &&
+                                  _fotoPerfilUrl!.isNotEmpty
+                              ? NetworkImage(_fotoPerfilUrl!)
+                              : null,
+                          child: _fotoPerfilUrl == null ||
+                                  _fotoPerfilUrl!.isEmpty
+                              ? const Icon(Icons.person,
+                                  size: 18, color: Colors.grey)
+                              : null,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -439,6 +485,174 @@ class _UniteHeaderState extends State<UniteHeader> {
   }
 }
 
+// ═══════════════════════════════════════════════════════
+// BOTÓN PREMIUM CON ANIMACIÓN
+// ═══════════════════════════════════════════════════════
+class _PremiumButton extends StatefulWidget {
+  final bool isMobile;
+  final VoidCallback onTap;
+
+  const _PremiumButton({
+    required this.isMobile,
+    required this.onTap,
+  });
+
+  @override
+  State<_PremiumButton> createState() => _PremiumButtonState();
+}
+
+class _PremiumButtonState extends State<_PremiumButton>
+    with SingleTickerProviderStateMixin {
+  bool _hovered = false;
+  bool _pressed = false;
+  late AnimationController _shimmerController;
+  late Animation<double> _shimmerAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+    _shimmerAnim = CurvedAnimation(
+      parent: _shimmerController,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // En móvil mostramos solo el icono de diamante
+    if (widget.isMobile) {
+      return MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() {
+          _hovered = false;
+          _pressed = false;
+        }),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) {
+            setState(() => _pressed = false);
+            widget.onTap();
+          },
+          onTapCancel: () => setState(() => _pressed = false),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _pressed
+                    ? [const Color(0xFFCC4D00), const Color(0xFFFF8800)]
+                    : _hovered
+                        ? [const Color(0xFFFF7800), const Color(0xFFFFAA00)]
+                        : [const Color(0xFFFF6100), const Color(0xFFFF9500)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF6100)
+                      .withOpacity(_hovered ? 0.4 : 0.25),
+                  blurRadius: _hovered ? 12 : 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.diamond_rounded,
+              size: 18,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Desktop: botón completo con texto
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() {
+        _hovered = false;
+        _pressed = false;
+      }),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          widget.onTap();
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          transform: Matrix4.translationValues(0, _pressed ? 1 : 0, 0),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: _pressed
+                    ? [const Color(0xFFCC4D00), const Color(0xFFFF7800)]
+                    : _hovered
+                        ? [const Color(0xFFFF7800), const Color(0xFFFFAA00)]
+                        : [const Color(0xFFFF6100), const Color(0xFFFF9500)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF6100)
+                      .withOpacity(_hovered ? 0.45 : 0.25),
+                  blurRadius: _hovered ? 16 : 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedRotation(
+                  turns: _hovered ? 0.05 : 0,
+                  duration: const Duration(milliseconds: 300),
+                  child: const Icon(
+                    Icons.diamond_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Premium',
+                  style: GoogleFonts.lexend(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// NAV LINKS
+// ═══════════════════════════════════════════════════════
 class _NavLink extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
