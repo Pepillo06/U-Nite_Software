@@ -1168,7 +1168,7 @@ class _PremiumBadgeVendedor extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const LinearGradient(
-          colors: [Color(0xFFFF6100), Color(0xFFFF9500)],
+          colors: [Color(0xFFFC7827), Color(0xFFFFDC18)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),

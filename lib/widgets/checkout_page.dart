@@ -34,6 +34,71 @@ class _CheckoutPageState extends State<CheckoutPage>
   String _prefijoCelular = '0412';
   bool _enviando = false;
 
+  // Errores por campo
+  final Map<String, String?> _errores = {
+    'fecha': null,
+    'celular': null,
+    'cedula': null,
+    'referencia': null,
+  };
+
+  bool _validar() {
+    final errores = <String, String?>{};
+
+    final fecha = _fechaController.text.trim();
+    if (fecha.isEmpty) {
+      errores['fecha'] = 'Ingresa la fecha de pago.';
+    } else {
+      final partes = fecha.split('/');
+      if (partes.length != 3 || partes.any((p) => p.isEmpty)) {
+        errores['fecha'] = 'Formato invalido. Usa mm/dd/yyyy.';
+      } else {
+        final mes = int.tryParse(partes[0]);
+        final dia = int.tryParse(partes[1]);
+        final anio = int.tryParse(partes[2]);
+        if (mes == null || mes < 1 || mes > 12) {
+          errores['fecha'] = 'El mes debe estar entre 01 y 12.';
+        } else if (dia == null || dia < 1 || dia > 31) {
+          errores['fecha'] = 'El dia debe estar entre 01 y 31.';
+        } else if (anio == null || anio < 2020) {
+          errores['fecha'] = 'El ano no es valido.';
+        } else {
+          errores['fecha'] = null;
+        }
+      }
+    }
+
+    final celular = _celularController.text.trim();
+    if (celular.isEmpty) {
+      errores['celular'] = 'Ingresa el numero de celular.';
+    } else if (celular.length != 7 || int.tryParse(celular) == null) {
+      errores['celular'] = 'Debe tener exactamente 7 digitos.';
+    } else {
+      errores['celular'] = null;
+    }
+
+    final cedula = _cedulaController.text.trim();
+    if (cedula.isEmpty) {
+      errores['cedula'] = 'Ingresa la cedula del emisor.';
+    } else if (cedula.length < 6 || cedula.length > 8 || int.tryParse(cedula) == null) {
+      errores['cedula'] = 'La cedula debe tener entre 6 y 8 digitos.';
+    } else {
+      errores['cedula'] = null;
+    }
+
+    final ref = _referenciaController.text.trim();
+    if (ref.isEmpty) {
+      errores['referencia'] = 'Ingresa los ultimos 4 digitos de la referencia.';
+    } else if (ref.length != 4 || int.tryParse(ref) == null) {
+      errores['referencia'] = 'Deben ser exactamente 4 digitos.';
+    } else {
+      errores['referencia'] = null;
+    }
+
+    setState(() => _errores.addAll(errores));
+    return errores.values.every((e) => e == null);
+  }
+
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -116,24 +181,7 @@ class _CheckoutPageState extends State<CheckoutPage>
   }
 
   Future<void> _finalizar() async {
-    // Validaciones básicas
-    if (_fechaController.text.isEmpty ||
-        _celularController.text.isEmpty ||
-        _cedulaController.text.isEmpty ||
-        _referenciaController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Por favor, completa todos los campos.',
-            style: GoogleFonts.lexend(fontSize: 13),
-          ),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
-      return;
-    }
+    if (!_validar()) return;
 
     setState(() => _enviando = true);
 
@@ -267,6 +315,7 @@ class _CheckoutPageState extends State<CheckoutPage>
                             prefijoCelular: _prefijoCelular,
                             onPrefijoChanged: (p) =>
                                 setState(() => _prefijoCelular = p!),
+                            errores: _errores,
                           ),
                           const SizedBox(height: 20),
                           _ResumenOrdenCard(
@@ -325,6 +374,7 @@ class _CheckoutPageState extends State<CheckoutPage>
                               prefijoCelular: _prefijoCelular,
                               onPrefijoChanged: (p) =>
                                   setState(() => _prefijoCelular = p!),
+                              errores: _errores,
                             ),
                           ),
                           const SizedBox(width: 20),
@@ -649,6 +699,7 @@ class _ReportarPagoCard extends StatelessWidget {
   final ValueChanged<String?> onBancoChanged;
   final String prefijoCelular;
   final ValueChanged<String?> onPrefijoChanged;
+  final Map<String, String?> errores;
 
   const _ReportarPagoCard({
     required this.fechaController,
@@ -661,12 +712,37 @@ class _ReportarPagoCard extends StatelessWidget {
     required this.onBancoChanged,
     required this.prefijoCelular,
     required this.onPrefijoChanged,
+    required this.errores,
   });
 
-  // Prefijos venezolanos válidos
   static const _prefijos = [
     '0412', '0414', '0416', '0424', '0426',
   ];
+
+  // Helper: texto de error en rojo debajo del campo
+  Widget _errorText(String campo) {
+    final msg = errores[campo];
+    if (msg == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 5, left: 2),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, size: 13, color: Colors.redAccent),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              msg,
+              style: GoogleFonts.lexend(
+                fontSize: 11,
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -684,7 +760,11 @@ class _ReportarPagoCard extends StatelessWidget {
 
           _CheckoutLabel('FECHA DE PAGO'),
           const SizedBox(height: 6),
-          _DateInput(controller: fechaController),
+          _DateInput(
+            controller: fechaController,
+            hasError: errores['fecha'] != null,
+          ),
+          _errorText('fecha'),
 
           const SizedBox(height: 16),
           Row(
@@ -702,17 +782,18 @@ class _ReportarPagoCard extends StatelessWidget {
                       prefijo: prefijoCelular,
                       prefijos: _prefijos,
                       onPrefijoChanged: onPrefijoChanged,
+                      hasError: errores['celular'] != null,
                     ),
+                    _errorText('celular'),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              // CÉDULA: solo números, máx 8 dígitos (cédula venezolana)
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _CheckoutLabel('CÉDULA EMISOR'),
+                    _CheckoutLabel('CEDULA EMISOR'),
                     const SizedBox(height: 6),
                     _OrangeInput(
                       controller: cedulaController,
@@ -722,7 +803,9 @@ class _ReportarPagoCard extends StatelessWidget {
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                       ],
+                      hasError: errores['cedula'] != null,
                     ),
+                    _errorText('cedula'),
                   ],
                 ),
               ),
@@ -760,7 +843,7 @@ class _ReportarPagoCard extends StatelessWidget {
           ),
 
           const SizedBox(height: 16),
-          _CheckoutLabel('ÚLTIMOS 4 DÍGITOS DE REFERENCIA'),
+          _CheckoutLabel('ULTIMOS 4 DIGITOS DE REFERENCIA'),
           const SizedBox(height: 6),
           _OrangeInput(
             controller: referenciaController,
@@ -768,7 +851,9 @@ class _ReportarPagoCard extends StatelessWidget {
             maxLength: 4,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            hasError: errores['referencia'] != null,
           ),
+          _errorText('referencia'),
         ],
       ),
     );
@@ -1240,6 +1325,7 @@ class _OrangeInput extends StatefulWidget {
   final int? maxLength;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
+  final bool hasError;
 
   const _OrangeInput({
     required this.controller,
@@ -1247,6 +1333,7 @@ class _OrangeInput extends StatefulWidget {
     this.maxLength,
     this.keyboardType,
     this.inputFormatters,
+    this.hasError = false,
   });
 
   @override
@@ -1314,12 +1401,18 @@ class _OrangeInputState extends State<_OrangeInput> {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            borderSide: BorderSide(
+              color: widget.hasError
+                  ? Colors.redAccent
+                  : const Color(0xFFE5E7EB),
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide:
-                const BorderSide(color: Color(0xFFFF6100), width: 2),
+            borderSide: BorderSide(
+              color: widget.hasError ? Colors.redAccent : const Color(0xFFFF6100),
+              width: 2,
+            ),
           ),
         ),
       ),
@@ -1335,12 +1428,14 @@ class _CelularInput extends StatefulWidget {
   final String prefijo;
   final List<String> prefijos;
   final ValueChanged<String?> onPrefijoChanged;
+  final bool hasError;
 
   const _CelularInput({
     required this.controller,
     required this.prefijo,
     required this.prefijos,
     required this.onPrefijoChanged,
+    this.hasError = false,
   });
 
   @override
@@ -1481,15 +1576,19 @@ class _CelularInputState extends State<_CelularInput> {
                     topRight: Radius.circular(10),
                     bottomRight: Radius.circular(10),
                   ),
-                  borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                  borderSide: BorderSide(
+                    color: widget.hasError ? Colors.redAccent : const Color(0xFFE5E7EB),
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: const BorderRadius.only(
                     topRight: Radius.circular(10),
                     bottomRight: Radius.circular(10),
                   ),
-                  borderSide:
-                      const BorderSide(color: Color(0xFFFF6100), width: 2),
+                  borderSide: BorderSide(
+                    color: widget.hasError ? Colors.redAccent : const Color(0xFFFF6100),
+                    width: 2,
+                  ),
                 ),
               ),
             ),
@@ -1503,7 +1602,8 @@ class _CelularInputState extends State<_CelularInput> {
 // Date input
 class _DateInput extends StatefulWidget {
   final TextEditingController controller;
-  const _DateInput({required this.controller});
+  final bool hasError;
+  const _DateInput({required this.controller, this.hasError = false});
 
   @override
   State<_DateInput> createState() => _DateInputState();
@@ -1586,12 +1686,16 @@ class _DateInputState extends State<_DateInput> {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+            borderSide: BorderSide(
+              color: widget.hasError ? Colors.redAccent : const Color(0xFFE5E7EB),
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide:
-                const BorderSide(color: Color(0xFFFF6100), width: 2),
+            borderSide: BorderSide(
+              color: widget.hasError ? Colors.redAccent : const Color(0xFFFF6100),
+              width: 2,
+            ),
           ),
         ),
       ),

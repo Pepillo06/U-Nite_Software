@@ -424,14 +424,14 @@ class _UniteHeaderState extends State<UniteHeader> {
                               ? Icons.swap_horiz_rounded
                               : Icons.diamond_outlined,
                           size: 18,
-                          color: const Color(0xFFFF6100),
+                          color: const Color(0xFFFCA027),
                         ),
                         const SizedBox(width: 10),
                         Text(
                           _esPremium ? 'Cambiar suscripción' : 'Ser Premium',
                           style: GoogleFonts.lexend(
                             fontSize: 14,
-                            color: const Color(0xFFFF6100),
+                            color: const Color(0xFFFCA027),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -509,7 +509,7 @@ class _UniteHeaderState extends State<UniteHeader> {
                                     style: GoogleFonts.lexend(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
-                                      color: const Color(0xFFFF6100),
+                                      color: const Color(0xFFFCA027),
                                       letterSpacing: 0.3,
                                     ),
                                   ),
@@ -571,7 +571,7 @@ class _PremiumBadge extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: const LinearGradient(
-          colors: [Color(0xFFFF6100), Color(0xFFFF9500)],
+          colors: [Color(0xFFFC7827), Color(0xFFFFDC18)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -660,7 +660,7 @@ class _PremiumButtonState extends State<_PremiumButton>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: _pressed
-                    ? [const Color(0xFFCC4D00), const Color(0xFFFF8800)]
+                    ? [const Color(0xFFFC7827), const Color(0xFFFFDC18)]
                     : _hovered
                         ? [const Color(0xFFFF7800), const Color(0xFFFFAA00)]
                         : [const Color(0xFFFF6100), const Color(0xFFFF9500)],
@@ -710,10 +710,10 @@ class _PremiumButtonState extends State<_PremiumButton>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: _pressed
-                    ? [const Color(0xFFCC4D00), const Color(0xFFFF7800)]
+                    ? [const Color(0xFFFC7827), const Color(0xFFFFDC18)]
                     : _hovered
-                        ? [const Color(0xFFFF7800), const Color(0xFFFFAA00)]
-                        : [const Color(0xFFFF6100), const Color(0xFFFF9500)],
+                        ? [const Color.fromARGB(255, 252, 167, 39), const Color.fromARGB(255, 255, 228, 79)]
+                        : [const Color(0xFFFC7827), const Color(0xFFFFDC18)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

@@ -1,5 +1,7 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/unite_header.dart';
 import 'checkout_page.dart';
 
@@ -51,6 +53,7 @@ class PremiumPlansPage extends StatefulWidget {
 class _PremiumPlansPageState extends State<PremiumPlansPage>
     with SingleTickerProviderStateMixin {
   bool _esAnual = true;
+  String? _planActualId; // id del plan que el usuario ya tiene
   late AnimationController _controller;
   late Animation<double> _fadeAnim;
 
@@ -114,7 +117,60 @@ class _PremiumPlansPageState extends State<PremiumPlansPage>
     );
     _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
     _controller.forward();
+    _cargarPlanActual();
   }
+
+  // Consulta el último pago aprobado del usuario para saber su plan actual
+  // Consulta el plan actual del usuario combinando es_premium + último pago
+// Consulta el plan actual del usuario combinando es_premium + último pago
+Future<void> _cargarPlanActual() async {
+  final supabase = Supabase.instance.client;
+  final userId = supabase.auth.currentUser?.id;
+  if (userId == null) return;
+
+  try {
+    // 1. Verificar si el usuario es premium
+    final userData = await supabase
+        .from('usuarios')
+        .select('es_premium')
+        .eq('id', userId)
+        .maybeSingle();
+
+    final esPremium = userData?['es_premium'] == true;
+
+    if (!esPremium) {
+      // No es premium → plan básico
+      if (mounted) setState(() => _planActualId = 'basico');
+      return;
+    }
+
+    // 2. Sí es premium → buscar su último pago (aprobado o pendiente)
+    //    "pendiente" puede existir porque el checkout lo activa antes de la revisión manual
+    final data = await supabase
+        .from('pagos_premium')
+        .select('tipo_plan')
+        .eq('usuario_id', userId)
+        .inFilter('estado', ['aprobado', 'pendiente'])
+        .order('creado_en', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    if (data != null && mounted) {
+      final tipoPlan = data['tipo_plan'] as String?;
+      const map = {
+        'Básico': 'basico',
+        'Estudiante Pro': 'pro',
+        'Campus Legend': 'legend',
+      };
+      setState(() => _planActualId = map[tipoPlan] ?? 'basico');
+    } else if (mounted) {
+      // Es premium pero no encontramos pago → asumir básico o pro por defecto
+      setState(() => _planActualId = 'basico');
+    }
+  } catch (_) {
+    if (mounted) setState(() => _planActualId = 'basico');
+  }
+}
 
   @override
   void dispose() {
@@ -166,6 +222,7 @@ class _PremiumPlansPageState extends State<PremiumPlansPage>
                                         plan: p,
                                         esAnual: _esAnual,
                                         onSeleccionar: () => _irAlCheckout(p),
+                                        planActualId: _planActualId,
                                       ),
                                     ))
                                 .toList(),
@@ -184,6 +241,7 @@ class _PremiumPlansPageState extends State<PremiumPlansPage>
                                             plan: p,
                                             esAnual: _esAnual,
                                             onSeleccionar: () => _irAlCheckout(p),
+                                            planActualId: _planActualId,
                                           ),
                                         ),
                                       ))
@@ -380,11 +438,13 @@ class _PlanCard extends StatefulWidget {
   final PlanModel plan;
   final bool esAnual;
   final VoidCallback onSeleccionar;
+  final String? planActualId;
 
   const _PlanCard({
     required this.plan,
     required this.esAnual,
     required this.onSeleccionar,
+    this.planActualId,
   });
 
   @override
@@ -396,11 +456,20 @@ class _PlanCardState extends State<_PlanCard> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.plan.id == 'legend') {
+      return _LegendPlanCard(
+        plan: widget.plan,
+        esAnual: widget.esAnual,
+        onSeleccionar: widget.onSeleccionar,
+        planActualId: widget.planActualId,
+      );
+    }
+
     final precio = widget.esAnual
         ? widget.plan.precioAnual
         : widget.plan.precioMensual;
     final esPro = widget.plan.esMasPopular;
-    final esBasico = widget.plan.id == 'basico';
+    final esPlanActual = widget.plan.id == (widget.planActualId ?? 'basico');
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -416,18 +485,22 @@ class _PlanCardState extends State<_PlanCard> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: esPro
-                ? const Color(0xFFFF6100)
-                : _hovered
-                    ? const Color(0xFFFF6100).withOpacity(0.4)
-                    : widget.plan.borderColor,
-            width: esPro ? 2 : 1.5,
+            color: esPlanActual
+                ? const Color(0xFF22C55E)
+                : esPro
+                    ? const Color(0xFFFF6100)
+                    : _hovered
+                        ? const Color(0xFFFF6100).withOpacity(0.4)
+                        : widget.plan.borderColor,
+            width: esPro || esPlanActual ? 2 : 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: esPro
-                  ? const Color(0xFFFF6100).withOpacity(_hovered ? 0.18 : 0.10)
-                  : Colors.black.withOpacity(_hovered ? 0.10 : 0.05),
+              color: esPlanActual
+                  ? const Color(0xFF22C55E).withOpacity(_hovered ? 0.15 : 0.08)
+                  : esPro
+                      ? const Color(0xFFFF6100).withOpacity(_hovered ? 0.18 : 0.10)
+                      : Colors.black.withOpacity(_hovered ? 0.10 : 0.05),
               blurRadius: _hovered ? 24 : 12,
               offset: const Offset(0, 4),
             ),
@@ -442,8 +515,8 @@ class _PlanCardState extends State<_PlanCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Badge "Más popular"
-                if (esPro)
+                // Badge "Más popular" o "Tu plan"
+                if (esPro || esPlanActual)
                   Align(
                     alignment: Alignment.topCenter,
                     child: Transform.translate(
@@ -452,24 +525,39 @@ class _PlanCardState extends State<_PlanCard> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFF6100),
+                          color: esPlanActual
+                              ? const Color(0xFF22C55E)
+                              : const Color(0xFFFF6100),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(
-                          'MÁS POPULAR',
-                          style: GoogleFonts.lexend(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            letterSpacing: 0.8,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (esPlanActual) ...[
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: Colors.white,
+                                size: 13,
+                              ),
+                              const SizedBox(width: 5),
+                            ],
+                            Text(
+                              esPlanActual ? 'TU PLAN' : 'MÁS POPULAR',
+                              style: GoogleFonts.lexend(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
 
                 Padding(
-                  padding: EdgeInsets.fromLTRB(28, esPro ? 8 : 28, 28, 0),
+                  padding: EdgeInsets.fromLTRB(28, (esPro || esPlanActual) ? 8 : 28, 28, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -514,7 +602,7 @@ class _PlanCardState extends State<_PlanCard> {
                         ],
                       ),
 
-                      if (widget.esAnual && !esBasico) ...[
+                      if (widget.esAnual && !esPlanActual) ...[
                         const SizedBox(height: 4),
                         Text(
                           'Facturado anualmente',
@@ -573,17 +661,461 @@ class _PlanCardState extends State<_PlanCard> {
             Padding(
               padding: const EdgeInsets.fromLTRB(28, 28, 28, 28),
               child: _PlanButton(
-                texto: esBasico ? 'Plan actual' : 'Seleccionar Plan',
+                texto: esPlanActual ? 'Plan actual' : 'Seleccionar Plan',
                 backgroundColor: widget.plan.buttonColor,
                 textColor: widget.plan.buttonTextColor,
                 borderColor: widget.plan.buttonBorderColor,
-                esPrimario: esPro,
-                esDeshabilitado: esBasico,
+                esPrimario: esPro && !esPlanActual,
+                esDeshabilitado: esPlanActual,
                 onTap: widget.onSeleccionar,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// CAMPUS LEGEND — TARJETA PREMIUM CON ANIMACIONES
+// ═══════════════════════════════════════════════════════
+class _Particle {
+  double x, y, size, speed, opacity, angle;
+  _Particle({
+    required this.x,
+    required this.y,
+    required this.size,
+    required this.speed,
+    required this.opacity,
+    required this.angle,
+  });
+}
+
+class _LegendPlanCard extends StatefulWidget {
+  final PlanModel plan;
+  final bool esAnual;
+  final VoidCallback onSeleccionar;
+  final String? planActualId;
+
+  const _LegendPlanCard({
+    required this.plan,
+    required this.esAnual,
+    required this.onSeleccionar,
+    this.planActualId,
+  });
+
+  @override
+  State<_LegendPlanCard> createState() => _LegendPlanCardState();
+}
+
+class _LegendPlanCardState extends State<_LegendPlanCard>
+    with TickerProviderStateMixin {
+  bool _hovered = false;
+
+  late AnimationController _shimmerCtrl;
+  late AnimationController _particleCtrl;
+  late AnimationController _glowCtrl;
+  late AnimationController _borderCtrl;
+  late Animation<double> _shimmerAnim;
+  late Animation<double> _glowAnim;
+
+  final List<_Particle> _particles = [];
+  final math.Random _rng = math.Random(42);
+
+  static const _bgCard  = Color(0xFF181C24);
+  static const _gold1   = Color(0xFFFFD060);
+  static const _gold2   = Color(0xFFFF9500);
+  static const _gold3   = Color(0xFFFFC040);
+  static const _textPrim = Color(0xFFF5F0E8);
+  static const _textSec  = Color(0xFF9A8F7A);
+
+  @override
+  void initState() {
+    super.initState();
+    for (int i = 0; i < 18; i++) {
+      _particles.add(_Particle(
+        x:       _rng.nextDouble(),
+        y:       _rng.nextDouble(),
+        size:    1.2 + _rng.nextDouble() * 2.2,
+        speed:   0.15 + _rng.nextDouble() * 0.25,
+        opacity: 0.25 + _rng.nextDouble() * 0.55,
+        angle:   _rng.nextDouble() * math.pi * 2,
+      ));
+    }
+    _shimmerCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))..repeat();
+    _particleCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+    _glowCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
+    _borderCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000))..repeat();
+    _shimmerAnim = CurvedAnimation(parent: _shimmerCtrl, curve: Curves.easeInOut);
+    _glowAnim    = CurvedAnimation(parent: _glowCtrl,    curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _shimmerCtrl.dispose();
+    _particleCtrl.dispose();
+    _glowCtrl.dispose();
+    _borderCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final precio = widget.esAnual ? widget.plan.precioAnual : widget.plan.precioMensual;
+    final esPlanActual = widget.plan.id == (widget.planActualId ?? 'basico');
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        transform: Matrix4.translationValues(0, _hovered ? -6 : 0, 0),
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_shimmerAnim, _particleCtrl, _glowAnim, _borderCtrl]),
+          builder: (context, _) {
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Glow exterior
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _gold2.withOpacity((_hovered ? 0.38 : 0.18) + _glowAnim.value * (_hovered ? 0.18 : 0.08)),
+                          blurRadius: _hovered ? 40 : 22,
+                          spreadRadius: _hovered ? 3 : 0,
+                        ),
+                        BoxShadow(
+                          color: _gold1.withOpacity(0.07 + _glowAnim.value * 0.05),
+                          blurRadius: 60,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Tarjeta
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    decoration: BoxDecoration(color: _bgCard, borderRadius: BorderRadius.circular(18)),
+                    child: Stack(
+                      children: [
+                        // Fondo radial animado
+                        Positioned.fill(child: CustomPaint(painter: _LegendBgPainter(shimmer: _shimmerAnim.value, glow: _glowAnim.value))),
+                        // Partículas
+                        Positioned.fill(child: CustomPaint(painter: _ParticlePainter(particles: _particles, progress: _particleCtrl.value, goldColor: _gold1))),
+                        // Borde superior con shimmer
+                        Positioned(top: 0, left: 0, right: 0, height: 2,
+                          child: CustomPaint(painter: _ShimmerLinePainter(progress: _borderCtrl.value, color1: _gold1, color2: _gold2))),
+                        // Contenido
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Badge "TU PLAN"
+                                if (esPlanActual)
+                                  Align(
+                                    alignment: Alignment.topCenter,
+                                    child: Transform.translate(
+                                      offset: const Offset(0, -14),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(colors: [Color(0xFF22C55E), Color(0xFF16A34A)]),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 13),
+                                            const SizedBox(width: 5),
+                                            Text('TU PLAN', style: GoogleFonts.lexend(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.8)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                Padding(
+                                  padding: EdgeInsets.fromLTRB(28, esPlanActual ? 8 : 28, 28, 0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Label ÉLITE
+                                      Row(children: [
+                                        ShaderMask(
+                                          shaderCallback: (b) => const LinearGradient(colors: [_gold1, _gold2]).createShader(b),
+                                          child: const Icon(Icons.workspace_premium_rounded, color: Colors.white, size: 20),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        ShaderMask(
+                                          shaderCallback: (b) => const LinearGradient(colors: [_gold1, _gold2]).createShader(b),
+                                          child: Text('ÉLITE', style: GoogleFonts.lexend(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 2.5)),
+                                        ),
+                                      ]),
+                                      const SizedBox(height: 10),
+                                      // Nombre
+                                      Text(widget.plan.nombre, style: GoogleFonts.lexend(fontSize: 22, fontWeight: FontWeight.w800, color: _textPrim, height: 1.1)),
+                                      const SizedBox(height: 10),
+                                      // Precio con shimmer dorado
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          ShaderMask(
+                                            shaderCallback: (b) => LinearGradient(
+                                              colors: [_gold1, _gold2, _gold3],
+                                              stops: [
+                                                (_shimmerAnim.value - 0.3).clamp(0.0, 1.0),
+                                                _shimmerAnim.value.clamp(0.0, 1.0),
+                                                (_shimmerAnim.value + 0.3).clamp(0.0, 1.0),
+                                              ],
+                                            ).createShader(b),
+                                            child: Text(
+                                              '\$${precio == 0 ? '0' : precio.toStringAsFixed(2)}',
+                                              style: GoogleFonts.lexend(fontSize: 42, fontWeight: FontWeight.w900, color: Colors.white, height: 1),
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 6, left: 5),
+                                            child: Text('/mes', style: GoogleFonts.lexend(fontSize: 14, color: _textSec, fontWeight: FontWeight.w400)),
+                                          ),
+                                        ],
+                                      ),
+                                      if (widget.esAnual && !esPlanActual) ...[
+                                        const SizedBox(height: 4),
+                                        Text('Facturado anualmente', style: GoogleFonts.lexend(fontSize: 12, color: _textSec)),
+                                      ],
+                                      // Separador dorado
+                                      Container(
+                                        height: 1,
+                                        margin: const EdgeInsets.symmetric(vertical: 18),
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(colors: [_gold2.withOpacity(0), _gold2.withOpacity(0.5), _gold2.withOpacity(0)]),
+                                        ),
+                                      ),
+                                      // Features
+                                      ...widget.plan.features.map((f) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 13),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            ShaderMask(
+                                              shaderCallback: (b) => const LinearGradient(colors: [_gold1, _gold2]).createShader(b),
+                                              child: const Icon(Icons.check_circle_outline_rounded, size: 19, color: Colors.white),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(child: Text(f.texto, style: GoogleFonts.lexend(fontSize: 13.5, fontWeight: FontWeight.w400, color: _textPrim.withOpacity(0.88), height: 1.35))),
+                                          ],
+                                        ),
+                                      )),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            // Botón
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+                              child: esPlanActual
+                                  ? _LegendCurrentPlanButton()
+                                  : _LegendSelectButton(hovered: _hovered, onTap: widget.onSeleccionar, shimmer: _shimmerAnim.value),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _LegendBgPainter extends CustomPainter {
+  final double shimmer, glow;
+  _LegendBgPainter({required this.shimmer, required this.glow});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = Rect.fromLTWH(0, 0, size.width, size.height);
+    canvas.drawRect(r, Paint()..shader = RadialGradient(
+      center: const Alignment(0.7, -0.6), radius: 1.1,
+      colors: [const Color(0xFFFF9500).withOpacity(0.13 + glow * 0.07), const Color(0xFFFFD060).withOpacity(0.05 + glow * 0.03), Colors.transparent],
+    ).createShader(r));
+    canvas.drawRect(r, Paint()..shader = RadialGradient(
+      center: const Alignment(-0.8, 0.9), radius: 0.8,
+      colors: [const Color(0xFFFF6100).withOpacity(0.08 + glow * 0.04), Colors.transparent],
+    ).createShader(r));
+    final sx = -size.width * 0.4 + shimmer * size.width * 1.8;
+    canvas.drawRect(r, Paint()..shader = LinearGradient(
+      begin: Alignment.topLeft, end: Alignment.bottomRight,
+      colors: [Colors.transparent, const Color(0xFFFFD060).withOpacity(0.06), const Color(0xFFFFFFFF).withOpacity(0.04), const Color(0xFFFFD060).withOpacity(0.06), Colors.transparent],
+      stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
+    ).createShader(Rect.fromLTWH(sx, 0, size.width * 0.6, size.height)));
+  }
+
+  @override
+  bool shouldRepaint(_LegendBgPainter old) => old.shimmer != shimmer || old.glow != glow;
+}
+
+class _ParticlePainter extends CustomPainter {
+  final List<_Particle> particles;
+  final double progress;
+  final Color goldColor;
+  _ParticlePainter({required this.particles, required this.progress, required this.goldColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final dy = (p.y - progress * p.speed) % 1.0;
+      final dx = p.x + math.sin(progress * math.pi * 2 + p.angle) * 0.04;
+      final px = dx.clamp(0.0, 1.0) * size.width;
+      final py = (dy < 0 ? dy + 1.0 : dy) * size.height;
+      canvas.drawCircle(
+        Offset(px, py), p.size,
+        Paint()..color = goldColor.withOpacity(p.opacity * (0.4 + 0.6 * math.sin(progress * math.pi * 2 + p.angle).abs())),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ParticlePainter old) => old.progress != progress;
+}
+
+class _ShimmerLinePainter extends CustomPainter {
+  final double progress;
+  final Color color1, color2;
+  _ShimmerLinePainter({required this.progress, required this.color1, required this.color2});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = progress * (size.width + size.width * 0.6) - size.width * 0.3;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..shader = LinearGradient(
+        colors: [Colors.transparent, color2.withOpacity(0.4), color1, color2.withOpacity(0.4), Colors.transparent],
+        stops: const [0.0, 0.3, 0.5, 0.7, 1.0],
+      ).createShader(Rect.fromLTWH(cx - 80, 0, 160, size.height)));
+  }
+
+  @override
+  bool shouldRepaint(_ShimmerLinePainter old) => old.progress != progress;
+}
+
+class _LegendSelectButton extends StatefulWidget {
+  final bool hovered;
+  final VoidCallback onTap;
+  final double shimmer;
+  const _LegendSelectButton({required this.hovered, required this.onTap, required this.shimmer});
+
+  @override
+  State<_LegendSelectButton> createState() => _LegendSelectButtonState();
+}
+
+class _LegendSelectButtonState extends State<_LegendSelectButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) { setState(() => _pressed = false); widget.onTap(); },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          height: 50,
+          transform: Matrix4.translationValues(0, _pressed ? 1.5 : 0, 0),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: _pressed
+                  ? [const Color(0xFFCC7000), const Color(0xFFAA5500)]
+                  : widget.hovered
+                      ? [const Color(0xFFFFE080), const Color(0xFFFFB830)]
+                      : [const Color(0xFFFFD060), const Color(0xFFFF9500)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFFFF9500).withOpacity(widget.hovered ? 0.55 : 0.30), blurRadius: widget.hovered ? 22 : 12, offset: const Offset(0, 4)),
+              BoxShadow(color: const Color(0xFFFFD060).withOpacity(widget.hovered ? 0.25 : 0.10), blurRadius: widget.hovered ? 35 : 10, spreadRadius: widget.hovered ? 2 : 0),
+            ],
+          ),
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CustomPaint(
+                  painter: _BtnShimmerPainter(progress: widget.shimmer),
+                  child: Container(),
+                ),
+              ),
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.workspace_premium_rounded, color: Color(0xFF3D2000), size: 18),
+                    const SizedBox(width: 8),
+                    Text('Seleccionar Plan', style: GoogleFonts.lexend(fontSize: 15, fontWeight: FontWeight.w800, color: const Color(0xFF2D1800), letterSpacing: 0.3)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BtnShimmerPainter extends CustomPainter {
+  final double progress;
+  _BtnShimmerPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final x = -size.width * 0.5 + progress * size.width * 2;
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..shader = LinearGradient(
+        colors: [Colors.transparent, Colors.white.withOpacity(0.22), Colors.transparent],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromLTWH(x, 0, size.width * 0.5, size.height)));
+  }
+
+  @override
+  bool shouldRepaint(_BtnShimmerPainter old) => old.progress != progress;
+}
+
+class _LegendCurrentPlanButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF22C55E), width: 1.5),
+        color: const Color(0xFF22C55E).withOpacity(0.12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 18),
+          const SizedBox(width: 8),
+          Text('Plan actual', style: GoogleFonts.lexend(fontSize: 15, fontWeight: FontWeight.w700, color: const Color(0xFF4ADE80))),
+        ],
       ),
     );
   }
@@ -622,30 +1154,64 @@ class _PlanButtonState extends State<_PlanButton> {
   @override
   Widget build(BuildContext context) {
     final isActive = !widget.esDeshabilitado;
-    final bgColor = _pressed && isActive
+    final esPlanActual = widget.esDeshabilitado;
+
+    // Si es "Plan actual", usamos estilo propio independiente del plan
+    if (esPlanActual) {
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: double.infinity,
+        height: 48,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0FDF4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0xFF22C55E),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Color(0xFF22C55E),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Plan actual',
+              style: GoogleFonts.lexend(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF16A34A),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final bgColor = _pressed
         ? const Color(0xFFCC4D00)
-        : _hovered && isActive
+        : _hovered
             ? (widget.esPrimario
                 ? const Color(0xFFE55A00)
                 : const Color(0xFFFFF3EE))
             : widget.backgroundColor;
 
     return MouseRegion(
-      cursor: isActive
-          ? SystemMouseCursors.click
-          : SystemMouseCursors.forbidden,
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() {
         _hovered = false;
         _pressed = false;
       }),
       child: GestureDetector(
-        onTapDown: (_) => isActive ? setState(() => _pressed = true) : null,
+        onTapDown: (_) => setState(() => _pressed = true),
         onTapUp: (_) {
-          if (isActive) {
-            setState(() => _pressed = false);
-            widget.onTap();
-          }
+          setState(() => _pressed = false);
+          widget.onTap();
         },
         onTapCancel: () => setState(() => _pressed = false),
         child: AnimatedContainer(
@@ -658,7 +1224,7 @@ class _PlanButtonState extends State<_PlanButton> {
             border: widget.borderColor != null
                 ? Border.all(color: widget.borderColor!, width: 1.5)
                 : null,
-            boxShadow: widget.esPrimario && isActive
+            boxShadow: widget.esPrimario
                 ? [
                     BoxShadow(
                       color: const Color(0xFFFF6100)
