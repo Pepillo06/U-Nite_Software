@@ -120,6 +120,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final String bioAcademica = _perfilData!['biografia_academica'] ?? '';
     final bool esVendedor = _perfilData!['es_vendedor'] ?? false;
     final bool esEstudiante = _perfilData!['es_estudiante'] ?? false;
+    final bool esPremium = _perfilData!['es_premium'] == true;
     final String fechaRegistro = _perfilData!['fecha_registro'] ?? '';
 
 // Extraer lugares de entrega únicos de los anuncios activos
@@ -299,25 +300,99 @@ class _ProfilePageState extends State<ProfilePage> {
                                 left: isMobile ? 0 : 40,
                                 right: isMobile ? 0 : null,
                                 child: Center(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.08),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 4),
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      // Borde dorado premium (capa exterior)
+                                      if (esPremium)
+                                        Container(
+                                          width: (isMobile ? 60 : 90) * 2 + 8,
+                                          height: (isMobile ? 60 : 90) * 2 + 8,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            gradient: const LinearGradient(
+                                              colors: [
+                                                Color(0xFFFFDC18),
+                                                Color(0xFFFC7827),
+                                                Color(0xFFFFDC18),
+                                                Color(0xFFFCA027),
+                                              ],
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFFFFAA00).withOpacity(0.45),
+                                                blurRadius: 18,
+                                                spreadRadius: 1,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ],
-                                    ),
-                                    child: CircleAvatar(
-                                      radius: isMobile ? 60 : 90,
-                                      backgroundColor: Colors.grey[200],
-                                      backgroundImage: fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
-                                      child: fotoUrl.isEmpty
-                                          ? Icon(Icons.person, size: isMobile ? 60 : 80, color: Colors.grey[400])
-                                          : null,
-                                    ),
+                                      // Separador blanco entre borde dorado y foto
+                                      Container(
+                                        width: (isMobile ? 60 : 90) * 2 + (esPremium ? 4 : 0),
+                                        height: (isMobile ? 60 : 90) * 2 + (esPremium ? 4 : 0),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.white,
+                                          boxShadow: esPremium
+                                              ? []
+                                              : [
+                                                  BoxShadow(
+                                                    color: Colors.black.withOpacity(0.08),
+                                                    blurRadius: 12,
+                                                    offset: const Offset(0, 4),
+                                                  ),
+                                                ],
+                                        ),
+                                      ),
+                                      // Foto de perfil
+                                      Positioned(
+                                        top: esPremium ? 4 : 0,
+                                        left: esPremium ? 4 : 0,
+                                        child: CircleAvatar(
+                                          radius: isMobile ? 60 : 90,
+                                          backgroundColor: Colors.grey[200],
+                                          backgroundImage: fotoUrl.isNotEmpty ? NetworkImage(fotoUrl) : null,
+                                          child: fotoUrl.isEmpty
+                                              ? Icon(Icons.person, size: isMobile ? 60 : 80, color: Colors.grey[400])
+                                              : null,
+                                        ),
+                                      ),
+                                      // Badge diamante en esquina inferior derecha
+                                      if (esPremium)
+                                        Positioned(
+                                          bottom: 2,
+                                          right: 2,
+                                          child: Container(
+                                            width: isMobile ? 26 : 34,
+                                            height: isMobile ? 26 : 34,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              gradient: const LinearGradient(
+                                                colors: [Color(0xFFFC7827), Color(0xFFFFDC18)],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              border: Border.all(color: Colors.white, width: 2),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(0xFFFF6100).withOpacity(0.45),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Icon(
+                                              Icons.diamond_rounded,
+                                              size: isMobile ? 14 : 18,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   ),
                                 ),
                               ),
